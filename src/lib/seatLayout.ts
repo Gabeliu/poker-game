@@ -49,3 +49,15 @@ export function computeSeatPositions(others: PublicPlayer[]): SeatPosition[] {
   const positions = computeArcPositions(ordered.length);
   return ordered.map((player, i) => ({ player, isSelf: false, ...positions[i] }));
 }
+
+/** A stereo pan value (-1..1) for a player's seat, for positional sound —
+ * the viewer's own seat (bottom-center) is always dead center. */
+export function panForPlayer(players: PublicPlayer[], viewerId: string | null, playerId: string): number {
+  if (playerId === viewerId) return 0;
+  const others = players.filter((p) => p.id !== viewerId).sort((a, b) => a.seat - b.seat);
+  const idx = others.findIndex((p) => p.id === playerId);
+  if (idx === -1) return 0;
+  const positions = computeArcPositions(others.length);
+  const xPct = positions[idx]?.xPct ?? 50;
+  return Math.max(-1, Math.min(1, (xPct - 50) / 42));
+}

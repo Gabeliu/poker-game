@@ -18,6 +18,7 @@ import { HandHistoryPanel } from "@/components/poker/HandHistoryPanel";
 import { PlayerListPanel } from "@/components/poker/PlayerListPanel";
 import { ChatPanel } from "@/components/poker/ChatPanel";
 import { LoadingExperience } from "@/components/poker/LoadingExperience";
+import { useGameAudio } from "@/hooks/useGameAudio";
 
 export default function TablePage({ params }: { params: Promise<{ roomId: string }> }) {
   const { roomId } = use(params);
@@ -41,9 +42,14 @@ export default function TablePage({ params }: { params: Promise<{ roomId: string
     sendChat,
   } = useRoomStore.getState();
 
-  const [displayName, setDisplayName] = useState(() => getStoredDisplayName());
+  // Seeded empty (not read from localStorage) so the client's first render
+  // matches the server-rendered HTML exactly — localStorage isn't available
+  // during SSR, and reading it in a useState initializer here caused a
+  // hydration mismatch (and a visible flash) for returning players. The
+  // real stored values are applied client-side, after mount, below.
+  const [displayName, setDisplayName] = useState("");
   const [joining, setJoining] = useState(false);
-  const [reconnecting, setReconnecting] = useState(() => Boolean(getStoredToken(roomId)));
+  const [reconnecting, setReconnecting] = useState(false);
   const attemptedAutoJoin = useRef(false);
 
   useEffect(() => {
@@ -51,10 +57,16 @@ export default function TablePage({ params }: { params: Promise<{ roomId: string
   }, [initListeners]);
 
   useEffect(() => {
+    const stored = getStoredDisplayName();
+    if (stored) setTimeout(() => setDisplayName(stored), 0);
+  }, []);
+
+  useEffect(() => {
     if (attemptedAutoJoin.current) return;
     const hasToken = Boolean(getStoredToken(roomId));
     if (hasToken) {
       attemptedAutoJoin.current = true;
+      setTimeout(() => setReconnecting(true), 0);
       joinRoom(roomId, getStoredDisplayName() || "Player").finally(() => setReconnecting(false));
     }
   }, [roomId, joinRoom]);
@@ -68,6 +80,8 @@ export default function TablePage({ params }: { params: Promise<{ roomId: string
   }, [toasts, dismissToast]);
 
   const isJoined = room && room.id === roomId && room.you.playerId;
+
+  useGameAudio(isJoined ? room : null);
 
   const handleJoin = async () => {
     const name = displayName.trim();

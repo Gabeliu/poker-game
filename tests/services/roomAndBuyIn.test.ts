@@ -14,6 +14,10 @@ describe("room + buy-in lifecycle", () => {
     const { playerId: bobId } = joinRoom(room.id, "Bob");
     expect(room.players).toHaveLength(2);
 
+    expect(() => joinRoom(room.id, "bob")).toThrow(RoomServiceError);
+    expect(() => joinRoom(room.id, "  BOB  ")).toThrow(RoomServiceError);
+    expect(room.players).toHaveLength(2);
+
     requestBuyIn(room, bobId, 2500, "initial");
     expect(room.buyInRequests).toHaveLength(1);
     expect(room.buyInRequests[0].status).toBe("pending");

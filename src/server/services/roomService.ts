@@ -130,9 +130,15 @@ export function joinRoom(
     throw new RoomServiceError("This room isn't accepting new players while a hand is in progress.");
   }
 
+  const sanitizedName = sanitizeDisplayName(displayName);
+  const nameTaken = room.players.some((p) => p.displayName.toLowerCase() === sanitizedName.toLowerCase());
+  if (nameTaken) {
+    throw new RoomServiceError("That name is already taken at this table. Try a different one.");
+  }
+
   const playerId = generatePlayerId();
   const token = generatePlayerToken();
-  const player = makePlayer(playerId, sanitizeDisplayName(displayName), nextSeat(room), false);
+  const player = makePlayer(playerId, sanitizedName, nextSeat(room), false);
   room.players.push(player);
   roomStore.registerToken(room.id, token, playerId);
 

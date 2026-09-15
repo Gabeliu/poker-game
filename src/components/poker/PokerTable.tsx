@@ -171,7 +171,12 @@ export function PokerTable({ room, canHostRemove, onRemovePlayer }: PokerTablePr
       })}
 
       {me && (
-        <div className="absolute left-1/2 -bottom-6 flex -translate-x-1/2 flex-col items-center gap-1 sm:-bottom-8">
+        // Top-anchored (not bottom-anchored) so the gap below the table is
+        // always the fixed margin below, never `height - offset` creeping
+        // upward into the oval when the table itself shrinks at narrower
+        // viewports — bottom-anchoring let a tall, fixed-size hand overlap
+        // the community cards on a short table.
+        <div className="absolute left-1/2 top-full mt-1 flex -translate-x-1/2 flex-col items-center gap-1 sm:mt-2">
           <HoleCards cards={me.holeCards} folded={me.handStatus === "folded"} />
           {room.hand.result?.revealedHands[me.id]?.description && (
             <span className="text-xs font-medium text-[var(--accent-lime)]">

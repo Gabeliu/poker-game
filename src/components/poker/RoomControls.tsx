@@ -10,6 +10,7 @@ import { HostSettingsDialog } from "./HostSettingsDialog";
 import { LedgerPanel } from "./LedgerPanel";
 import { BuyInDialog } from "./BuyInDialog";
 import { PlayerAvatar } from "./PlayerAvatar";
+import { SoundControl } from "./SoundControl";
 
 interface RoomControlsProps {
   room: ClientRoomView;
@@ -77,6 +78,8 @@ export function RoomControls({
         {me && <LedgerPanel entries={room.ledger.filter((e) => e.playerId === me.id)} currentChips={me.chips} />}
 
         {isHost && <HostRequestsPanel requests={room.buyInRequests} onResolve={onResolveBuyIn} />}
+
+        <SoundControl />
 
         {isHost && (
           <HostSettingsDialog

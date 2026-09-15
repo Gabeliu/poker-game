@@ -31,7 +31,14 @@ export default function Home() {
   }, [initListeners]);
 
   const [createOpen, setCreateOpen] = useState(false);
-  const [name, setName] = useState(() => getStoredDisplayName());
+  // Seeded empty, not read from localStorage, so the client's first render
+  // can't diverge from the server-rendered HTML (see the table page for the
+  // hydration bug this pattern caused there). Hydrated client-side below.
+  const [name, setName] = useState("");
+  useEffect(() => {
+    const stored = getStoredDisplayName();
+    if (stored) setTimeout(() => setName(stored), 0);
+  }, []);
   const [roomName, setRoomName] = useState("Poker Night");
   const [smallBlind, setSmallBlind] = useState("25");
   const [bigBlind, setBigBlind] = useState("50");

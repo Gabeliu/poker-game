@@ -4,10 +4,21 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { formatChips } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import type { ActionRequest, ClientRoomView } from "@/lib/types";
+import type { ActionRequest, ClientRoomView, PokerAction } from "@/lib/types";
 import { getLegalActions } from "@/server/engine/betting";
+import { audioManager } from "@/audio/AudioManager";
+import type { SoundEventName } from "@/audio/types";
 import { BetControls } from "./BetControls";
 import { TurnTimer } from "./TurnTimer";
+
+const ACTION_SOUND: Record<PokerAction, SoundEventName> = {
+  fold: "fold",
+  check: "check",
+  call: "call",
+  bet: "bet",
+  raise: "raise",
+  "all-in": "all-in",
+};
 
 interface PokerActionsProps {
   room: ClientRoomView;
@@ -30,8 +41,18 @@ export function PokerActions({ room, onAction }: PokerActionsProps) {
     setPending(true);
     const res = await onAction(action);
     setPending(false);
-    if (!res.ok) toast.error(res.error);
-    else setRaising(false);
+    if (!res.ok) {
+      toast.error(res.error);
+      return;
+    }
+    setRaising(false);
+    // Fired here (the moment we know the server accepted it) rather than
+    // inferred from the next room broadcast — an action that completes a
+    // betting round advances the street in that same broadcast, so the
+    // intermediate "just checked/called" state a diff would need is never
+    // actually sent to the client. This is the one authoritative place that
+    // always knows exactly what the viewer just did.
+    audioManager.play(ACTION_SOUND[action.action]);
   };
 
   // Keyboard shortcuts: F(old), C(heck/all), R(aise) — only live on your turn,
