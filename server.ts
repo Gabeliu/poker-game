@@ -6,7 +6,10 @@ import { registerRoomHandlers } from "./src/server/socket/handlers";
 
 const dev = process.env.NODE_ENV !== "production";
 const port = Number(process.env.PORT) || 3000;
-const hostname = process.env.HOSTNAME || "localhost";
+// Bind all interfaces by default — required on most hosting platforms
+// (Render, Railway, Fly, etc.), which route external traffic to 0.0.0.0.
+// Only pin to localhost if explicitly asked to (e.g. local-only testing).
+const hostname = process.env.HOSTNAME || "0.0.0.0";
 
 const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
@@ -25,7 +28,7 @@ app.prepare().then(() => {
     registerRoomHandlers(io, socket);
   });
 
-  httpServer.listen(port, () => {
+  httpServer.listen(port, hostname, () => {
     console.log(`> Poker table ready on http://${hostname}:${port}`);
   });
 });
