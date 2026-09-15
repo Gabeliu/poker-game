@@ -38,7 +38,7 @@ export function PokerTable({ room, canHostRemove, onRemovePlayer }: PokerTablePr
   };
 
   return (
-    <div className="relative mx-auto aspect-[16/10] h-[min(56vh,500px)] w-auto max-w-full">
+    <div className="relative mx-auto aspect-[3/4] h-[min(68vh,600px,calc((100vw-2.5rem)*4/3))] w-auto max-w-full sm:aspect-[16/11] sm:h-[min(65vh,720px,calc((100vw-4rem)*11/16))]">
       <div className="table-dome-rim absolute inset-0 rounded-[46%] shadow-[0_24px_60px_rgba(0,0,0,0.6)]" />
       <div className="table-dome-surface absolute inset-[3%] rounded-[46%] shadow-[inset_0_0_50px_rgba(0,0,0,0.45)]">
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 pt-[16%]">

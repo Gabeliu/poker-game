@@ -17,12 +17,16 @@ const SUIT_COLOR: Record<Card["suit"], string> = {
   hearts: "text-suit-red",
 };
 
+// "lg" and "xl" shrink on narrow viewports — the community/hole cards would
+// otherwise keep a fixed pixel footprint while the table itself gets
+// narrower on mobile (it uses a taller, narrower aspect ratio there), which
+// was colliding with side-seated players' avatars at higher player counts.
 const SIZE_CLASSES = {
   xs: "w-[1.5rem] h-[2.25rem] text-[9px] rounded-[5px]",
   sm: "w-[2.25rem] h-[3.25rem] text-[11px] rounded-[7px]",
   md: "w-[3rem] h-[4.25rem] text-sm rounded-[9px]",
-  lg: "w-[4rem] h-[5.75rem] text-lg rounded-[11px]",
-  xl: "w-[6rem] h-[8.5rem] text-2xl rounded-[14px]",
+  lg: "w-[2.75rem] h-[4rem] text-sm rounded-[8px] sm:w-[4rem] sm:h-[5.75rem] sm:text-lg sm:rounded-[11px]",
+  xl: "w-[4.25rem] h-[6.25rem] text-lg rounded-[10px] sm:w-[6rem] sm:h-[8.5rem] sm:text-2xl sm:rounded-[14px]",
 } as const;
 
 interface PlayingCardProps {
