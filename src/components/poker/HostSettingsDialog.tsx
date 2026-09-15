@@ -1,0 +1,181 @@
+"use client";
+
+import { useState } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { formatChips } from "@/lib/format";
+import type { PublicPlayer, RoomSettings } from "@/lib/types";
+
+interface HostSettingsDialogProps {
+  settings: RoomSettings;
+  players: PublicPlayer[];
+  hostPlayerId: string;
+  onUpdateSettings: (settings: Partial<RoomSettings>) => void;
+  onRemovePlayer: (playerId: string) => void;
+  onTransferOwnership: (playerId: string) => void;
+  children: React.ReactNode;
+}
+
+export function HostSettingsDialog({
+  settings,
+  players,
+  hostPlayerId,
+  onUpdateSettings,
+  onRemovePlayer,
+  onTransferOwnership,
+  children,
+}: HostSettingsDialogProps) {
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState(settings);
+
+  const save = () => {
+    onUpdateSettings(form);
+    setOpen(false);
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        setOpen(v);
+        if (v) setForm(settings);
+      }}
+    >
+      <DialogTrigger asChild>{children}</DialogTrigger>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Room settings</DialogTitle>
+        </DialogHeader>
+        <Tabs defaultValue="settings">
+          <TabsList className="w-full">
+            <TabsTrigger value="settings" className="flex-1">
+              Table
+            </TabsTrigger>
+            <TabsTrigger value="players" className="flex-1">
+              Players
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="settings" className="flex flex-col gap-3 pt-2">
+            <div className="grid gap-1.5">
+              <Label>Room name</Label>
+              <Input value={form.roomName} onChange={(e) => setForm({ ...form, roomName: e.target.value })} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-1.5">
+                <Label>Small blind</Label>
+                <Input
+                  type="number"
+                  value={form.smallBlind}
+                  onChange={(e) => setForm({ ...form, smallBlind: Number(e.target.value) })}
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label>Big blind</Label>
+                <Input
+                  type="number"
+                  value={form.bigBlind}
+                  onChange={(e) => setForm({ ...form, bigBlind: Number(e.target.value) })}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-1.5">
+                <Label>Min buy-in</Label>
+                <Input
+                  type="number"
+                  placeholder="No minimum"
+                  value={form.minBuyIn ?? ""}
+                  onChange={(e) => setForm({ ...form, minBuyIn: e.target.value ? Number(e.target.value) : null })}
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label>Max buy-in</Label>
+                <Input
+                  type="number"
+                  placeholder="No maximum"
+                  value={form.maxBuyIn ?? ""}
+                  onChange={(e) => setForm({ ...form, maxBuyIn: e.target.value ? Number(e.target.value) : null })}
+                />
+              </div>
+            </div>
+            <div className="grid gap-1.5">
+              <Label>Turn time limit (seconds)</Label>
+              <Input
+                type="number"
+                value={form.turnTimeLimitSeconds}
+                onChange={(e) => setForm({ ...form, turnTimeLimitSeconds: Number(e.target.value) })}
+              />
+            </div>
+            <div className="flex items-center justify-between rounded-lg border border-white/10 px-3 py-2">
+              <Label htmlFor="allow-topups" className="text-sm font-normal">
+                Allow additional buy-ins
+              </Label>
+              <Switch
+                id="allow-topups"
+                checked={form.allowAdditionalBuyIns}
+                onCheckedChange={(v) => setForm({ ...form, allowAdditionalBuyIns: v })}
+              />
+            </div>
+            <div className="flex items-center justify-between rounded-lg border border-white/10 px-3 py-2">
+              <Label htmlFor="allow-join" className="text-sm font-normal">
+                Allow joining mid-hand
+              </Label>
+              <Switch
+                id="allow-join"
+                checked={form.allowJoinDuringHand}
+                onCheckedChange={(v) => setForm({ ...form, allowJoinDuringHand: v })}
+              />
+            </div>
+            <DialogFooter className="pt-2">
+              <Button onClick={save} className="w-full bg-[var(--gold)] text-black hover:bg-[var(--gold)]/90">
+                Save settings
+              </Button>
+            </DialogFooter>
+          </TabsContent>
+
+          <TabsContent value="players" className="pt-2">
+            <div className="flex flex-col gap-2 max-h-80 overflow-y-auto">
+              {players.map((p) => (
+                <div key={p.id} className="flex items-center justify-between rounded-lg border border-white/10 px-3 py-2">
+                  <div>
+                    <p className="text-sm font-medium">
+                      {p.displayName} {p.id === hostPlayerId && <span className="text-[var(--gold)]">(host)</span>}
+                    </p>
+                    <p className="text-xs text-muted-foreground tabular-nums">{formatChips(p.chips)} chips</p>
+                  </div>
+                  {p.id !== hostPlayerId && (
+                    <div className="flex gap-1.5">
+                      <Button size="sm" variant="outline" onClick={() => onTransferOwnership(p.id)}>
+                        Make host
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="border-destructive/40 text-destructive hover:bg-destructive/10"
+                        onClick={() => onRemovePlayer(p.id)}
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </TabsContent>
+        </Tabs>
+      </DialogContent>
+    </Dialog>
+  );
+}

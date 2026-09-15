@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# testing artifacts
+/test-results/
+/playwright-report/
+/e2e/screenshots/
+/blob-report/

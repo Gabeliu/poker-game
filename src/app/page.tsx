@@ -1,69 +1,199 @@
-import Image from "next/image";
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Spade, Link2, Users, Coins, PlayCircle } from "lucide-react";
+import { useRoomStore } from "@/hooks/useRoomStore";
+import { getStoredDisplayName, storeDisplayName } from "@/lib/socketClient";
 
 export default function Home() {
+  const router = useRouter();
+  const initListeners = useRoomStore((s) => s.initListeners);
+  const createRoom = useRoomStore((s) => s.createRoom);
+
+  useEffect(() => {
+    initListeners();
+  }, [initListeners]);
+
+  const [createOpen, setCreateOpen] = useState(false);
+  const [name, setName] = useState(() => getStoredDisplayName());
+  const [roomName, setRoomName] = useState("Poker Night");
+  const [smallBlind, setSmallBlind] = useState("25");
+  const [bigBlind, setBigBlind] = useState("50");
+  const [creating, setCreating] = useState(false);
+
+  const [joinCode, setJoinCode] = useState("");
+
+  const handleCreate = async () => {
+    if (!name.trim()) return;
+    setCreating(true);
+    storeDisplayName(name.trim());
+    const res = await createRoom(name.trim(), {
+      roomName: roomName.trim() || "Poker Night",
+      smallBlind: Number(smallBlind) || 25,
+      bigBlind: Number(bigBlind) || 50,
+    });
+    setCreating(false);
+    if (res.ok && res.roomId) {
+      router.push(`/table/${res.roomId}`);
+    } else {
+      toast.error(!res.ok ? res.error : "Couldn't create the room.");
+    }
+  };
+
+  const handleJoin = () => {
+    const code = joinCode.trim().toUpperCase();
+    if (!code) return;
+    router.push(`/table/${code}`);
+  };
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <main className="relative flex min-h-screen flex-col overflow-hidden bg-background">
+      {/* Ambient felt glow backdrop */}
+      <div
+        className="pointer-events-none absolute inset-0 opacity-60"
+        style={{
+          background:
+            "radial-gradient(60% 50% at 50% 0%, oklch(0.34 0.09 155 / 35%) 0%, transparent 70%)",
+        }}
+      />
+
+      <header className="relative z-10 flex items-center justify-between px-6 py-5 sm:px-10">
+        <div className="flex items-center gap-2">
+          <Spade className="h-6 w-6 text-[var(--gold)]" fill="currentColor" />
+          <span className="text-lg font-bold tracking-tight">Felt</span>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
+      </header>
+
+      <section className="relative z-10 flex flex-1 flex-col items-center justify-center px-4 pb-20 text-center">
+        <h1 className="max-w-2xl text-4xl font-bold leading-tight tracking-tight sm:text-5xl">
+          Play Texas Hold&rsquo;em with your friends,
+          <span className="text-[var(--gold)]"> anywhere.</span>
+        </h1>
+        <p className="mt-4 max-w-md text-balance text-muted-foreground">
+          Create a private table, share one link, and deal in. Virtual chips, real friends, no
+          app to install.
+        </p>
+
+        <div className="mt-8 flex w-full max-w-md flex-col gap-3 sm:flex-row">
+          <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+            <DialogTrigger asChild>
+              <Button
+                size="lg"
+                data-testid="create-table-trigger"
+                className="flex-1 bg-[var(--gold)] text-black hover:bg-[var(--gold)]/90 font-semibold shadow-lg"
+              >
+                Create Table
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-sm">
+              <DialogHeader>
+                <DialogTitle>Create a table</DialogTitle>
+              </DialogHeader>
+              <div className="flex flex-col gap-3 py-2">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="display-name">Your display name</Label>
+                  <Input
+                    id="display-name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="e.g. Gabriel"
+                    maxLength={24}
+                    autoFocus
+                  />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="room-name">Room name</Label>
+                  <Input
+                    id="room-name"
+                    value={roomName}
+                    onChange={(e) => setRoomName(e.target.value)}
+                    placeholder="Poker Night"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="sb">Small blind</Label>
+                    <Input id="sb" type="number" value={smallBlind} onChange={(e) => setSmallBlind(e.target.value)} />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="bb">Big blind</Label>
+                    <Input id="bb" type="number" value={bigBlind} onChange={(e) => setBigBlind(e.target.value)} />
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  You can fine-tune buy-in limits and more from the table once it&rsquo;s created.
+                </p>
+              </div>
+              <DialogFooter>
+                <Button
+                  className="w-full bg-[var(--gold)] text-black hover:bg-[var(--gold)]/90 font-semibold"
+                  disabled={!name.trim() || creating}
+                  data-testid="create-table-submit"
+                  onClick={handleCreate}
+                >
+                  {creating ? "Creating…" : "Create Table"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          <div className="flex flex-1 gap-2">
+            <Input
+              value={joinCode}
+              onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+              placeholder="Room code"
+              maxLength={8}
+              className="text-center font-mono tracking-widest"
+              onKeyDown={(e) => e.key === "Enter" && handleJoin()}
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+            <Button
+              size="lg"
+              variant="outline"
+              className="border-white/15"
+              data-testid="landing-join-submit"
+              onClick={handleJoin}
+              disabled={!joinCode.trim()}
+            >
+              Join
+            </Button>
+          </div>
         </div>
-      </main>
-    </div>
+
+        <ol className="mt-14 flex w-full max-w-3xl flex-col gap-4 text-left sm:flex-row sm:justify-between sm:text-center">
+          <Step icon={<PlayCircle className="h-5 w-5" />} step="1" label="Create a room" />
+          <Step icon={<Link2 className="h-5 w-5" />} step="2" label="Share the link" />
+          <Step icon={<Users className="h-5 w-5" />} step="3" label="Friends join" />
+          <Step icon={<Coins className="h-5 w-5" />} step="4" label="Host approves buy-in" />
+          <Step icon={<Spade className="h-5 w-5" />} step="5" label="Play poker" />
+        </ol>
+      </section>
+    </main>
+  );
+}
+
+function Step({ icon, step, label }: { icon: React.ReactNode; step: string; label: string }) {
+  return (
+    <li className="flex items-center gap-3 sm:flex-col sm:items-center sm:gap-2">
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--gold)]/30 bg-card text-[var(--gold)]">
+        {icon}
+      </span>
+      <span className="text-sm text-muted-foreground">
+        <span className="mr-1 font-semibold text-foreground">{step}.</span>
+        {label}
+      </span>
+    </li>
   );
 }
