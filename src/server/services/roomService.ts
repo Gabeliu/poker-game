@@ -150,7 +150,7 @@ export function assertHost(room: RoomState, playerId: string): void {
 }
 
 export function toPublicPlayer(player: Player, revealTo: "self" | "everyone" | "none"): PublicPlayer {
-  const shouldRevealCards = revealTo === "everyone" || player.holeCardsRevealed;
+  const shouldRevealCards = revealTo === "everyone" || revealTo === "self" || player.holeCardsRevealed;
   const { holeCards, ...rest } = player;
   return {
     ...rest,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createRoom, joinRoom, removePlayer, RoomServiceError } from "@/server/services/roomService";
+import { buildClientView, createRoom, joinRoom, removePlayer, RoomServiceError } from "@/server/services/roomService";
 import { requestBuyIn, resolveBuyInRequest } from "@/server/services/buyInService";
 import { startHand, submitAction } from "@/server/engine/handEngine";
 import { Deck } from "@/server/engine/deck";
@@ -112,5 +112,35 @@ describe("room + buy-in lifecycle", () => {
     removePlayer(room, hostId);
     expect(room.hostPlayerId).toBe(bobId);
     expect(room.players.find((p) => p.id === bobId)!.isHost).toBe(true);
+  });
+});
+
+describe("client view hole card visibility", () => {
+  it("shows a player their own hole cards, but hides other players' hole cards", () => {
+    const { room, playerId: hostId } = createRoom("Host", { smallBlind: 5, bigBlind: 10 });
+    const { playerId: guestId } = joinRoom(room.id, "Guest");
+    requestBuyIn(room, hostId, 1000, "initial");
+    resolveBuyInRequest(room, room.buyInRequests[0].id, true);
+    requestBuyIn(room, guestId, 1000, "initial");
+    resolveBuyInRequest(room, room.buyInRequests.find((r) => r.playerId === guestId)!.id, true);
+
+    startHand(room, new Deck());
+
+    const hostView = buildClientView(room, hostId);
+    const hostSelf = hostView.players.find((p) => p.id === hostId)!;
+    const hostOpponent = hostView.players.find((p) => p.id === guestId)!;
+
+    // The viewer sees their own two hole cards...
+    expect(hostSelf.holeCards).toHaveLength(2);
+    expect(hostView.you.holeCards).toHaveLength(2);
+    expect(hostSelf.holeCards).toEqual(hostView.you.holeCards);
+    // ...but not their opponent's.
+    expect(hostOpponent.holeCards).toHaveLength(0);
+    expect(hostOpponent.hasHoleCards).toBe(true); // still knows they were dealt in
+
+    // From the guest's perspective, it's reversed.
+    const guestView = buildClientView(room, guestId);
+    expect(guestView.players.find((p) => p.id === guestId)!.holeCards).toHaveLength(2);
+    expect(guestView.players.find((p) => p.id === hostId)!.holeCards).toHaveLength(0);
   });
 });
