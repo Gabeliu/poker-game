@@ -4,6 +4,8 @@ A polished, real-time multiplayer Texas Hold'em poker web app. Create a private 
 and play with friends using virtual chips. No accounts, no real money — just a shareable room code
 and a host who approves buy-ins.
 
+Repo: [github.com/Gabeliu/poker-game](https://github.com/Gabeliu/poker-game)
+
 ## Stack
 
 - **Next.js 16 (App Router) + TypeScript + Tailwind CSS + shadcn/ui**
@@ -28,6 +30,29 @@ npm test             # unit tests (vitest)
 npm run test:e2e      # end-to-end tests (playwright) — starts its own dev server
 npm run lint          # eslint
 ```
+
+## Deploying
+
+The app needs a host that runs a persistent Node process with WebSocket support (not a
+serverless/edge platform) — it's a stateful custom server, not a set of API routes. A
+[`render.yaml`](./render.yaml) blueprint is included for [Render](https://render.com):
+
+1. Sign up at [dashboard.render.com](https://dashboard.render.com) (free, no card required for
+   the free web-service tier).
+2. **New +** → **Blueprint** → connect this GitHub repo.
+3. Render detects `render.yaml` and pre-fills the build command, start command, and Node
+   version — click **Apply**.
+4. Once the build finishes you get a public URL (e.g. `https://felt-poker.onrender.com`) that
+   anyone can open to create or join a table.
+
+The same build/start commands work on Railway, Fly.io, or a plain VPS if you'd rather use one of
+those instead — the app just needs `npm install && npm run build` then `npm run start`, with a
+`PORT` env var set by the platform.
+
+Note: Render's free tier spins the service down after 15 minutes of no traffic (a ~30-60s cold
+start on the next visit), and since state is in-memory, any rooms in progress are lost if it spins
+down mid-session. The paid tier removes the spin-down; see
+[Known limitations](#known-limitations) for the in-memory tradeoff in general.
 
 ## Architecture
 
