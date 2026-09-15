@@ -6,6 +6,7 @@ import type {
   BuyInRequestType,
   ClientRoomView,
   RoomSettings,
+  SeatNumber,
 } from "@/lib/types";
 import { getSocket, getStoredToken, storeToken } from "@/lib/socketClient";
 
@@ -28,6 +29,7 @@ interface RoomStoreState {
   removePlayer: (playerId: string) => Promise<Ack>;
   transferOwnership: (playerId: string) => Promise<Ack>;
   sitOut: (sittingOut: boolean) => Promise<Ack>;
+  takeSeat: (seat: SeatNumber) => Promise<Ack>;
   submitAction: (action: ActionRequest) => Promise<Ack>;
   sendChat: (text: string) => Promise<Ack>;
   dismissToast: (id: number) => void;
@@ -106,6 +108,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
   removePlayer: (playerId) => emitWithAck("host:removePlayer", { roomId: get().room!.id, playerId }),
   transferOwnership: (playerId) => emitWithAck("host:transferOwnership", { roomId: get().room!.id, playerId }),
   sitOut: (sittingOut) => emitWithAck("player:sitOut", { roomId: get().room!.id, sittingOut }),
+  takeSeat: (seat) => emitWithAck("seat:take", { roomId: get().room!.id, seat }),
   submitAction: (action) => emitWithAck("action:submit", { roomId: get().room!.id, action }),
   sendChat: (text) => emitWithAck("chat:send", { roomId: get().room!.id, text }),
 

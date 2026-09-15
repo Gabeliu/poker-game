@@ -18,6 +18,17 @@ export async function joinRoom(page: Page, roomId: string, name: string): Promis
   // of the redesign — your identity is the big hole cards + stack panel
   // instead), so confirm the join by the room chrome being present instead.
   await expect(page.getByTestId("buyin-trigger")).toBeVisible({ timeout: 10_000 });
+  await sitDown(page);
+}
+
+/** Joining the room no longer seats you automatically — take the first open
+ * seat so callers that expect "joined == seated" (most of this suite) keep
+ * working. */
+export async function sitDown(page: Page): Promise<void> {
+  const openSeat = page.locator('[data-testid="empty-seat"][data-seat-action="sit"]').first();
+  await expect(openSeat).toBeVisible({ timeout: 10_000 });
+  await openSeat.click();
+  await expect(page.locator('[data-testid="empty-seat"][data-seat-action="sit"]')).toHaveCount(0);
 }
 
 export async function requestBuyIn(page: Page, amount: number): Promise<void> {

@@ -9,6 +9,7 @@ import {
   getRoomOrThrow,
   joinRoom,
   removePlayer,
+  takeSeat,
   transferOwnership,
   updateSettings,
 } from "@/server/services/roomService";
@@ -152,6 +153,20 @@ export function registerRoomHandlers(io: AppServer, socket: AppSocket): void {
       const playerId = requirePlayerId(socket);
       assertHost(room, playerId);
       transferOwnership(room, payload.playerId);
+      ack({ ok: true });
+      void broadcastRoomState(io, room.id);
+    } catch (err) {
+      ack({ ok: false, error: errorMessage(err) });
+    }
+  });
+
+  socket.on("seat:take", (payload, ack) => {
+    try {
+      const room = getRoomOrThrow(payload.roomId);
+      const playerId = requirePlayerId(socket);
+      takeSeat(room, playerId, payload.seat);
+      const player = room.players.find((p) => p.id === playerId);
+      if (player) postSystemMessage(room, `${player.displayName} took a seat`);
       ack({ ok: true });
       void broadcastRoomState(io, room.id);
     } catch (err) {

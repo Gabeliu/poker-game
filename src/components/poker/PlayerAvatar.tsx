@@ -30,6 +30,10 @@ const SIZE_CLASSES = {
   sm: "h-8 w-8 text-[11px]",
   md: "h-11 w-11 text-sm",
   lg: "h-14 w-14 text-base",
+  // For the fixed 8-seat ring: sized for the "table is full" worst case
+  // (positions don't move or grow as seats empty out), scaling only with
+  // viewport width, not with how many seats happen to be occupied.
+  table: "h-8 w-8 text-[11px] sm:h-10 sm:w-10 sm:text-xs md:h-11 md:w-11 md:text-sm",
 } as const;
 
 interface PlayerAvatarProps {

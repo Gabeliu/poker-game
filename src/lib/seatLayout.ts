@@ -1,63 +1,77 @@
-import type { PublicPlayer } from "./types";
+import type { PublicPlayer, SeatNumber } from "./types";
+import { ALL_SEATS, MAX_SEATS } from "./types";
 
 export interface ArcPosition {
   xPct: number;
   yPct: number;
 }
 
-export interface SeatPosition extends ArcPosition {
-  player: PublicPlayer;
-  isSelf: boolean;
-}
-
 /**
- * Pure positioning math: lays `count` slots along the top arc of the table
- * dome, evenly spaced. The viewer isn't seated on the ring at all — their
- * identity is the large hole cards at bottom-center plus the stack panel —
- * so the arc only ever needs to fit "everyone else" (real players and/or
- * empty-seat placeholders), and it widens as more slots are added instead
- * of wrapping fully around (which would put seats behind/below the
- * viewer's own cards).
+ * Fixed 8-seat table. The local player's own seat is never drawn as a ring
+ * seat — their identity is the large hole cards + stack panel at the
+ * bottom, exactly as before — so the table only ever needs 7 fixed ring
+ * positions for "everyone else." Server seat numbers are authoritative and
+ * never change; this module only maps them to *visual* positions so the
+ * viewer's own seat always reads as "the bottom."
+ *
+ * Positions are evenly spaced every 45° around the ellipse, starting just
+ * past the viewer's own spot (at 90°, skipped) and going all the way
+ * around back to it — offset 1 sits just anticlockwise of the viewer,
+ * offset 7 just clockwise, matching real turn-order adjacency.
  */
-export function computeArcPositions(count: number): ArcPosition[] {
-  if (count === 0) return [];
+const RING_RADIUS_X = 44;
+const RING_RADIUS_Y = 37;
 
-  // Arc widens as more slots are added, capped before it would wrap around
-  // into the viewer's own space at the bottom.
-  const arcSpan = Math.min(320, 130 + Math.max(0, count - 2) * 27);
-  const arcStart = 270 - arcSpan / 2;
-
-  // Radius grows a little as more slots are added, spreading seats over
-  // more of the available dome surface so adjacent seats don't crowd.
-  const radiusX = Math.min(47, 40 + count * 0.6);
-  const radiusY = Math.min(38, 28 + count * 0.8);
-
-  return Array.from({ length: count }, (_, i) => {
-    const angleDeg = count === 1 ? 270 : arcStart + ((i + 0.5) / count) * arcSpan;
-    const angleRad = (angleDeg * Math.PI) / 180;
-    return {
-      xPct: 50 + radiusX * Math.cos(angleRad),
-      yPct: 50 + radiusY * Math.sin(angleRad),
-    };
-  });
+function positionForAngleDeg(angleDeg: number): ArcPosition {
+  const rad = (angleDeg * Math.PI) / 180;
+  return {
+    xPct: 50 + RING_RADIUS_X * Math.cos(rad),
+    yPct: 50 + RING_RADIUS_Y * Math.sin(rad),
+  };
 }
 
-/** Lays out every player *other than the viewer*, sorted by seat. */
-export function computeSeatPositions(others: PublicPlayer[]): SeatPosition[] {
-  if (others.length === 0) return [];
-  const ordered = [...others].sort((a, b) => a.seat - b.seat);
-  const positions = computeArcPositions(ordered.length);
-  return ordered.map((player, i) => ({ player, isSelf: false, ...positions[i] }));
+/** Index 0 is the viewer's own spot (bottom-centre, 90°) — rendered as the
+ * hole-cards/stack panel rather than a ring seat once the viewer is seated,
+ * but still a real position: an unseated viewer has no anchor yet, so all 8
+ * seats (including whichever lands on offset 0) render as plain ring seats. */
+const RING_POSITIONS: ArcPosition[] = Array.from({ length: 8 }, (_, i) => positionForAngleDeg(90 + 45 * i));
+
+/** How many seats clockwise from the viewer's own seat, in server-seat
+ * terms (1-7 for every other seat; 0 would be the viewer's own). Falls
+ * back to treating seat 0 as the anchor when the viewer isn't seated yet,
+ * so the pre-seated lobby view still renders a stable, sensible layout. */
+export function seatOffsetFromViewer(seat: SeatNumber, mySeat: SeatNumber | null): number {
+  const anchor = mySeat ?? 0;
+  return ((seat - anchor + MAX_SEATS) % MAX_SEATS);
+}
+
+/** The visual ring position for a given server seat, relative to the viewer. */
+export function ringPositionForSeat(seat: SeatNumber, mySeat: SeatNumber | null): ArcPosition {
+  const offset = seatOffsetFromViewer(seat, mySeat);
+  return RING_POSITIONS[offset] ?? RING_POSITIONS[1];
+}
+
+/** The seats PokerTable should render as ring seats: all 8 if the viewer
+ * hasn't sat down yet (no anchor, so nothing is reserved for "you"), or the
+ * other 7 once they have (their own seat renders as the hole-cards panel
+ * instead), each paired with its visual ring position. */
+export function ringSeatPositions(mySeat: SeatNumber | null): { seat: SeatNumber; position: ArcPosition }[] {
+  return ALL_SEATS.filter((s) => s !== mySeat).map((seat) => ({ seat, position: ringPositionForSeat(seat, mySeat) }));
+}
+
+/** Looks up the occupying player for a seat, if any. */
+export function playerAtSeat(players: PublicPlayer[], seat: SeatNumber): PublicPlayer | null {
+  return players.find((p) => p.seat === seat) ?? null;
 }
 
 /** A stereo pan value (-1..1) for a player's seat, for positional sound —
  * the viewer's own seat (bottom-center) is always dead center. */
-export function panForPlayer(players: PublicPlayer[], viewerId: string | null, playerId: string): number {
-  if (playerId === viewerId) return 0;
-  const others = players.filter((p) => p.id !== viewerId).sort((a, b) => a.seat - b.seat);
-  const idx = others.findIndex((p) => p.id === playerId);
-  if (idx === -1) return 0;
-  const positions = computeArcPositions(others.length);
-  const xPct = positions[idx]?.xPct ?? 50;
-  return Math.max(-1, Math.min(1, (xPct - 50) / 42));
+export function panForPlayer(players: Pick<PublicPlayer, "id" | "seat">[], viewerId: string | null, playerId: string): number {
+  const player = players.find((p) => p.id === playerId);
+  if (!player || player.seat === null) return 0;
+  const viewer = players.find((p) => p.id === viewerId);
+  const mySeat = viewer?.seat ?? null;
+  if (player.seat === mySeat) return 0;
+  const { xPct } = ringPositionForSeat(player.seat, mySeat);
+  return Math.max(-1, Math.min(1, (xPct - 50) / 44));
 }

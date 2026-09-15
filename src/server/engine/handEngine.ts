@@ -123,7 +123,8 @@ export function submitAction(
     }
   }
 
-  advanceGameFlow(room, deck, player.seat);
+  // Only a seated player can ever be the active player, so this is always non-null.
+  advanceGameFlow(room, deck, player.seat!);
   return { ok: true };
 }
 

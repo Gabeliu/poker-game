@@ -7,6 +7,11 @@
 
 // ---------- Primitives ----------
 
+/** Fixed 8-seat table model — every room has exactly these seats, occupied or not. */
+export type SeatNumber = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
+export const MAX_SEATS = 8;
+export const ALL_SEATS: readonly SeatNumber[] = [0, 1, 2, 3, 4, 5, 6, 7];
+
 export type Suit = "clubs" | "diamonds" | "hearts" | "spades";
 export type Rank =
   | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "10"
@@ -36,8 +41,10 @@ export interface Player {
   connectionStatus: PlayerConnectionStatus;
   /** Approved chip stack, server authoritative. */
   chips: number;
-  /** Seat index around the table, stable once assigned. */
-  seat: number;
+  /** Seat around the table, stable once chosen. Null means the player has
+   * joined the room but hasn't sat down yet — they can still chat and
+   * request a buy-in, but aren't dealt into hands. */
+  seat: SeatNumber | null;
   /** True once the player has at least one approved buy-in and can be dealt in. */
   hasBoughtIn: boolean;
   /** Sitting out voluntarily (won't be dealt into next hand). */

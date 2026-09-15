@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { ClientRoomView } from "@/lib/types";
-import { computeArcPositions, type ArcPosition } from "@/lib/seatLayout";
+import type { ClientRoomView, SeatNumber } from "@/lib/types";
+import { playerAtSeat, ringPositionForSeat, ringSeatPositions, type ArcPosition } from "@/lib/seatLayout";
 import { copyInviteLink } from "@/lib/invite";
 import { usePlayerStatusLabels } from "@/hooks/usePlayerStatusLabels";
 import { PlayerSeat } from "./PlayerSeat";
@@ -18,8 +18,9 @@ import { Spade } from "lucide-react";
  * coordinate space as seat positions — used as the destination for bet
  * flights and the origin for payout flights. */
 const POT_POINT: ArcPosition = { xPct: 50, yPct: 40 };
-/** The viewer isn't seated on the ring (see seatLayout.ts) — their chip
- * flights originate/land at their hole-card position instead. */
+/** The viewer's own seat is never drawn as a ring seat — their identity is
+ * the large hole cards + stack panel below the table — so their chip
+ * flights originate/land at that panel's position instead. */
 const SELF_POINT: ArcPosition = { xPct: 50, yPct: 91 };
 
 interface Flight {
@@ -31,42 +32,31 @@ interface Flight {
 
 interface PokerTableProps {
   room: ClientRoomView;
-  canHostRemove: boolean;
+  isHost: boolean;
   onRemovePlayer: (playerId: string) => void;
+  onSit: (seat: SeatNumber) => void;
 }
 
-function densityFor(seatCount: number): "roomy" | "cozy" | "tight" {
-  if (seatCount <= 4) return "roomy";
-  if (seatCount <= 7) return "cozy";
-  return "tight";
-}
-
-/** How many empty invite-seats to show so the waiting room never looks like
- * a near-empty oval — padded up to this minimum, never removed once real
- * players exceed it. */
-const MIN_LOBBY_SEATS = 4;
-
-export function PokerTable({ room, canHostRemove, onRemovePlayer }: PokerTableProps) {
+export function PokerTable({ room, isHost, onRemovePlayer, onSit }: PokerTableProps) {
   const me = room.players.find((p) => p.id === room.you.playerId);
-  const others = [...room.players.filter((p) => p.id !== room.you.playerId)].sort((a, b) => a.seat - b.seat);
-  const isLobby = room.status === "lobby" && room.hand.phase === "waiting";
-  const emptySeatCount = isLobby ? Math.max(0, MIN_LOBBY_SEATS - room.players.length) : 0;
-  const totalSlots = others.length + emptySeatCount;
-  const positions = computeArcPositions(totalSlots);
+  const mySeat = me?.seat ?? null;
+  const canSit = Boolean(me) && mySeat === null;
   const handInProgress = room.hand.phase !== "waiting" && room.hand.phase !== "hand-complete";
-  const density = densityFor(totalSlots);
   const statusLabels = usePlayerStatusLabels(room.players, room.hand.lastAggressorId);
+  const ringSeats = ringSeatPositions(mySeat);
 
   const seatPointFor = (playerId: string): ArcPosition | null => {
     if (playerId === room.you.playerId) return SELF_POINT;
-    const idx = others.findIndex((p) => p.id === playerId);
-    return idx === -1 ? null : positions[idx];
+    const p = room.players.find((pl) => pl.id === playerId);
+    if (!p || p.seat === null) return null;
+    return ringPositionForSeat(p.seat, mySeat);
   };
 
   const [flights, setFlights] = useState<Flight[]>([]);
   const prevBetsRef = useRef<Record<string, number>>({});
   const prevHandNumberRef = useRef(room.hand.handNumber);
   const prevResultRef = useRef(room.hand.result);
+  const flightIdRef = useRef(0);
 
   const betSignature = room.players.map((p) => `${p.id}:${p.currentBet}`).join("|");
 
@@ -77,7 +67,8 @@ export function PokerTable({ room, canHostRemove, onRemovePlayer }: PokerTablePr
       if (p.currentBet > prev) {
         const from = seatPointFor(p.id);
         if (from) {
-          spawned.push({ id: `bet-${p.id}-${Date.now()}`, from, to: POT_POINT, amount: p.currentBet - prev });
+          flightIdRef.current += 1;
+          spawned.push({ id: `bet-${p.id}-${flightIdRef.current}`, from, to: POT_POINT, amount: p.currentBet - prev });
         }
       }
       prevBetsRef.current[p.id] = p.currentBet;
@@ -100,7 +91,9 @@ export function PokerTable({ room, canHostRemove, onRemovePlayer }: PokerTablePr
       const spawned: Flight[] = result.winners
         .map((w) => {
           const to = seatPointFor(w.playerId);
-          return to ? { id: `win-${w.playerId}-${w.potId}-${Date.now()}`, from: POT_POINT, to, amount: w.amount } : null;
+          if (!to) return null;
+          flightIdRef.current += 1;
+          return { id: `win-${w.playerId}-${w.potId}-${flightIdRef.current}`, from: POT_POINT, to, amount: w.amount };
         })
         .filter((f): f is Flight => f !== null);
       if (spawned.length > 0) {
@@ -128,9 +121,11 @@ export function PokerTable({ room, canHostRemove, onRemovePlayer }: PokerTablePr
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 pt-[16%]">
           <Pot pots={room.hand.pots} liveTotal={room.players.reduce((s, p) => s + p.totalCommittedThisHand, 0)} />
           <CommunityCards cards={room.hand.communityCards} />
-          {room.hand.phase === "waiting" && room.players.length < 2 && (
+          {room.hand.phase === "waiting" && (
             <p className="max-w-[55%] text-center text-xs text-[var(--text-secondary)]">
-              Waiting for players · Blinds {room.settings.smallBlind}/{room.settings.bigBlind}
+              {room.players.filter((p) => p.seat !== null).length < 2
+                ? `Waiting for players · Blinds ${room.settings.smallBlind}/${room.settings.bigBlind}`
+                : `Ready when you are · Blinds ${room.settings.smallBlind}/${room.settings.bigBlind}`}
             </p>
           )}
         </div>
@@ -148,43 +143,58 @@ export function PokerTable({ room, canHostRemove, onRemovePlayer }: PokerTablePr
         <Deck handNumber={room.hand.handNumber} className="absolute left-[61%] top-[7.5%] opacity-90" />
       </div>
 
-      {others.map((player, i) => (
-        <PlayerSeat
-          key={player.id}
-          seat={{ player, isSelf: false, ...positions[i] }}
-          badge={badgeFor(player.seat)}
-          isActiveTurn={player.id === room.hand.activePlayerId}
-          canHostRemove={canHostRemove}
-          turnDeadline={room.hand.turnDeadline}
-          turnTimeLimitSeconds={room.settings.turnTimeLimitSeconds}
-          statusLabel={statusLabels[player.id]?.label ?? null}
-          statusKey={statusLabels[player.id]?.key ?? 0}
-          density={density}
-          handDescription={room.hand.result?.revealedHands[player.id]?.description ?? null}
-          onRemove={() => onRemovePlayer(player.id)}
-        />
-      ))}
-
-      {Array.from({ length: emptySeatCount }, (_, i) => {
-        const pos = positions[others.length + i];
-        return <EmptySeat key={`empty-${i}`} xPct={pos.xPct} yPct={pos.yPct} onInvite={() => copyInviteLink(room.id)} />;
+      {ringSeats.map(({ seat, position }) => {
+        const player = playerAtSeat(room.players, seat);
+        if (player) {
+          return (
+            <PlayerSeat
+              key={seat}
+              player={player}
+              position={position}
+              badge={badgeFor(seat)}
+              isActiveTurn={player.id === room.hand.activePlayerId}
+              canHostRemove={isHost}
+              turnDeadline={room.hand.turnDeadline}
+              turnTimeLimitSeconds={room.settings.turnTimeLimitSeconds}
+              statusLabel={statusLabels[player.id]?.label ?? null}
+              statusKey={statusLabels[player.id]?.key ?? 0}
+              handDescription={room.hand.result?.revealedHands[player.id]?.description ?? null}
+              onRemove={() => onRemovePlayer(player.id)}
+            />
+          );
+        }
+        return (
+          <EmptySeat
+            key={seat}
+            position={position}
+            canSit={canSit}
+            onSit={() => onSit(seat)}
+            canInvite={isHost && !canSit}
+            onInvite={() => copyInviteLink(room.id)}
+          />
+        );
       })}
 
-      {me && (
-        // Top-anchored (not bottom-anchored) so the gap below the table is
-        // always the fixed margin below, never `height - offset` creeping
-        // upward into the oval when the table itself shrinks at narrower
-        // viewports — bottom-anchoring let a tall, fixed-size hand overlap
-        // the community cards on a short table.
-        <div className="absolute left-1/2 top-full mt-1 flex -translate-x-1/2 flex-col items-center gap-1 sm:mt-2">
-          <HoleCards cards={me.holeCards} folded={me.handStatus === "folded"} />
-          {room.hand.result?.revealedHands[me.id]?.description && (
-            <span className="text-xs font-medium text-[var(--accent-lime)]">
-              {room.hand.result.revealedHands[me.id].description}
-            </span>
-          )}
-        </div>
-      )}
+      {me &&
+        (mySeat !== null ? (
+          // Top-anchored (not bottom-anchored) so the gap below the table is
+          // always the fixed margin below, never `height - offset` creeping
+          // upward into the oval when the table itself shrinks at narrower
+          // viewports — bottom-anchoring let a tall, fixed-size hand overlap
+          // the community cards on a short table.
+          <div className="absolute left-1/2 top-full mt-1 flex -translate-x-1/2 flex-col items-center gap-1 sm:mt-2">
+            <HoleCards cards={me.holeCards} folded={me.handStatus === "folded"} />
+            {room.hand.result?.revealedHands[me.id]?.description && (
+              <span className="text-xs font-medium text-[var(--accent-lime)]">
+                {room.hand.result.revealedHands[me.id].description}
+              </span>
+            )}
+          </div>
+        ) : (
+          <div className="absolute left-1/2 top-full mt-2 -translate-x-1/2 whitespace-nowrap text-xs font-medium text-[var(--text-secondary)] sm:mt-3">
+            Pick an open seat to join the table
+          </div>
+        ))}
 
       {flights.map((f) => (
         <ChipFlight key={f.id} from={f.from} to={f.to} amount={f.amount} onDone={() => removeFlight(f.id)} />

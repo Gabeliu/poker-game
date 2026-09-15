@@ -1,7 +1,8 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import type { SeatPosition } from "@/lib/seatLayout";
+import type { ArcPosition } from "@/lib/seatLayout";
+import type { PublicPlayer } from "@/lib/types";
 import { PlayingCard } from "./PlayingCard";
 import { PlayerAvatar } from "./PlayerAvatar";
 import { ChipStack } from "./ChipStack";
@@ -12,7 +13,8 @@ import { Crown, WifiOff, X } from "lucide-react";
 type BadgeKind = "D" | "SB" | "BB" | null;
 
 interface PlayerSeatProps {
-  seat: SeatPosition;
+  player: PublicPlayer;
+  position: ArcPosition;
   badge: BadgeKind;
   isActiveTurn: boolean;
   canHostRemove: boolean;
@@ -21,20 +23,13 @@ interface PlayerSeatProps {
   turnTimeLimitSeconds: number;
   statusLabel: string | null;
   statusKey: string | number;
-  /** Shrinks avatar/text as more players join, per the density scale from PokerTable. */
-  density: "roomy" | "cozy" | "tight";
   /** Shown under their revealed cards at showdown, e.g. "Two Pair, Kings and Fives". */
   handDescription?: string | null;
 }
 
-const AVATAR_SIZE: Record<PlayerSeatProps["density"], "lg" | "md" | "sm" | "xs"> = {
-  roomy: "lg",
-  cozy: "sm",
-  tight: "xs",
-};
-
 export function PlayerSeat({
-  seat,
+  player,
+  position,
   badge,
   isActiveTurn,
   canHostRemove,
@@ -43,10 +38,8 @@ export function PlayerSeat({
   turnTimeLimitSeconds,
   statusLabel,
   statusKey,
-  density,
   handDescription,
 }: PlayerSeatProps) {
-  const { player } = seat;
   const folded = player.handStatus === "folded";
   const allIn = player.handStatus === "all-in";
   const sittingOut = player.sittingOut || player.handStatus === "sitting-out" || !player.hasBoughtIn;
@@ -61,18 +54,19 @@ export function PlayerSeat({
       data-player-chips={player.chips}
       data-player-status={player.handStatus}
       style={{
-        left: `${seat.xPct}%`,
-        top: `${seat.yPct}%`,
+        left: `${position.xPct}%`,
+        top: `${position.yPct}%`,
         transform: "translate(-50%, -50%)",
       }}
     >
       <div className={cn("relative flex flex-col items-center", folded && "animate-fold-away")}>
         <PlayerStatus label={statusLabel} statusKey={statusKey} />
 
-        {/* Small card backs (or revealed showdown cards) peeking behind the avatar — only at
-            the roomiest density; they're the first thing to go as the table fills up. */}
-        {(showCardBacks || showRevealedCards) && density === "roomy" && (
-          <div className="mb-1 flex gap-0.5">
+        {/* Small card backs (or revealed showdown cards) peeking behind the
+            avatar — hidden at the narrowest widths, where mobile prioritises
+            the viewer's own cards over opponents'. */}
+        {(showCardBacks || showRevealedCards) && (
+          <div className="mb-1 hidden gap-0.5 sm:flex">
             <PlayingCard
               card={showRevealedCards ? player.holeCards[0] : undefined}
               faceDown={!showRevealedCards}
@@ -89,8 +83,8 @@ export function PlayerSeat({
             />
           </div>
         )}
-        {showRevealedCards && density === "roomy" && handDescription && (
-          <span className="mb-1 max-w-[96px] truncate text-[10px] font-medium text-[var(--accent-lime)]">
+        {showRevealedCards && handDescription && (
+          <span className="mb-1 hidden max-w-[96px] truncate text-[10px] font-medium text-[var(--accent-lime)] sm:block">
             {handDescription}
           </span>
         )}
@@ -101,7 +95,7 @@ export function PlayerSeat({
               <TurnTimer key={turnDeadline ?? 0} durationSeconds={turnTimeLimitSeconds} variant="ring" />
             </div>
           )}
-          <PlayerAvatar name={player.displayName} size={AVATAR_SIZE[density]} dimmed={folded || sittingOut} />
+          <PlayerAvatar name={player.displayName} size="table" dimmed={folded || sittingOut} />
 
           {badge && (
             <span
@@ -130,12 +124,7 @@ export function PlayerSeat({
           )}
         </div>
 
-        <span
-          className={cn(
-            "max-w-[88px] truncate text-center font-medium text-[var(--text-primary)]",
-            density === "roomy" ? "mt-1 text-xs" : "text-[11px]"
-          )}
-        >
+        <span className="mt-1 max-w-[72px] truncate text-center text-[11px] font-medium text-[var(--text-primary)] sm:max-w-[88px] sm:text-xs">
           {player.displayName}
         </span>
 
@@ -150,11 +139,7 @@ export function PlayerSeat({
         )}
 
         {player.currentBet > 0 && (
-          <ChipStack
-            amount={player.currentBet}
-            variant="bet"
-            className={cn("animate-chip-pop", density === "roomy" ? "mt-1" : "mt-0.5")}
-          />
+          <ChipStack amount={player.currentBet} variant="bet" className="animate-chip-pop mt-0.5" />
         )}
       </div>
     </div>

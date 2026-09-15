@@ -1,28 +1,64 @@
 "use client";
 
+import { cn } from "@/lib/utils";
+import type { ArcPosition } from "@/lib/seatLayout";
+import { Plus } from "lucide-react";
+
 interface EmptySeatProps {
-  xPct: number;
-  yPct: number;
+  position: ArcPosition;
+  /** The viewer hasn't sat down yet — this seat is a real, clickable invitation to sit. */
+  canSit: boolean;
+  onSit: () => void;
+  /** The host, already seated elsewhere — a quieter "invite someone here" affordance. */
+  canInvite: boolean;
   onInvite: () => void;
 }
 
-/** An unoccupied seat during the waiting room — click to copy the invite link. */
-export function EmptySeat({ xPct, yPct, onInvite }: EmptySeatProps) {
+/** An unoccupied seat — subtle and recessive compared to an occupied one,
+ * but never fully invisible, so the table always reads as a real room with
+ * open chairs rather than an empty oval. */
+export function EmptySeat({ position, canSit, onSit, canInvite, onInvite }: EmptySeatProps) {
+  const interactive = canSit || canInvite;
+  const label = canSit ? "Sit Here" : canInvite ? "Invite" : null;
+
+  const content = (
+    <>
+      <span
+        className={cn(
+          "flex h-8 w-8 items-center justify-center rounded-full border border-dashed border-white/15 text-white/25 transition-colors sm:h-10 sm:w-10",
+          interactive && "group-hover:border-[var(--accent-lime)]/50 group-hover:text-[var(--accent-lime)]"
+        )}
+      >
+        <Plus className="h-3.5 w-3.5" />
+      </span>
+      {label && (
+        <span className="text-[10px] font-medium text-white/25 transition-colors group-hover:text-[var(--accent-lime)]">
+          {label}
+        </span>
+      )}
+    </>
+  );
+
+  const style = { left: `${position.xPct}%`, top: `${position.yPct}%`, transform: "translate(-50%, -50%)" } as const;
+
+  if (!interactive) {
+    return (
+      <div className="pointer-events-none absolute flex flex-col items-center gap-1 opacity-70" style={style} data-testid="empty-seat">
+        {content}
+      </div>
+    );
+  }
+
   return (
     <button
-      onClick={onInvite}
+      onClick={canSit ? onSit : onInvite}
       className="group absolute flex flex-col items-center gap-1"
-      style={{ left: `${xPct}%`, top: `${yPct}%`, transform: "translate(-50%, -50%)" }}
-      title="Copy invite link"
+      style={style}
+      title={canSit ? "Take this seat" : "Invite a player to this seat"}
+      data-testid="empty-seat"
+      data-seat-action={canSit ? "sit" : "invite"}
     >
-      <span className="flex h-11 w-11 items-center justify-center rounded-full border border-dashed border-white/20 text-white/30 transition-colors group-hover:border-[var(--accent-lime)]/50 group-hover:text-[var(--accent-lime)]">
-        <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4">
-          <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-        </svg>
-      </span>
-      <span className="text-[10px] font-medium text-white/25 transition-colors group-hover:text-[var(--accent-lime)]">
-        Invite
-      </span>
+      {content}
     </button>
   );
 }

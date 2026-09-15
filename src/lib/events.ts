@@ -8,7 +8,7 @@
  * broadcast to update the UI (server is the single source of truth).
  */
 
-import type { ActionRequest, BuyInRequestType, ClientRoomView, RoomSettings } from "./types";
+import type { ActionRequest, BuyInRequestType, ClientRoomView, RoomSettings, SeatNumber } from "./types";
 
 // ---- Client -> Server ----
 
@@ -50,6 +50,11 @@ export interface ClientToServerEvents {
 
   "host:transferOwnership": (
     payload: { roomId: string; playerId: string },
+    ack: (res: { ok: true } | { ok: false; error: string }) => void
+  ) => void;
+
+  "seat:take": (
+    payload: { roomId: string; seat: SeatNumber },
     ack: (res: { ok: true } | { ok: false; error: string }) => void
   ) => void;
 

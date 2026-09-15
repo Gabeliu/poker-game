@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import type { PublicPlayer } from "@/lib/types";
 
 export function PlayerListPanel({ players, meId }: { players: PublicPlayer[]; meId: string | null }) {
-  const sorted = [...players].sort((a, b) => a.seat - b.seat);
+  const sorted = [...players].sort((a, b) => (a.seat ?? 99) - (b.seat ?? 99));
 
   return (
     <div className="flex flex-col gap-2">

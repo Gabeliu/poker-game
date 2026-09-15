@@ -40,6 +40,7 @@ export default function TablePage({ params }: { params: Promise<{ roomId: string
     sitOut,
     submitAction,
     sendChat,
+    takeSeat,
   } = useRoomStore.getState();
 
   // Seeded empty (not read from localStorage) so the client's first render
@@ -155,6 +156,11 @@ export default function TablePage({ params }: { params: Promise<{ roomId: string
 
   const isHost = room.hostPlayerId === room.you.playerId;
 
+  const handleSit = async (seat: Parameters<typeof takeSeat>[0]) => {
+    const res = await takeSeat(seat);
+    if (!res.ok) toast.error(res.error);
+  };
+
   return (
     <main className="ambient-page-bg flex min-h-screen items-center justify-center p-2 sm:p-5">
       <div className="relative flex h-[calc(100vh-1rem)] w-full max-w-[1400px] flex-col overflow-hidden rounded-[28px] border border-white/8 bg-[var(--surface-app)] shadow-[0_40px_100px_rgba(0,0,0,0.6)] sm:h-[calc(100vh-2.5rem)] sm:rounded-[36px]">
@@ -179,7 +185,7 @@ export default function TablePage({ params }: { params: Promise<{ roomId: string
         >
           <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 px-3 py-2 [container-type:size] sm:px-6">
             <HostDisconnectedBanner room={room} />
-            <PokerTable room={room} canHostRemove={isHost} onRemovePlayer={removePlayer} />
+            <PokerTable room={room} isHost={isHost} onRemovePlayer={removePlayer} onSit={handleSit} />
           </div>
 
           <div className="px-3 pb-4 sm:px-6 sm:pb-6">

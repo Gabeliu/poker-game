@@ -1,4 +1,5 @@
-import type { ClientRoomView, Player, PublicPlayer, RoomSettings, RoomState } from "@/lib/types";
+import type { ClientRoomView, Player, PublicPlayer, RoomSettings, RoomState, SeatNumber } from "@/lib/types";
+import { MAX_SEATS } from "@/lib/types";
 import { advanceGameFlow, checkForImmediateHandEnd } from "@/server/engine/handEngine";
 import { roomStore } from "./roomStore";
 import { generatePlayerId, generatePlayerToken, generateRoomId } from "@/server/utils/ids";
@@ -41,11 +42,11 @@ function sanitizeDisplayName(name: string): string {
   return trimmed.length > 0 ? trimmed : "Player";
 }
 
-function nextSeat(room: RoomState): number {
-  return room.players.length === 0 ? 0 : Math.max(...room.players.map((p) => p.seat)) + 1;
+function occupiedSeatCount(room: RoomState): number {
+  return room.players.filter((p) => p.seat !== null).length;
 }
 
-function makePlayer(id: string, displayName: string, seat: number, isHost: boolean): Player {
+function makePlayer(id: string, displayName: string, seat: SeatNumber | null, isHost: boolean): Player {
   return {
     id,
     displayName,
@@ -130,6 +131,12 @@ export function joinRoom(
     throw new RoomServiceError("This room isn't accepting new players while a hand is in progress.");
   }
 
+  // No spectator mode: without an open seat there's nothing for a new
+  // arrival to do here, so the table itself is closed to them.
+  if (occupiedSeatCount(room) >= MAX_SEATS) {
+    throw new RoomServiceError("This table is full.");
+  }
+
   const sanitizedName = sanitizeDisplayName(displayName);
   const nameTaken = room.players.some((p) => p.displayName.toLowerCase() === sanitizedName.toLowerCase());
   if (nameTaken) {
@@ -138,11 +145,33 @@ export function joinRoom(
 
   const playerId = generatePlayerId();
   const token = generatePlayerToken();
-  const player = makePlayer(playerId, sanitizedName, nextSeat(room), false);
+  // Joining puts you in the room, not in a seat — sitting down is a
+  // separate, explicit, server-validated action (see takeSeat below).
+  const player = makePlayer(playerId, sanitizedName, null, false);
   room.players.push(player);
   roomStore.registerToken(room.id, token, playerId);
 
   return { room, playerId, playerToken: token, reconnected: false };
+}
+
+/** Seats a player at a specific, empty seat. Fully server-validated — the
+ * client only ever suggests a seat, never decides whether it's actually
+ * available. Synchronous, so there's no window for two requests to race
+ * each other onto the same seat. */
+export function takeSeat(room: RoomState, playerId: string, seat: SeatNumber): void {
+  if (!Number.isInteger(seat) || seat < 0 || seat >= MAX_SEATS) {
+    throw new RoomServiceError("That seat doesn't exist.");
+  }
+  const player = room.players.find((p) => p.id === playerId);
+  if (!player) throw new RoomServiceError("You're not in this room.");
+  if (player.seat !== null) {
+    throw new RoomServiceError("You're already seated.");
+  }
+  const taken = room.players.some((p) => p.seat === seat);
+  if (taken) {
+    throw new RoomServiceError("That seat is already taken.");
+  }
+  player.seat = seat;
 }
 
 export function getRoomOrThrow(roomId: string): RoomState {
@@ -215,7 +244,8 @@ export function removePlayer(room: RoomState, playerId: string): void {
       if (room.hand.activePlayerId === player.id) {
         player.handStatus = "folded";
         player.hasActedThisStreet = true;
-        advanceGameFlow(room, deck, player.seat);
+        // Only a seated player can ever be mid-hand-active, so this is always non-null.
+        advanceGameFlow(room, deck, player.seat!);
       } else {
         player.handStatus = "folded";
         checkForImmediateHandEnd(room);
@@ -227,7 +257,8 @@ export function removePlayer(room: RoomState, playerId: string): void {
   room.buyInRequests = room.buyInRequests.filter((r) => r.playerId !== playerId || r.status !== "pending");
 
   if (room.hostPlayerId === playerId && room.players.length > 0) {
-    const next = [...room.players].sort((a, b) => a.seat - b.seat)[0];
+    // Prefer handing off to a seated player (an unseated one sorts last via the fallback).
+    const next = [...room.players].sort((a, b) => (a.seat ?? MAX_SEATS) - (b.seat ?? MAX_SEATS))[0];
     transferOwnership(room, next.id);
   }
 }

@@ -1,23 +1,24 @@
-import type { Player } from "@/lib/types";
+import type { Player, SeatNumber } from "@/lib/types";
 
 // Generic over T so these work with both the server's full Player and the
 // client-facing PublicPlayer (which omits private fields like holeCards/
 // handHistory) — every field these helpers actually read exists on both.
 
-/** Players eligible to be dealt into a new hand: bought in, not sitting out, has chips. */
+/** Players eligible to be dealt into a new hand: bought in, not sitting out, has chips, seated. */
 export function getEligiblePlayers<T extends Pick<Player, "hasBoughtIn" | "sittingOut" | "chips" | "seat">>(
   players: T[]
-): T[] {
+): (T & { seat: SeatNumber })[] {
   return players
-    .filter((p) => p.hasBoughtIn && !p.sittingOut && p.chips > 0)
+    .filter((p): p is T & { seat: SeatNumber } => p.hasBoughtIn && !p.sittingOut && p.chips > 0 && p.seat !== null)
     .sort((a, b) => a.seat - b.seat);
 }
 
 /** Returns the next player, in ascending seat order (wrapping), from a candidate pool. */
 export function nextPlayerAfterSeat<T extends Pick<Player, "seat">>(pool: T[], fromSeat: number): T | null {
-  if (pool.length === 0) return null;
-  const sorted = [...pool].sort((a, b) => a.seat - b.seat);
-  const next = sorted.find((p) => p.seat > fromSeat);
+  const seated = pool.filter((p) => p.seat !== null);
+  if (seated.length === 0) return null;
+  const sorted = [...seated].sort((a, b) => a.seat! - b.seat!);
+  const next = sorted.find((p) => p.seat! > fromSeat);
   return next ?? sorted[0];
 }
 

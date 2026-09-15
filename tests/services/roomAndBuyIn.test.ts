@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildClientView, createRoom, joinRoom, removePlayer, RoomServiceError } from "@/server/services/roomService";
+import { buildClientView, createRoom, joinRoom, removePlayer, RoomServiceError, takeSeat } from "@/server/services/roomService";
 import { requestBuyIn, resolveBuyInRequest } from "@/server/services/buyInService";
 import { startHand, submitAction } from "@/server/engine/handEngine";
 import { Deck } from "@/server/engine/deck";
@@ -77,6 +77,7 @@ describe("room + buy-in lifecycle", () => {
   it("blocks removing an all-in player mid-hand but allows it once the hand ends", () => {
     const { room, playerId: hostId } = createRoom("Host", { smallBlind: 5, bigBlind: 10 });
     const { playerId: guestId } = joinRoom(room.id, "Guest");
+    takeSeat(room, guestId, 1);
     requestBuyIn(room, hostId, 100, "initial");
     resolveBuyInRequest(room, room.buyInRequests[0].id, true);
     requestBuyIn(room, guestId, 100, "initial");
@@ -119,10 +120,62 @@ describe("room + buy-in lifecycle", () => {
   });
 });
 
+describe("seat assignment", () => {
+  it("host is auto-seated at 0 on creation; joining players start unseated", () => {
+    const { room, playerId: hostId } = createRoom("Host", {});
+    expect(room.players.find((p) => p.id === hostId)!.seat).toBe(0);
+
+    const { playerId: bobId } = joinRoom(room.id, "Bob");
+    expect(room.players.find((p) => p.id === bobId)!.seat).toBeNull();
+  });
+
+  it("lets an unseated player take any open seat, server-validated", () => {
+    const { room } = createRoom("Host", {});
+    const { playerId: bobId } = joinRoom(room.id, "Bob");
+    takeSeat(room, bobId, 3);
+    expect(room.players.find((p) => p.id === bobId)!.seat).toBe(3);
+  });
+
+  it("rejects taking an already-occupied seat", () => {
+    const { room, playerId: hostId } = createRoom("Host", {});
+    const { playerId: bobId } = joinRoom(room.id, "Bob");
+    expect(() => takeSeat(room, bobId, 0)).toThrow(RoomServiceError); // host already has seat 0
+    expect(room.players.find((p) => p.id === hostId)!.seat).toBe(0);
+  });
+
+  it("rejects an invalid seat number", () => {
+    const { room } = createRoom("Host", {});
+    const { playerId: bobId } = joinRoom(room.id, "Bob");
+    // @ts-expect-error -- deliberately testing server-side rejection of an out-of-range seat
+    expect(() => takeSeat(room, bobId, 8)).toThrow(RoomServiceError);
+    // @ts-expect-error -- deliberately testing server-side rejection of a negative seat
+    expect(() => takeSeat(room, bobId, -1)).toThrow(RoomServiceError);
+  });
+
+  it("rejects a player taking a second seat", () => {
+    const { room } = createRoom("Host", {});
+    const { playerId: bobId } = joinRoom(room.id, "Bob");
+    takeSeat(room, bobId, 2);
+    expect(() => takeSeat(room, bobId, 3)).toThrow(RoomServiceError);
+    expect(room.players.find((p) => p.id === bobId)!.seat).toBe(2);
+  });
+
+  it("caps a table at 8 seated players and rejects joining once full", () => {
+    const { room } = createRoom("Host", {}); // seat 0 taken
+    for (let seat = 1; seat < 8; seat++) {
+      const { playerId } = joinRoom(room.id, `Player${seat}`);
+      takeSeat(room, playerId, seat as 1 | 2 | 3 | 4 | 5 | 6 | 7);
+    }
+    expect(room.players).toHaveLength(8);
+    expect(() => joinRoom(room.id, "OneTooMany")).toThrow(RoomServiceError);
+  });
+});
+
 describe("client view hole card visibility", () => {
   it("shows a player their own hole cards, but hides other players' hole cards", () => {
     const { room, playerId: hostId } = createRoom("Host", { smallBlind: 5, bigBlind: 10 });
     const { playerId: guestId } = joinRoom(room.id, "Guest");
+    takeSeat(room, guestId, 1);
     requestBuyIn(room, hostId, 1000, "initial");
     resolveBuyInRequest(room, room.buyInRequests[0].id, true);
     requestBuyIn(room, guestId, 1000, "initial");
@@ -153,6 +206,7 @@ describe("hand history", () => {
   it("records each player's own hand privately after it completes", () => {
     const { room, playerId: hostId } = createRoom("Host", { smallBlind: 5, bigBlind: 10 });
     const { playerId: guestId } = joinRoom(room.id, "Guest");
+    takeSeat(room, guestId, 1);
     requestBuyIn(room, hostId, 1000, "initial");
     resolveBuyInRequest(room, room.buyInRequests[0].id, true);
     requestBuyIn(room, guestId, 1000, "initial");
