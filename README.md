@@ -5,6 +5,8 @@ and play with friends using virtual chips. No accounts, no real money — just a
 and a host who approves buy-ins.
 
 Repo: [github.com/Gabeliu/poker-game](https://github.com/Gabeliu/poker-game)
+Live: [felt-poker-qxjk.onrender.com](https://felt-poker-qxjk.onrender.com) (Render free tier — see
+[Deploying](#deploying) for what that means for uptime and room persistence)
 
 ## Stack
 
@@ -30,6 +32,13 @@ npm test             # unit tests (vitest)
 npm run test:e2e      # end-to-end tests (playwright) — starts its own dev server
 npm run lint          # eslint
 ```
+
+**If you expose your local server publicly** (e.g. an ngrok/Cloudflare tunnel to show someone a
+build before deploying), run it via `npm run build && npm run start`, not `npm run dev`. Dev mode's
+hot-reload machinery expects to be reached at the same origin it was served from; behind a tunnel
+domain its WebSocket handshake fails, the client bundle never finishes hydrating, and every button
+silently does nothing (no console error beyond a failed HMR socket). The production build has none
+of that and is what you want exposed either way.
 
 ## Deploying
 
@@ -94,13 +103,19 @@ turn and they don't come back in time.
 - `tests/engine/*` — hand evaluator, side-pot math, and the full hand state machine (blinds,
   betting, all-ins, side pots, split pots, dealer rotation, busting) — 41 cases.
 - `tests/services/*` — room/buy-in lifecycle, reconnection, min/max buy-in limits, host removal
-  rules — 8 cases.
+  rules, and per-viewer hole-card visibility (a player sees their own cards, never an
+  opponent's) — 9 cases.
 - `e2e/poker.spec.ts` — real multi-browser-context Playwright flows: create → join → buy-in
   request/approve/reject/resubmit → play a full hand to showdown, reconnect-without-losing-seat,
   host remove/transfer, and a 7-player layout check (desktop + mobile viewports).
 
 ## Known limitations
 
-- Single-process, in-memory state — restarting the server clears all rooms.
+- **Every room and invite link dies on restart.** State lives only in the running process's
+  memory — no database. Redeploying (every `git push` to a connected host), the free-tier
+  spin-down, or just restarting the process locally all wipe every room that existed before it.
+  Any link copied before that moment will 404 with "Room not found" afterward; there's nothing
+  wrong with the link itself, the room it pointed to is just gone. Create a fresh room (and
+  re-share that new link) after any restart or deploy.
 - No persistent accounts; identity is a per-room browser token, not a login.
 - No chat.
