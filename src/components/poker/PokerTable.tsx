@@ -140,7 +140,7 @@ export function PokerTable({ room, isHost, onRemovePlayer, onSit }: PokerTablePr
           </span>
         </div>
 
-        <Deck handNumber={room.hand.handNumber} className="absolute left-[61%] top-[7.5%] opacity-90" />
+        <Deck handNumber={room.hand.handNumber} className="absolute left-[68%] top-[6%] opacity-90" />
       </div>
 
       {ringSeats.map(({ seat, position }) => {
