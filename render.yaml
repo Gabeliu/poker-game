@@ -8,7 +8,10 @@ services:
     startCommand: npm run start
     healthCheckPath: /
     envVars:
-      - key: NODE_ENV
-        value: production
+      # NOTE: do NOT set NODE_ENV=production here. Render applies env vars
+      # during the build step too, and npm treats NODE_ENV=production as a
+      # signal to skip devDependencies on install — which breaks the build,
+      # since Tailwind/TypeScript (needed to compile the app) live there.
+      # The start script sets NODE_ENV=production itself at runtime instead.
       - key: NODE_VERSION
         value: 22.11.0
