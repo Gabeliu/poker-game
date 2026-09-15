@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 
 interface TurnTimerProps {
   durationSeconds: number;
-  variant?: "ring" | "pill";
+  variant?: "ring" | "pill" | "bar";
   className?: string;
 }
 
@@ -38,6 +38,20 @@ export function TurnTimer({ durationSeconds, variant = "ring", className }: Turn
           background: `conic-gradient(${urgent ? "var(--danger)" : "var(--accent-lime)"} ${pct * 360}deg, transparent 0deg)`,
         }}
       />
+    );
+  }
+
+  if (variant === "bar") {
+    return (
+      <div className={cn("h-1.5 w-full overflow-hidden rounded-full bg-white/10", className)}>
+        <div
+          className={cn(
+            "h-full origin-left rounded-full transition-transform duration-1000 ease-linear",
+            urgent ? "bg-[var(--danger)]" : "bg-[var(--accent-lime)]"
+          )}
+          style={{ transform: `scaleX(${pct})` }}
+        />
+      </div>
     );
   }
 

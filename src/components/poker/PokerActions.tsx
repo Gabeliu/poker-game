@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import type { ActionRequest, ClientRoomView } from "@/lib/types";
 import { getLegalActions } from "@/server/engine/betting";
 import { BetControls } from "./BetControls";
+import { TurnTimer } from "./TurnTimer";
 
 interface PokerActionsProps {
   room: ClientRoomView;
@@ -58,74 +59,92 @@ export function PokerActions({ room, onAction }: PokerActionsProps) {
 
   if (!isMyTurn || !myPlayer || !info) return null;
 
+  // Own countdown, visible right above your controls on every screen size —
+  // not just the small ring on other players' avatars or the desktop-only
+  // "Your Turn!" pill.
+  const timerBar = (
+    <TurnTimer
+      key={room.hand.turnDeadline ?? 0}
+      durationSeconds={room.settings.turnTimeLimitSeconds}
+      variant="bar"
+      className="w-full max-w-xs"
+    />
+  );
+
   if (raising && canBetOrRaise) {
     return (
-      <BetControls
-        minAmount={info.minRaiseToAmount ?? room.settings.bigBlind}
-        maxAmount={info.maxRaiseToAmount ?? myPlayer.chips}
-        potTotal={potTotal}
-        actionLabel={raiseVerb}
-        onCancel={() => setRaising(false)}
-        onConfirm={(amount) => run({ action: raiseVerb === "Bet" ? "bet" : "raise", amount })}
-      />
+      <div className="flex w-full max-w-md flex-col items-center gap-1.5">
+        {timerBar}
+        <BetControls
+          minAmount={info.minRaiseToAmount ?? room.settings.bigBlind}
+          maxAmount={info.maxRaiseToAmount ?? myPlayer.chips}
+          potTotal={potTotal}
+          actionLabel={raiseVerb}
+          onCancel={() => setRaising(false)}
+          onConfirm={(amount) => run({ action: raiseVerb === "Bet" ? "bet" : "raise", amount })}
+        />
+      </div>
     );
   }
 
   return (
-    <div className="flex items-center gap-2 rounded-full border border-white/10 bg-black/45 px-2 py-2 shadow-[0_8px_24px_rgba(0,0,0,0.45)] backdrop-blur-xl sm:gap-3 sm:px-3">
-      <ActionButton
-        testId="action-fold"
-        label="Fold"
-        shortcut="F"
-        disabled={pending}
-        onClick={() => run({ action: "fold" })}
-        className="text-[var(--danger)] hover:bg-[var(--danger)]/10"
-      />
+    <div className="flex flex-col items-center gap-1.5">
+      {timerBar}
+      <div className="flex items-center gap-2 rounded-full border border-white/10 bg-black/45 px-2 py-2 shadow-[0_8px_24px_rgba(0,0,0,0.45)] backdrop-blur-xl sm:gap-3 sm:px-3">
+        <ActionButton
+          testId="action-fold"
+          label="Fold"
+          shortcut="F"
+          disabled={pending}
+          onClick={() => run({ action: "fold" })}
+          className="text-[var(--danger)] hover:bg-[var(--danger)]/10"
+        />
 
-      {info.legalActions.includes("check") && (
-        <ActionButton
-          testId="action-check"
-          label="Check"
-          shortcut="C"
-          disabled={pending}
-          onClick={() => run({ action: "check" })}
-          className="text-[var(--text-primary)] hover:bg-white/10"
-        />
-      )}
-      {info.legalActions.includes("call") && (
-        <ActionButton
-          testId="action-call"
-          label={`Call ${formatChips(info.callAmount)}`}
-          shortcut="C"
-          disabled={pending}
-          onClick={() => run({ action: "call" })}
-          className="text-[var(--text-primary)] hover:bg-white/10"
-        />
-      )}
-
-      {canBetOrRaise ? (
-        <ActionButton
-          testId="action-raise"
-          label={raiseVerb}
-          shortcut="R"
-          disabled={pending}
-          onClick={() => setRaising(true)}
-          className="bg-[var(--positive)] text-black hover:bg-[var(--positive)]/90"
-          solid
-        />
-      ) : (
-        info.legalActions.includes("all-in") && (
+        {info.legalActions.includes("check") && (
           <ActionButton
-            testId="action-allin"
-            label={`All In ${formatChips(myPlayer.chips)}`}
+            testId="action-check"
+            label="Check"
+            shortcut="C"
+            disabled={pending}
+            onClick={() => run({ action: "check" })}
+            className="text-[var(--text-primary)] hover:bg-white/10"
+          />
+        )}
+        {info.legalActions.includes("call") && (
+          <ActionButton
+            testId="action-call"
+            label={`Call ${formatChips(info.callAmount)}`}
+            shortcut="C"
+            disabled={pending}
+            onClick={() => run({ action: "call" })}
+            className="text-[var(--text-primary)] hover:bg-white/10"
+          />
+        )}
+
+        {canBetOrRaise ? (
+          <ActionButton
+            testId="action-raise"
+            label={raiseVerb}
             shortcut="R"
             disabled={pending}
-            onClick={() => run({ action: "all-in" })}
-            className="bg-[var(--danger)] text-white hover:bg-[var(--danger)]/90"
+            onClick={() => setRaising(true)}
+            className="bg-[var(--positive)] text-black hover:bg-[var(--positive)]/90"
             solid
           />
-        )
-      )}
+        ) : (
+          info.legalActions.includes("all-in") && (
+            <ActionButton
+              testId="action-allin"
+              label={`All In ${formatChips(myPlayer.chips)}`}
+              shortcut="R"
+              disabled={pending}
+              onClick={() => run({ action: "all-in" })}
+              className="bg-[var(--danger)] text-white hover:bg-[var(--danger)]/90"
+              solid
+            />
+          )
+        )}
+      </div>
     </div>
   );
 }

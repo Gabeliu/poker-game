@@ -23,6 +23,8 @@ interface PlayerSeatProps {
   statusKey: string | number;
   /** Shrinks avatar/text as more players join, per the density scale from PokerTable. */
   density: "roomy" | "cozy" | "tight";
+  /** Shown under their revealed cards at showdown, e.g. "Two Pair, Kings and Fives". */
+  handDescription?: string | null;
 }
 
 const AVATAR_SIZE: Record<PlayerSeatProps["density"], "lg" | "md" | "sm" | "xs"> = {
@@ -42,6 +44,7 @@ export function PlayerSeat({
   statusLabel,
   statusKey,
   density,
+  handDescription,
 }: PlayerSeatProps) {
   const { player } = seat;
   const folded = player.handStatus === "folded";
@@ -85,6 +88,11 @@ export function PlayerSeat({
               className="-ml-2"
             />
           </div>
+        )}
+        {showRevealedCards && density === "roomy" && handDescription && (
+          <span className="mb-1 max-w-[96px] truncate text-[10px] font-medium text-[var(--accent-lime)]">
+            {handDescription}
+          </span>
         )}
 
         <div className="relative">

@@ -64,13 +64,19 @@ export function PokerTable({ room, canHostRemove, onRemovePlayer }: PokerTablePr
           statusLabel={statusLabels[seat.player.id]?.label ?? null}
           statusKey={statusLabels[seat.player.id]?.key ?? 0}
           density={density}
+          handDescription={room.hand.result?.revealedHands[seat.player.id]?.description ?? null}
           onRemove={() => onRemovePlayer(seat.player.id)}
         />
       ))}
 
       {me && (
-        <div className="absolute left-1/2 -bottom-6 -translate-x-1/2 sm:-bottom-8">
+        <div className="absolute left-1/2 -bottom-6 flex -translate-x-1/2 flex-col items-center gap-1 sm:-bottom-8">
           <HoleCards cards={me.holeCards} folded={me.handStatus === "folded"} />
+          {room.hand.result?.revealedHands[me.id]?.description && (
+            <span className="text-xs font-medium text-[var(--accent-lime)]">
+              {room.hand.result.revealedHands[me.id].description}
+            </span>
+          )}
         </div>
       )}
     </div>

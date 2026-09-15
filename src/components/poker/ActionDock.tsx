@@ -49,7 +49,7 @@ export function ActionDock({ room, isHost, onAction, onStartHand, onSitOut }: Ac
               <p className="text-xs text-[var(--text-secondary)]">Need at least 2 players with approved chips.</p>
             )}
           </>
-        ) : me?.handStatus === "sitting-out" && me.hasBoughtIn ? (
+        ) : me?.sittingOut && me.hasBoughtIn ? (
           <div className="flex items-center gap-2">
             <p className="text-sm text-[var(--text-secondary)]">You&apos;re sitting out.</p>
             <Button size="sm" variant="outline" onClick={() => onSitOut(false)}>
@@ -114,26 +114,44 @@ function WaitingIndicator({
 }
 
 function ResultSummary({ room }: { room: ClientRoomView }) {
-  const winners = room.hand.result!.winners;
-  const byPlayer = new Map<string, number>();
-  for (const w of winners) byPlayer.set(w.playerId, (byPlayer.get(w.playerId) ?? 0) + w.amount);
-  const entries = [...byPlayer.entries()];
+  const result = room.hand.result!;
+  const winnersByPlayer = new Map<string, number>();
+  for (const w of result.winners) winnersByPlayer.set(w.playerId, (winnersByPlayer.get(w.playerId) ?? 0) + w.amount);
+
+  // At a real showdown, everyone who didn't fold shows their hand — not
+  // just whoever won. revealedHands covers exactly that group; an
+  // uncontested win (everyone else folded) has no revealedHands at all,
+  // so fall back to just the winner line in that case.
+  const revealed = Object.entries(result.revealedHands);
+  const playerIds = revealed.length > 0 ? revealed.map(([id]) => id) : [...winnersByPlayer.keys()];
 
   return (
     <div
       data-testid="hand-result-summary"
       className={cn(
-        "flex flex-col items-center gap-1 rounded-2xl border border-[var(--accent-lime)]/30 bg-black/55 px-5 py-3 text-center shadow-[0_12px_32px_rgba(0,0,0,0.5)] backdrop-blur-xl",
-        entries.length === 1 && "animate-winner-pulse"
+        "flex flex-col items-center gap-1.5 rounded-2xl border border-[var(--accent-lime)]/30 bg-black/55 px-5 py-3 text-center shadow-[0_12px_32px_rgba(0,0,0,0.5)] backdrop-blur-xl",
+        winnersByPlayer.size === 1 && "animate-winner-pulse"
       )}
     >
-      {entries.map(([playerId, amount]) => {
+      {playerIds.map((playerId) => {
         const player = room.players.find((p) => p.id === playerId);
-        const desc = winners.find((w) => w.playerId === playerId)?.handDescription;
+        const amountWon = winnersByPlayer.get(playerId);
+        const desc = amountWon
+          ? result.winners.find((w) => w.playerId === playerId)?.handDescription
+          : result.revealedHands[playerId]?.description;
+        const isWinner = Boolean(amountWon);
         return (
           <p key={playerId} className="text-sm">
-            <span className="font-semibold text-[var(--accent-lime)]">{player?.displayName ?? "Player"}</span>{" "}
-            wins <span className="font-semibold text-[var(--text-primary)]">{formatChips(amount)}</span>
+            <span className={cn("font-semibold", isWinner ? "text-[var(--accent-lime)]" : "text-[var(--text-primary)]")}>
+              {player?.displayName ?? "Player"}
+            </span>{" "}
+            {isWinner && amountWon !== undefined ? (
+              <>
+                wins <span className="font-semibold text-[var(--text-primary)]">{formatChips(amountWon)}</span>
+              </>
+            ) : (
+              <span className="text-[var(--text-secondary)]">didn&apos;t win this one</span>
+            )}
             {desc ? <span className="block text-xs text-[var(--text-secondary)]">{desc}</span> : null}
           </p>
         );
