@@ -8,8 +8,13 @@ const dev = process.env.NODE_ENV !== "production";
 const port = Number(process.env.PORT) || 3000;
 // Bind all interfaces by default — required on most hosting platforms
 // (Render, Railway, Fly, etc.), which route external traffic to 0.0.0.0.
-// Only pin to localhost if explicitly asked to (e.g. local-only testing).
-const hostname = process.env.HOSTNAME || "0.0.0.0";
+// IMPORTANT: do NOT read process.env.HOSTNAME here. Linux containers
+// (Render included) auto-populate HOSTNAME with the container's own
+// internal name (e.g. "srv-xxxx-hibernate-yyyy") — it has nothing to do
+// with which network interface to bind to, and binding to it makes the
+// server unreachable from the platform's proxy (502 Bad Gateway). Use a
+// distinct BIND_HOST var if you ever need to override the bind address.
+const hostname = process.env.BIND_HOST || "0.0.0.0";
 
 const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
