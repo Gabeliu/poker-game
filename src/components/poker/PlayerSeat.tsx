@@ -1,38 +1,58 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { formatChips } from "@/lib/format";
 import type { SeatPosition } from "@/lib/seatLayout";
 import { PlayingCard } from "./PlayingCard";
+import { PlayerAvatar } from "./PlayerAvatar";
+import { ChipStack } from "./ChipStack";
+import { PlayerStatus } from "./PlayerStatus";
+import { TurnTimer } from "./TurnTimer";
 import { Crown, WifiOff, X } from "lucide-react";
+
+type BadgeKind = "D" | "SB" | "BB" | null;
 
 interface PlayerSeatProps {
   seat: SeatPosition;
-  isDealer: boolean;
+  badge: BadgeKind;
   isActiveTurn: boolean;
   canHostRemove: boolean;
   onRemove?: () => void;
   turnDeadline?: number | null;
   turnTimeLimitSeconds: number;
+  statusLabel: string | null;
+  statusKey: string | number;
+  /** Shrinks avatar/text as more players join, per the density scale from PokerTable. */
+  density: "roomy" | "cozy" | "tight";
 }
+
+const AVATAR_SIZE: Record<PlayerSeatProps["density"], "lg" | "md" | "sm" | "xs"> = {
+  roomy: "lg",
+  cozy: "sm",
+  tight: "xs",
+};
 
 export function PlayerSeat({
   seat,
-  isDealer,
+  badge,
   isActiveTurn,
   canHostRemove,
   onRemove,
   turnDeadline,
   turnTimeLimitSeconds,
+  statusLabel,
+  statusKey,
+  density,
 }: PlayerSeatProps) {
-  const { player, isSelf } = seat;
+  const { player } = seat;
   const folded = player.handStatus === "folded";
   const allIn = player.handStatus === "all-in";
   const sittingOut = player.sittingOut || player.handStatus === "sitting-out" || !player.hasBoughtIn;
+  const showCardBacks = player.hasHoleCards && !player.holeCardsRevealed && !folded;
+  const showRevealedCards = player.hasHoleCards && player.holeCardsRevealed;
 
   return (
     <div
-      className="absolute flex flex-col items-center"
+      className="group absolute flex flex-col items-center"
       data-testid="player-seat"
       data-player-name={player.displayName}
       data-player-chips={player.chips}
@@ -43,103 +63,92 @@ export function PlayerSeat({
         transform: "translate(-50%, -50%)",
       }}
     >
-      {/* Hole cards */}
-      <div className="mb-1 flex gap-0.5">
-        {player.hasHoleCards ? (
-          Array.from({ length: 2 }).map((_, i) => (
-            <PlayingCard
-              key={i}
-              card={player.holeCards[i]}
-              faceDown={player.holeCards.length === 0}
-              size="sm"
-              dealDelayMs={i * 90}
-            />
-          ))
-        ) : (
-          <div className="h-10" />
-        )}
-      </div>
+      <div className={cn("relative flex flex-col items-center", folded && "animate-fold-away")}>
+        <PlayerStatus label={statusLabel} statusKey={statusKey} />
 
-      {/* Seat card */}
-      <div
-        className={cn(
-          "relative flex flex-col items-center gap-0.5 rounded-xl border px-3 py-1.5 min-w-[104px] backdrop-blur-sm transition-all",
-          "border-white/10 bg-card/90",
-          folded && "opacity-40 grayscale",
-          isActiveTurn && !folded && "animate-active-glow border-transparent"
-        )}
-      >
-        {isDealer && (
-          <div className="absolute -top-2 -right-2 h-5 w-5 rounded-full bg-[var(--gold)] text-[10px] font-bold text-black flex items-center justify-center shadow">
-            D
+        {/* Small card backs (or revealed showdown cards) peeking behind the avatar — only at
+            the roomiest density; they're the first thing to go as the table fills up. */}
+        {(showCardBacks || showRevealedCards) && density === "roomy" && (
+          <div className="mb-1 flex gap-0.5">
+            <PlayingCard
+              card={showRevealedCards ? player.holeCards[0] : undefined}
+              faceDown={!showRevealedCards}
+              size="xs"
+              rotationDeg={-8}
+              className="-mr-2"
+            />
+            <PlayingCard
+              card={showRevealedCards ? player.holeCards[1] : undefined}
+              faceDown={!showRevealedCards}
+              size="xs"
+              rotationDeg={8}
+              className="-ml-2"
+            />
           </div>
         )}
-        {player.isHost && (
-          <Crown className="absolute -top-2 -left-2 h-4 w-4 text-[var(--gold)] drop-shadow" fill="currentColor" />
-        )}
-        {player.connectionStatus === "disconnected" && (
-          <WifiOff className="absolute top-1 right-1 h-3 w-3 text-destructive" />
-        )}
-        {canHostRemove && !isSelf && (
-          <button
-            onClick={onRemove}
-            className="absolute -bottom-2 -right-2 h-5 w-5 rounded-full bg-destructive text-white flex items-center justify-center opacity-0 group-hover:opacity-100 hover:opacity-100 transition-opacity"
-            title="Remove player"
-          >
-            <X className="h-3 w-3" />
-          </button>
-        )}
 
-        <span className="text-xs font-medium truncate max-w-[110px]">
+        <div className="relative">
+          {isActiveTurn && !folded && (
+            <div className="absolute -inset-1.5 rounded-full">
+              <TurnTimer key={turnDeadline ?? 0} durationSeconds={turnTimeLimitSeconds} variant="ring" />
+            </div>
+          )}
+          <PlayerAvatar name={player.displayName} size={AVATAR_SIZE[density]} dimmed={folded || sittingOut} />
+
+          {badge && (
+            <span
+              className={cn(
+                "absolute -bottom-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-bold shadow",
+                badge === "D" ? "bg-[var(--accent-lime)] text-[var(--accent-lime-foreground)]" : "bg-white/20 text-white"
+              )}
+            >
+              {badge}
+            </span>
+          )}
+          {player.isHost && (
+            <Crown className="absolute -top-1.5 -left-1.5 h-3.5 w-3.5 text-[var(--accent-lime)] drop-shadow" fill="currentColor" />
+          )}
+          {player.connectionStatus === "disconnected" && (
+            <WifiOff className="absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full bg-black/70 p-0.5 text-[var(--danger)]" />
+          )}
+          {canHostRemove && (
+            <button
+              onClick={onRemove}
+              className="absolute -bottom-1 -left-1 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--danger)] text-white opacity-0 transition-opacity group-hover:opacity-100"
+              title="Remove player"
+            >
+              <X className="h-2.5 w-2.5" />
+            </button>
+          )}
+        </div>
+
+        <span
+          className={cn(
+            "max-w-[88px] truncate text-center font-medium text-[var(--text-primary)]",
+            density === "roomy" ? "mt-1 text-xs" : "text-[11px]"
+          )}
+        >
           {player.displayName}
-          {isSelf ? " (you)" : ""}
-        </span>
-        <span className="text-[13px] font-semibold text-[var(--gold)] tabular-nums">
-          {formatChips(player.chips)}
         </span>
 
-        {folded && (
-          <span className="absolute inset-0 flex items-center justify-center text-[11px] font-bold tracking-wider text-white/70">
-            FOLDED
+        {allIn ? (
+          <span className="text-[10px] font-bold uppercase tracking-wide text-[var(--danger)]">All-in</span>
+        ) : sittingOut ? (
+          <span className="text-[10px] text-[var(--text-secondary)]">
+            {!player.hasBoughtIn ? "No chips" : "Sitting out"}
           </span>
-        )}
-        {allIn && (
-          <span className="text-[10px] font-bold uppercase tracking-wide text-destructive">All-in</span>
-        )}
-        {sittingOut && !folded && (
-          <span className="text-[10px] font-medium text-muted-foreground">
-            {!player.hasBoughtIn ? "No chips yet" : "Sitting out"}
-          </span>
+        ) : (
+          <ChipStack amount={player.chips} variant="stack" />
         )}
 
-        {isActiveTurn && player.handStatus === "active" && (
-          <TurnTimerBar key={turnDeadline ?? 0} durationSeconds={turnTimeLimitSeconds} />
+        {player.currentBet > 0 && (
+          <ChipStack
+            amount={player.currentBet}
+            variant="bet"
+            className={cn("animate-chip-pop", density === "roomy" ? "mt-1" : "mt-0.5")}
+          />
         )}
       </div>
-
-      {/* Current bet chip */}
-      {player.currentBet > 0 && (
-        <div className="animate-chip-pop mt-1.5 flex items-center gap-1 rounded-full bg-black/60 border border-[var(--gold)]/40 px-2 py-0.5 text-[11px] font-semibold text-[var(--gold)] tabular-nums">
-          <span className="h-2.5 w-2.5 rounded-full bg-[var(--gold)]" />
-          {formatChips(player.currentBet)}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function TurnTimerBar({ durationSeconds }: { durationSeconds: number }) {
-  // Purely visual pacing cue — the server is the sole authority on timeouts
-  // and will auto-fold/check regardless of what this bar shows. The parent
-  // remounts this component (via a `key` on the turn's deadline) at the
-  // start of each turn, so it always animates one full duration from mount
-  // with no need to read the clock during render.
-  return (
-    <div className="mt-0.5 h-[3px] w-full overflow-hidden rounded-full bg-white/10">
-      <div
-        className="h-full origin-left bg-[var(--gold)] animate-[turn-timer_linear_forwards]"
-        style={{ animationDuration: `${durationSeconds}s` }}
-      />
     </div>
   );
 }

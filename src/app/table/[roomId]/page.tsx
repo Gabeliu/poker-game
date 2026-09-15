@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Spade } from "lucide-react";
 import { useRoomStore } from "@/hooks/useRoomStore";
 import { getStoredDisplayName, getStoredToken, storeDisplayName } from "@/lib/socketClient";
-import { TopBar } from "@/components/poker/TopBar";
+import { RoomControls } from "@/components/poker/RoomControls";
 import { PokerTable } from "@/components/poker/PokerTable";
 import { ActionDock } from "@/components/poker/ActionDock";
 
@@ -75,20 +75,21 @@ export default function TablePage({ params }: { params: Promise<{ roomId: string
 
   if (!isJoined) {
     return (
-      <main className="flex min-h-screen flex-col items-center justify-center gap-6 bg-background px-4">
+      <main className="ambient-page-bg flex min-h-screen flex-col items-center justify-center gap-6 px-4">
         <div className="flex items-center gap-2">
-          <Spade className="h-7 w-7 text-[var(--gold)]" fill="currentColor" />
-          <span className="text-xl font-bold">Felt</span>
+          <Spade className="h-7 w-7 text-[var(--accent-lime)]" fill="currentColor" />
+          <span className="text-xl font-bold text-[var(--text-primary)]">Felt</span>
         </div>
 
-        <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-card/80 p-6 shadow-xl">
-          <h1 className="mb-1 text-center text-lg font-semibold">Join table</h1>
-          <p className="mb-4 text-center text-sm text-muted-foreground">
-            Room code <span className="font-mono font-semibold text-[var(--gold)]">{roomId.toUpperCase()}</span>
+        <div className="w-full max-w-sm rounded-3xl border border-white/10 bg-[var(--surface-app)] p-6 shadow-2xl">
+          <h1 className="mb-1 text-center text-lg font-semibold text-[var(--text-primary)]">Join table</h1>
+          <p className="mb-4 text-center text-sm text-[var(--text-secondary)]">
+            Room code{" "}
+            <span className="font-mono font-semibold text-[var(--accent-lime)]">{roomId.toUpperCase()}</span>
           </p>
 
           {joinError && (
-            <p className="mb-3 rounded-md bg-destructive/10 px-3 py-2 text-center text-sm text-destructive">
+            <p className="mb-3 rounded-md bg-[var(--danger)]/10 px-3 py-2 text-center text-sm text-[var(--danger)]">
               {joinError}
             </p>
           )}
@@ -107,7 +108,7 @@ export default function TablePage({ params }: { params: Promise<{ roomId: string
           </div>
 
           <Button
-            className="w-full bg-[var(--gold)] text-black hover:bg-[var(--gold)]/90 font-semibold"
+            className="w-full bg-[var(--accent-lime)] text-[var(--accent-lime-foreground)] hover:bg-[var(--accent-lime)]/90 font-semibold"
             disabled={!displayName.trim() || joining || !connected}
             data-testid="table-join-submit"
             onClick={handleJoin}
@@ -116,7 +117,7 @@ export default function TablePage({ params }: { params: Promise<{ roomId: string
           </Button>
 
           <button
-            className="mt-3 w-full text-center text-xs text-muted-foreground hover:text-foreground"
+            className="mt-3 w-full text-center text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
             onClick={() => router.push("/")}
           >
             Back to home
@@ -129,20 +130,23 @@ export default function TablePage({ params }: { params: Promise<{ roomId: string
   const isHost = room.hostPlayerId === room.you.playerId;
 
   return (
-    <main className="flex min-h-screen flex-col bg-background">
-      <TopBar
-        room={room}
-        isHost={isHost}
-        onResolveBuyIn={resolveBuyIn}
-        onUpdateSettings={updateSettings}
-        onRemovePlayer={removePlayer}
-        onTransferOwnership={transferOwnership}
-        onRequestBuyIn={requestBuyIn}
-      />
+    <main className="ambient-page-bg flex min-h-screen items-center justify-center p-2 sm:p-5">
+      <div className="relative flex h-[calc(100vh-1rem)] w-full max-w-[1400px] flex-col overflow-hidden rounded-[28px] border border-white/8 bg-[var(--surface-app)] shadow-[0_40px_100px_rgba(0,0,0,0.6)] sm:h-[calc(100vh-2.5rem)] sm:rounded-[36px]">
+        <RoomControls
+          room={room}
+          isHost={isHost}
+          onResolveBuyIn={resolveBuyIn}
+          onUpdateSettings={updateSettings}
+          onRemovePlayer={removePlayer}
+          onTransferOwnership={transferOwnership}
+          onRequestBuyIn={requestBuyIn}
+        />
 
-      <div className="flex flex-1 flex-col items-center justify-center gap-4 px-4 py-4 min-h-0">
-        <PokerTable room={room} canHostRemove={isHost} onRemovePlayer={removePlayer} />
-        <div className="w-full">
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 px-3 py-2 sm:px-6">
+          <PokerTable room={room} canHostRemove={isHost} onRemovePlayer={removePlayer} />
+        </div>
+
+        <div className="px-3 pb-4 sm:px-6 sm:pb-6">
           <ActionDock room={room} isHost={isHost} onAction={submitAction} onStartHand={startHand} onSitOut={sitOut} />
         </div>
       </div>

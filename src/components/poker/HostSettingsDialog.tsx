@@ -139,7 +139,7 @@ export function HostSettingsDialog({
               />
             </div>
             <DialogFooter className="pt-2">
-              <Button onClick={save} className="w-full bg-[var(--gold)] text-black hover:bg-[var(--gold)]/90">
+              <Button onClick={save} className="w-full bg-[var(--accent-lime)] text-[var(--accent-lime-foreground)] hover:bg-[var(--accent-lime)]/90">
                 Save settings
               </Button>
             </DialogFooter>
@@ -151,7 +151,7 @@ export function HostSettingsDialog({
                 <div key={p.id} className="flex items-center justify-between rounded-lg border border-white/10 px-3 py-2">
                   <div>
                     <p className="text-sm font-medium">
-                      {p.displayName} {p.id === hostPlayerId && <span className="text-[var(--gold)]">(host)</span>}
+                      {p.displayName} {p.id === hostPlayerId && <span className="text-[var(--accent-lime)]">(host)</span>}
                     </p>
                     <p className="text-xs text-muted-foreground tabular-nums">{formatChips(p.chips)} chips</p>
                   </div>

@@ -60,19 +60,11 @@ export default function Home() {
   };
 
   return (
-    <main className="relative flex min-h-screen flex-col overflow-hidden bg-background">
-      {/* Ambient felt glow backdrop */}
-      <div
-        className="pointer-events-none absolute inset-0 opacity-60"
-        style={{
-          background:
-            "radial-gradient(60% 50% at 50% 0%, oklch(0.34 0.09 155 / 35%) 0%, transparent 70%)",
-        }}
-      />
+    <main className="ambient-page-bg relative flex min-h-screen flex-col overflow-hidden">
 
       <header className="relative z-10 flex items-center justify-between px-6 py-5 sm:px-10">
         <div className="flex items-center gap-2">
-          <Spade className="h-6 w-6 text-[var(--gold)]" fill="currentColor" />
+          <Spade className="h-6 w-6 text-[var(--accent-lime)]" fill="currentColor" />
           <span className="text-lg font-bold tracking-tight">Felt</span>
         </div>
       </header>
@@ -80,7 +72,7 @@ export default function Home() {
       <section className="relative z-10 flex flex-1 flex-col items-center justify-center px-4 pb-20 text-center">
         <h1 className="max-w-2xl text-4xl font-bold leading-tight tracking-tight sm:text-5xl">
           Play Texas Hold&rsquo;em with your friends,
-          <span className="text-[var(--gold)]"> anywhere.</span>
+          <span className="text-[var(--accent-lime)]"> anywhere.</span>
         </h1>
         <p className="mt-4 max-w-md text-balance text-muted-foreground">
           Create a private table, share one link, and deal in. Virtual chips, real friends, no
@@ -93,7 +85,7 @@ export default function Home() {
               <Button
                 size="lg"
                 data-testid="create-table-trigger"
-                className="flex-1 bg-[var(--gold)] text-black hover:bg-[var(--gold)]/90 font-semibold shadow-lg"
+                className="flex-1 bg-[var(--accent-lime)] text-[var(--accent-lime-foreground)] hover:bg-[var(--accent-lime)]/90 font-semibold shadow-lg"
               >
                 Create Table
               </Button>
@@ -139,7 +131,7 @@ export default function Home() {
               </div>
               <DialogFooter>
                 <Button
-                  className="w-full bg-[var(--gold)] text-black hover:bg-[var(--gold)]/90 font-semibold"
+                  className="w-full bg-[var(--accent-lime)] text-[var(--accent-lime-foreground)] hover:bg-[var(--accent-lime)]/90 font-semibold"
                   disabled={!name.trim() || creating}
                   data-testid="create-table-submit"
                   onClick={handleCreate}
@@ -187,7 +179,7 @@ export default function Home() {
 function Step({ icon, step, label }: { icon: React.ReactNode; step: string; label: string }) {
   return (
     <li className="flex items-center gap-3 sm:flex-col sm:items-center sm:gap-2">
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--gold)]/30 bg-card text-[var(--gold)]">
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--accent-lime)]/30 bg-card text-[var(--accent-lime)]">
         {icon}
       </span>
       <span className="text-sm text-muted-foreground">

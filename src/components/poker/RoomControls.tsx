@@ -9,8 +9,9 @@ import { HostRequestsPanel } from "./HostRequestsPanel";
 import { HostSettingsDialog } from "./HostSettingsDialog";
 import { LedgerPanel } from "./LedgerPanel";
 import { BuyInDialog } from "./BuyInDialog";
+import { PlayerAvatar } from "./PlayerAvatar";
 
-interface TopBarProps {
+interface RoomControlsProps {
   room: ClientRoomView;
   isHost: boolean;
   onResolveBuyIn: (requestId: string, approve: boolean) => void;
@@ -20,7 +21,8 @@ interface TopBarProps {
   onRequestBuyIn: (amount: number, type: "initial" | "topup") => Promise<{ ok: true } | { ok: false; error: string }>;
 }
 
-export function TopBar({
+/** Thin, minimal top nav — logo left, room/blinds center, actions right. */
+export function RoomControls({
   room,
   isHost,
   onResolveBuyIn,
@@ -28,7 +30,7 @@ export function TopBar({
   onRemovePlayer,
   onTransferOwnership,
   onRequestBuyIn,
-}: TopBarProps) {
+}: RoomControlsProps) {
   const router = useRouter();
   const me = room.players.find((p) => p.id === room.you.playerId);
   const pendingMine = room.buyInRequests.find((r) => r.playerId === me?.id && r.status === "pending");
@@ -44,19 +46,26 @@ export function TopBar({
   };
 
   return (
-    <header className="flex items-center justify-between gap-2 border-b border-white/10 bg-card/60 px-3 py-2.5 backdrop-blur sm:gap-3 sm:px-4">
-      <div className="flex min-w-0 items-center gap-2">
-        <Spade className="h-5 w-5 shrink-0 text-[var(--gold)]" fill="currentColor" />
-        <div className="min-w-0">
-          <p className="truncate text-sm font-semibold leading-tight">{room.settings.roomName}</p>
-          <p className="truncate text-[11px] leading-tight text-muted-foreground">
-            Blinds {room.settings.smallBlind}/{room.settings.bigBlind} · {room.id}
-          </p>
-        </div>
+    <header className="relative flex items-center justify-between gap-2 px-3 py-2.5 sm:px-4">
+      <div className="flex min-w-0 flex-1 items-center gap-1.5">
+        <Spade className="h-4 w-4 shrink-0 text-[var(--accent-lime)]" fill="currentColor" />
+        <span className="hidden text-sm font-semibold text-[var(--text-primary)] sm:inline">Felt</span>
       </div>
 
-      <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
-        <Button variant="outline" size="sm" className="border-white/15 bg-card/80 gap-1.5 px-2 sm:px-3" onClick={copyInvite}>
+      <div className="pointer-events-none absolute left-1/2 top-1/2 hidden max-w-[40%] -translate-x-1/2 -translate-y-1/2 text-center sm:block">
+        <p className="truncate text-sm font-medium text-[var(--text-primary)]">{room.settings.roomName}</p>
+        <p className="text-[10px] text-[var(--text-secondary)]">
+          Blinds {room.settings.smallBlind}/{room.settings.bigBlind}
+        </p>
+      </div>
+
+      <div className="flex flex-1 shrink-0 items-center justify-end gap-1 sm:gap-1.5">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="gap-1.5 px-2 text-[var(--text-secondary)] hover:bg-white/8 hover:text-[var(--text-primary)] sm:px-3"
+          onClick={copyInvite}
+        >
           <Link2 className="h-3.5 w-3.5" />
           <span className="hidden sm:inline">Invite Friends</span>
         </Button>
@@ -64,10 +73,10 @@ export function TopBar({
         {me && (
           <BuyInDialog player={me} settings={room.settings} pendingRequest={pendingMine} onRequest={onRequestBuyIn}>
             <Button
-              variant="outline"
+              variant="ghost"
               size="sm"
               data-testid="buyin-trigger"
-              className="border-white/15 bg-card/80 px-2 sm:px-3"
+              className="px-2 text-[var(--text-secondary)] hover:bg-white/8 hover:text-[var(--text-primary)] sm:px-3"
             >
               <span className="sm:hidden">{!me.hasBoughtIn ? "Buy In" : "+Chips"}</span>
               <span className="hidden sm:inline">{!me.hasBoughtIn ? "Buy In" : "Add Chips"}</span>
@@ -89,20 +98,22 @@ export function TopBar({
             onTransferOwnership={onTransferOwnership}
           >
             <Button
-              variant="outline"
+              variant="ghost"
               size="icon"
               data-testid="host-settings-trigger"
-              className="border-white/15 bg-card/80"
+              className="text-[var(--text-secondary)] hover:bg-white/8 hover:text-[var(--text-primary)]"
             >
               <Settings className="h-4 w-4" />
             </Button>
           </HostSettingsDialog>
         )}
 
+        {me && <PlayerAvatar name={me.displayName} size="sm" className="ml-0.5" />}
+
         <Button
           variant="ghost"
           size="icon"
-          className="text-muted-foreground hover:text-destructive"
+          className="text-[var(--text-secondary)] hover:bg-[var(--danger)]/10 hover:text-[var(--danger)]"
           onClick={() => router.push("/")}
         >
           <LogOut className="h-4 w-4" />

@@ -33,7 +33,7 @@ export function LedgerPanel({ entries, currentChips }: { entries: LedgerEntry[];
             {sorted.map((e) => (
               <div key={e.id} className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">{LABELS[e.type]}</span>
-                <span className={e.amount >= 0 ? "text-[var(--success)] font-medium tabular-nums" : "text-destructive font-medium tabular-nums"}>
+                <span className={e.amount >= 0 ? "text-[var(--positive)] font-medium tabular-nums" : "text-destructive font-medium tabular-nums"}>
                   {formatSignedChips(e.amount)}
                 </span>
               </div>
@@ -42,7 +42,7 @@ export function LedgerPanel({ entries, currentChips }: { entries: LedgerEntry[];
         )}
         <div className="mt-2 flex items-center justify-between border-t border-white/10 pt-2 text-sm font-semibold">
           <span>Current stack</span>
-          <span className="text-[var(--gold)] tabular-nums">{formatChips(currentChips)}</span>
+          <span className="text-[var(--accent-lime)] tabular-nums">{formatChips(currentChips)}</span>
         </div>
       </PopoverContent>
     </Popover>

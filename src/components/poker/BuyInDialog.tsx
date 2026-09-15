@@ -59,7 +59,7 @@ export function BuyInDialog({ player, settings, pendingRequest, onRequest, child
               <DialogTitle>Buy-in requested</DialogTitle>
             </DialogHeader>
             <div className="flex flex-col items-center gap-2 py-4 text-center">
-              <span className="text-3xl font-bold text-[var(--gold)] tabular-nums">
+              <span className="text-3xl font-bold text-[var(--accent-lime)] tabular-nums">
                 {formatChips(pendingRequest.amount)}
               </span>
               <span className="text-sm text-muted-foreground">chips</span>
@@ -102,7 +102,7 @@ export function BuyInDialog({ player, settings, pendingRequest, onRequest, child
                 onClick={submit}
                 disabled={submitting}
                 data-testid="buyin-submit"
-                className="w-full bg-[var(--gold)] text-black hover:bg-[var(--gold)]/90"
+                className="w-full bg-[var(--accent-lime)] text-[var(--accent-lime-foreground)] hover:bg-[var(--accent-lime)]/90"
               >
                 {isTopUp ? "Request more chips" : "Request Buy-In"}
               </Button>

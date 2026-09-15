@@ -3,8 +3,10 @@
 import { Button } from "@/components/ui/button";
 import { formatChips } from "@/lib/format";
 import type { ActionRequest, ClientRoomView } from "@/lib/types";
-import { BettingControls } from "./BettingControls";
+import { PokerActions } from "./PokerActions";
+import { TurnTimer } from "./TurnTimer";
 import { getEligiblePlayers } from "@/server/engine/seats";
+import { cn } from "@/lib/utils";
 
 interface ActionDockProps {
   room: ClientRoomView;
@@ -20,63 +22,90 @@ export function ActionDock({ room, isHost, onAction, onStartHand, onSitOut }: Ac
   const handOver = room.hand.phase === "waiting" || room.hand.phase === "hand-complete";
   const eligibleCount = getEligiblePlayers(room.players).length;
 
-  if (isMyTurn) {
-    return (
-      <div className="flex justify-center">
-        <BettingControls
-          key={`${room.hand.activePlayerId}-${room.hand.phase}`}
-          room={room}
-          onAction={onAction}
-        />
-      </div>
-    );
-  }
+  return (
+    <div className="flex w-full items-end justify-between gap-2 px-1 sm:gap-3">
+      <div className="hidden w-24 shrink-0 sm:block sm:w-32" aria-hidden />
 
-  if (handOver) {
-    return (
-      <div className="flex flex-col items-center gap-2">
-        {room.hand.result && room.hand.result.winners.length > 0 && (
-          <ResultSummary room={room} />
-        )}
-        {isHost ? (
-          <Button
-            size="lg"
-            disabled={eligibleCount < 2}
-            onClick={onStartHand}
-            data-testid="start-hand-button"
-            className="bg-[var(--gold)] text-black hover:bg-[var(--gold)]/90 font-semibold px-8 shadow-lg"
-          >
-            {room.hand.handNumber === 0 ? "Start Hand" : "Start Next Hand"}
-          </Button>
+      <div className="flex flex-1 flex-col items-center gap-2">
+        {isMyTurn ? (
+          <PokerActions key={`${room.hand.activePlayerId}-${room.hand.phase}`} room={room} onAction={onAction} />
+        ) : handOver ? (
+          <>
+            {room.hand.result && room.hand.result.winners.length > 0 && <ResultSummary room={room} />}
+            {isHost ? (
+              <Button
+                size="lg"
+                disabled={eligibleCount < 2}
+                onClick={onStartHand}
+                data-testid="start-hand-button"
+                className="bg-[var(--accent-lime)] text-[var(--accent-lime-foreground)] hover:bg-[var(--accent-lime)]/90 font-semibold px-8 shadow-[0_8px_24px_rgba(0,0,0,0.4)]"
+              >
+                {room.hand.handNumber === 0 ? "Start Hand" : "Start Next Hand"}
+              </Button>
+            ) : (
+              <p className="text-sm text-[var(--text-secondary)]">Waiting for the host to start the next hand&hellip;</p>
+            )}
+            {eligibleCount < 2 && isHost && (
+              <p className="text-xs text-[var(--text-secondary)]">Need at least 2 players with approved chips.</p>
+            )}
+          </>
+        ) : me?.handStatus === "sitting-out" && me.hasBoughtIn ? (
+          <div className="flex items-center gap-2">
+            <p className="text-sm text-[var(--text-secondary)]">You&apos;re sitting out.</p>
+            <Button size="sm" variant="outline" onClick={() => onSitOut(false)}>
+              Sit back in
+            </Button>
+          </div>
         ) : (
-          <p className="text-sm text-muted-foreground">Waiting for the host to start the next hand&hellip;</p>
-        )}
-        {eligibleCount < 2 && isHost && (
-          <p className="text-xs text-muted-foreground">Need at least 2 players with approved chips.</p>
+          <WaitingIndicator room={room} onSitOut={onSitOut} isSittable={me?.handStatus === "active"} />
         )}
       </div>
-    );
-  }
 
-  if (me?.handStatus === "sitting-out" && me.hasBoughtIn) {
-    return (
-      <div className="flex flex-col items-center gap-2">
-        <p className="text-sm text-muted-foreground">You&apos;re sitting out.</p>
-        <Button size="sm" variant="outline" onClick={() => onSitOut(false)}>
-          Sit back in
-        </Button>
+      <div className="flex w-20 shrink-0 flex-col items-end gap-1.5 sm:w-32">
+        {isMyTurn && me?.handStatus === "active" && (
+          <TurnTimer
+            key={room.hand.turnDeadline ?? 0}
+            durationSeconds={room.settings.turnTimeLimitSeconds}
+            variant="pill"
+            className="hidden sm:flex"
+          />
+        )}
+        {me?.hasBoughtIn && (
+          <div
+            data-testid="your-stack"
+            data-your-chips={me.chips}
+            className="flex flex-col items-end rounded-xl border border-white/10 bg-black/40 px-2 py-1 backdrop-blur sm:px-3 sm:py-1.5"
+          >
+            <span className="text-[8px] font-medium uppercase tracking-wider text-[var(--text-secondary)] sm:text-[9px]">
+              Stack
+            </span>
+            <span className="text-sm font-bold tabular-nums text-[var(--text-primary)] sm:text-lg">
+              {formatChips(me.chips)}
+            </span>
+          </div>
+        )}
       </div>
-    );
-  }
+    </div>
+  );
+}
 
+function WaitingIndicator({
+  room,
+  onSitOut,
+  isSittable,
+}: {
+  room: ClientRoomView;
+  onSitOut: (sittingOut: boolean) => void;
+  isSittable: boolean;
+}) {
   const activePlayer = room.players.find((p) => p.id === room.hand.activePlayerId);
   return (
-    <div className="flex items-center justify-center gap-2">
-      <p className="text-sm text-muted-foreground">
+    <div className="flex flex-col items-center gap-1 sm:flex-row sm:gap-2">
+      <p className="text-center text-xs text-[var(--text-secondary)] sm:text-sm">
         {activePlayer ? `Waiting for ${activePlayer.displayName}…` : "Hand in progress…"}
       </p>
-      {me?.handStatus === "active" && (
-        <Button size="sm" variant="ghost" className="text-xs text-muted-foreground" onClick={() => onSitOut(true)}>
+      {isSittable && (
+        <Button size="sm" variant="ghost" className="text-xs text-[var(--text-secondary)]" onClick={() => onSitOut(true)}>
           Sit out next hand
         </Button>
       )}
@@ -88,20 +117,24 @@ function ResultSummary({ room }: { room: ClientRoomView }) {
   const winners = room.hand.result!.winners;
   const byPlayer = new Map<string, number>();
   for (const w of winners) byPlayer.set(w.playerId, (byPlayer.get(w.playerId) ?? 0) + w.amount);
+  const entries = [...byPlayer.entries()];
 
   return (
     <div
       data-testid="hand-result-summary"
-      className="flex flex-col items-center gap-1 rounded-xl border border-[var(--gold)]/30 bg-card/90 px-4 py-2 text-center shadow-lg"
+      className={cn(
+        "flex flex-col items-center gap-1 rounded-2xl border border-[var(--accent-lime)]/30 bg-black/55 px-5 py-3 text-center shadow-[0_12px_32px_rgba(0,0,0,0.5)] backdrop-blur-xl",
+        entries.length === 1 && "animate-winner-pulse"
+      )}
     >
-      {[...byPlayer.entries()].map(([playerId, amount]) => {
+      {entries.map(([playerId, amount]) => {
         const player = room.players.find((p) => p.id === playerId);
         const desc = winners.find((w) => w.playerId === playerId)?.handDescription;
         return (
           <p key={playerId} className="text-sm">
-            <span className="font-semibold text-[var(--gold)]">{player?.displayName ?? "Player"}</span>{" "}
-            won <span className="font-semibold">{formatChips(amount)}</span>
-            {desc ? <span className="text-muted-foreground"> — {desc}</span> : null}
+            <span className="font-semibold text-[var(--accent-lime)]">{player?.displayName ?? "Player"}</span>{" "}
+            wins <span className="font-semibold text-[var(--text-primary)]">{formatChips(amount)}</span>
+            {desc ? <span className="block text-xs text-[var(--text-secondary)]">{desc}</span> : null}
           </p>
         );
       })}

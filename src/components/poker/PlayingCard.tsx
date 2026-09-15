@@ -18,10 +18,11 @@ const SUIT_COLOR: Record<Card["suit"], string> = {
 };
 
 const SIZE_CLASSES = {
-  sm: "w-7 h-10 text-[10px] rounded-[5px]",
-  md: "w-10 h-14 text-sm rounded-[7px]",
-  lg: "w-14 h-20 text-lg rounded-[9px]",
-  xl: "w-16 h-24 text-xl rounded-[10px]",
+  xs: "w-[1.5rem] h-[2.25rem] text-[9px] rounded-[5px]",
+  sm: "w-[2.25rem] h-[3.25rem] text-[11px] rounded-[7px]",
+  md: "w-[3rem] h-[4.25rem] text-sm rounded-[9px]",
+  lg: "w-[4rem] h-[5.75rem] text-lg rounded-[11px]",
+  xl: "w-[6rem] h-[8.5rem] text-2xl rounded-[14px]",
 } as const;
 
 interface PlayingCardProps {
@@ -29,6 +30,8 @@ interface PlayingCardProps {
   faceDown?: boolean;
   size?: keyof typeof SIZE_CLASSES;
   dealDelayMs?: number;
+  /** Subtle natural tilt, in degrees — real cards are never perfectly aligned. */
+  rotationDeg?: number;
   className?: string;
   /** Renders a dashed empty placeholder instead of a card. */
   empty?: boolean;
@@ -39,17 +42,14 @@ export function PlayingCard({
   faceDown,
   size = "md",
   dealDelayMs = 0,
+  rotationDeg = 0,
   className,
   empty,
 }: PlayingCardProps) {
   if (empty) {
     return (
       <div
-        className={cn(
-          SIZE_CLASSES[size],
-          "rounded-[7px] border border-dashed border-white/15",
-          className
-        )}
+        className={cn(SIZE_CLASSES[size], "rounded-[9px] border border-dashed border-white/12", className)}
       />
     );
   }
@@ -60,30 +60,43 @@ export function PlayingCard({
     <div
       className={cn(
         SIZE_CLASSES[size],
-        "animate-deal-in relative shrink-0 select-none shadow-[0_2px_6px_rgba(0,0,0,0.45)]",
+        "animate-deal-in relative shrink-0 select-none shadow-[0_6px_16px_rgba(0,0,0,0.55)]",
         className
       )}
-      style={{ animationDelay: `${dealDelayMs}ms` }}
+      style={{
+        animationDelay: `${dealDelayMs}ms`,
+        // Preserve any rotation set via the deal-in animation's end state.
+        transform: rotationDeg ? `rotate(${rotationDeg}deg)` : undefined,
+      }}
     >
       {showBack ? (
         <div
-          className="h-full w-full rounded-[inherit] border border-black/30"
+          className="h-full w-full rounded-[inherit] border border-black/40"
           style={{
             background:
-              "repeating-linear-gradient(135deg, oklch(0.32 0.1 250) 0px, oklch(0.32 0.1 250) 3px, oklch(0.26 0.09 250) 3px, oklch(0.26 0.09 250) 6px)",
+              "repeating-linear-gradient(135deg, oklch(0.24 0.05 280) 0px, oklch(0.24 0.05 280) 3px, oklch(0.19 0.04 280) 3px, oklch(0.19 0.04 280) 6px)",
           }}
         >
-          <div className="h-full w-full rounded-[inherit] border-2 border-white/10 flex items-center justify-center">
-            <div className="h-1/2 w-1/2 rounded-full border border-[var(--gold)]/50" />
+          <div className="flex h-full w-full items-center justify-center rounded-[inherit] border-2 border-white/8">
+            <div className="h-1/2 w-1/2 rounded-full border border-[var(--accent-purple)]/50" />
           </div>
         </div>
       ) : (
-        <div className="h-full w-full rounded-[inherit] bg-[var(--card-face)] border border-black/10 flex flex-col justify-between p-[6%] leading-none">
-          <span className={cn("font-bold", SUIT_COLOR[card.suit])}>{card.rank}</span>
-          <span className={cn("self-center text-[1.4em]", SUIT_COLOR[card.suit])}>
+        <div className="relative h-full w-full rounded-[inherit] border border-black/10 bg-[var(--card-face)] p-[9%] leading-none">
+          <span className={cn("absolute top-[8%] left-[10%] font-bold", SUIT_COLOR[card.suit])}>
+            {card.rank}
+          </span>
+          <span
+            className={cn(
+              "absolute inset-0 flex items-center justify-center text-[2em] opacity-90",
+              SUIT_COLOR[card.suit]
+            )}
+          >
             {SUIT_SYMBOL[card.suit]}
           </span>
-          <span className={cn("self-end font-bold rotate-180", SUIT_COLOR[card.suit])}>
+          <span
+            className={cn("absolute bottom-[8%] right-[10%] rotate-180 font-bold", SUIT_COLOR[card.suit])}
+          >
             {card.rank}
           </span>
         </div>

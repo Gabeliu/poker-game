@@ -90,8 +90,8 @@
   --card-foreground: oklch(0.94 0.008 90);
   --popover: oklch(0.19 0.016 255);
   --popover-foreground: oklch(0.94 0.008 90);
-  --primary: oklch(0.78 0.14 85);
-  --primary-foreground: oklch(0.18 0.03 85);
+  --primary: oklch(0.87 0.19 128);
+  --primary-foreground: oklch(0.16 0.03 128);
   --secondary: oklch(0.27 0.018 255);
   --secondary-foreground: oklch(0.94 0.008 90);
   --muted: oklch(0.24 0.016 255);
@@ -101,7 +101,7 @@
   --destructive: oklch(0.62 0.22 25);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 14%);
-  --ring: oklch(0.78 0.14 85 / 55%);
+  --ring: oklch(0.87 0.19 128 / 55%);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -109,24 +109,43 @@
   --chart-5: oklch(0.269 0 0);
   --sidebar: oklch(0.19 0.016 255);
   --sidebar-foreground: oklch(0.94 0.008 90);
-  --sidebar-primary: oklch(0.78 0.14 85);
-  --sidebar-primary-foreground: oklch(0.18 0.03 85);
+  --sidebar-primary: oklch(0.87 0.19 128);
+  --sidebar-primary-foreground: oklch(0.16 0.03 128);
   --sidebar-accent: oklch(0.27 0.018 255);
   --sidebar-accent-foreground: oklch(0.94 0.008 90);
   --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.78 0.14 85 / 55%);
+  --sidebar-ring: oklch(0.87 0.19 128 / 55%);
 
-  /* Poker-table specific tokens */
-  --felt-1: oklch(0.34 0.09 155);
-  --felt-2: oklch(0.24 0.07 155);
-  --felt-rail: oklch(0.16 0.03 60);
-  --felt-rail-edge: oklch(0.1 0.02 60);
-  --success: oklch(0.68 0.17 150);
-  --danger: oklch(0.62 0.22 25);
-  --gold: oklch(0.78 0.14 85);
+  /* ---- Poker-product design tokens ---- */
+  /* Ambient page background: near-black with a soft purple/lavender bloom
+     behind the rounded app container (not a flat color). */
+  --ambient-bg: oklch(0.09 0.01 280);
+  --ambient-glow-a: oklch(0.42 0.16 300 / 55%);
+  --ambient-glow-b: oklch(0.5 0.14 260 / 30%);
+
+  /* The big rounded app container itself. */
+  --surface-app: oklch(0.1 0.012 270);
+
+  /* The table: a layered dome, not a flat oval. */
+  --table-rim-a: oklch(0.16 0.02 270);
+  --table-rim-b: oklch(0.08 0.012 270);
+  --table-surface-a: oklch(0.19 0.02 270);
+  --table-surface-b: oklch(0.13 0.016 270);
+  --table-glow: oklch(0.55 0.14 295 / 35%);
+
+  /* Accents — used sparingly against the dark surfaces. */
+  --accent-lime: oklch(0.87 0.19 128);
+  --accent-lime-foreground: oklch(0.16 0.03 128);
+  --accent-purple: oklch(0.72 0.14 300);
+  --positive: oklch(0.72 0.15 152);
+  --danger: oklch(0.66 0.18 22);
+
+  --text-primary: oklch(0.96 0.006 90);
+  --text-secondary: oklch(0.68 0.02 270);
+
   --card-face: oklch(0.97 0.006 90);
   --card-face-text: oklch(0.16 0.01 0);
-  --suit-red: oklch(0.58 0.21 25);
+  --suit-red: oklch(0.6 0.2 22);
   --suit-black: oklch(0.2 0.01 0);
 }
 
@@ -143,13 +162,19 @@
 }
 
 @layer utilities {
-  .felt-surface {
+  .ambient-page-bg {
     background:
-      radial-gradient(120% 90% at 50% 8%, oklch(0.4 0.1 155 / 55%) 0%, transparent 55%),
-      radial-gradient(140% 100% at 50% 50%, var(--felt-1) 0%, var(--felt-2) 68%, var(--felt-2) 100%);
+      radial-gradient(60% 50% at 18% 0%, var(--ambient-glow-a) 0%, transparent 60%),
+      radial-gradient(55% 45% at 85% 100%, var(--ambient-glow-b) 0%, transparent 60%),
+      var(--ambient-bg);
   }
-  .felt-rail {
-    background: linear-gradient(180deg, var(--felt-rail) 0%, var(--felt-rail-edge) 100%);
+  .table-dome-rim {
+    background: linear-gradient(180deg, var(--table-rim-a) 0%, var(--table-rim-b) 100%);
+  }
+  .table-dome-surface {
+    background:
+      radial-gradient(70% 60% at 50% 0%, var(--table-glow) 0%, transparent 60%),
+      radial-gradient(120% 90% at 50% 100%, var(--table-surface-a) 0%, var(--table-surface-b) 75%);
   }
   .text-suit-red {
     color: var(--suit-red);
@@ -196,10 +221,55 @@
 @keyframes active-glow {
   0%,
   100% {
-    box-shadow: 0 0 0 2px var(--gold), 0 0 18px 2px color-mix(in oklch, var(--gold) 55%, transparent);
+    box-shadow: 0 0 0 2px var(--accent-lime), 0 0 16px 2px color-mix(in oklch, var(--accent-lime) 50%, transparent);
   }
   50% {
-    box-shadow: 0 0 0 2px var(--gold), 0 0 28px 6px color-mix(in oklch, var(--gold) 75%, transparent);
+    box-shadow: 0 0 0 2px var(--accent-lime), 0 0 26px 5px color-mix(in oklch, var(--accent-lime) 70%, transparent);
+  }
+}
+
+@keyframes status-pill {
+  0% {
+    opacity: 0;
+    transform: translateY(4px) scale(0.9);
+  }
+  12%,
+  78% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.95);
+  }
+}
+
+@keyframes winner-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 2px var(--accent-lime), 0 0 24px 4px color-mix(in oklch, var(--accent-lime) 60%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 3px var(--accent-lime), 0 0 40px 10px color-mix(in oklch, var(--accent-lime) 85%, transparent);
+  }
+}
+
+@keyframes fold-away {
+  to {
+    opacity: 0;
+    transform: translateY(6px) scale(0.85) rotate(-6deg);
+  }
+}
+
+@keyframes pot-bump {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.12);
+  }
+  100% {
+    transform: scale(1);
   }
 }
 
@@ -211,4 +281,16 @@
 }
 .animate-active-glow {
   animation: active-glow 1.6s ease-in-out infinite;
+}
+.animate-status-pill {
+  animation: status-pill 2.2s ease-in-out forwards;
+}
+.animate-winner-pulse {
+  animation: winner-pulse 1.4s ease-in-out infinite;
+}
+.animate-fold-away {
+  animation: fold-away 320ms ease-in forwards;
+}
+.animate-pot-bump {
+  animation: pot-bump 380ms cubic-bezier(0.22, 1, 0.36, 1);
 }

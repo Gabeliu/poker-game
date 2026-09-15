@@ -14,7 +14,10 @@ async function joinRoom(page: Page, roomId: string, name: string): Promise<void>
   await page.goto(`/table/${roomId}`);
   await page.getByLabel("Your display name").fill(name);
   await page.getByTestId("table-join-submit").click();
-  await expect(page.getByTestId("player-seat").filter({ hasText: name }).first()).toBeVisible({ timeout: 10_000 });
+  // The viewer never renders as their own player-seat (that's the "you" side
+  // of the redesign — your identity is the big hole cards + stack panel
+  // instead), so confirm the join by the room chrome being present instead.
+  await expect(page.getByTestId("buyin-trigger")).toBeVisible({ timeout: 10_000 });
 }
 
 async function requestBuyIn(page: Page, amount: number): Promise<void> {
@@ -104,7 +107,7 @@ test.describe("Felt poker table — full multiplayer flow", () => {
     await expect(host.getByText("Waiting for the host to approve")).toBeVisible();
     // Host approves their own request via the host panel.
     await approveLatestRequest(host, "Gabriel");
-    await expect(host.getByTestId("player-seat").filter({ hasText: "Gabriel" })).toContainText("5,000");
+    await expect(host.getByTestId("your-stack")).toContainText("5,000");
 
     // 4. Bob opens the shared link and joins.
     await joinRoom(bob, roomId, "Bob");
@@ -113,7 +116,7 @@ test.describe("Felt poker table — full multiplayer flow", () => {
     await requestBuyIn(bob, 2500);
     await expect(bob.getByText("Waiting for the host to approve")).toBeVisible();
     await approveLatestRequest(host, "Bob");
-    await expect(bob.getByTestId("player-seat").filter({ hasText: "Bob" })).toContainText("2,500", { timeout: 10_000 });
+    await expect(bob.getByTestId("your-stack")).toContainText("2,500", { timeout: 10_000 });
 
     // 8-11. Carol joins, requests a buy-in, host rejects it, Carol resubmits, host approves.
     await joinRoom(carol, roomId, "Carol");
@@ -121,7 +124,7 @@ test.describe("Felt poker table — full multiplayer flow", () => {
     await rejectLatestRequest(host, "Carol");
     await requestBuyIn(carol, 1500);
     await approveLatestRequest(host, "Carol");
-    await expect(carol.getByTestId("player-seat").filter({ hasText: "Carol" })).toContainText("1,500", { timeout: 10_000 });
+    await expect(carol.getByTestId("your-stack")).toContainText("1,500", { timeout: 10_000 });
 
     // 12. Game cannot start with fewer than 2 approved players — already satisfied (3 approved). Sanity check the
     // start button is enabled now that we have 3 approved players.
@@ -132,30 +135,16 @@ test.describe("Felt poker table — full multiplayer flow", () => {
     await expect(host.getByTestId("player-seat").first()).toBeVisible();
     await playHandToCompletion([host, bob, carol]);
 
-    // Chip conservation: total chips across all three players should still equal what was bought in (5000+2500+1500).
-    const totalChips = async () => {
-      let total = 0;
-      for (const page of [host, bob, carol]) {
-        const text = await page.getByTestId("player-seat").filter({ hasText: "Gabriel" }).getAttribute("data-player-chips");
-        total += Number(text ?? 0);
-      }
-      return total;
-    };
-    // (Sanity: at least confirm the UI reached a post-hand state without crashing.)
+    // Sanity: the UI reached a post-hand state without crashing.
     expect(await host.getByTestId("start-hand-button").isVisible()).toBe(true);
-    void totalChips;
 
     // 18. Test a second buy-in / top-up request for Bob.
-    const bobChipsBefore = Number(
-      await bob.getByTestId("player-seat").filter({ hasText: "Bob" }).getAttribute("data-player-chips")
-    );
+    const bobChipsBefore = Number(await bob.getByTestId("your-stack").getAttribute("data-your-chips"));
     await requestBuyIn(bob, 1000);
     await approveLatestRequest(host, "Bob");
     await expect(host.getByTestId("buyin-request-row").filter({ hasText: "Bob" })).toHaveCount(0);
     await expect
-      .poll(async () =>
-        Number(await bob.getByTestId("player-seat").filter({ hasText: "Bob" }).getAttribute("data-player-chips"))
-      )
+      .poll(async () => Number(await bob.getByTestId("your-stack").getAttribute("data-your-chips")))
       .toBe(bobChipsBefore + 1000);
 
     // 21. Desktop layout screenshot.
@@ -184,17 +173,14 @@ test.describe("Felt poker table — full multiplayer flow", () => {
     await joinRoom(guest, roomId, "Guest");
     await requestBuyIn(guest, 3000);
     await approveLatestRequest(host, "Guest");
-    await expect(guest.getByTestId("player-seat").filter({ hasText: "Guest" })).toContainText("3,000", {
-      timeout: 10_000,
-    });
+    await expect(guest.getByTestId("your-stack")).toContainText("3,000", { timeout: 10_000 });
 
     // Simulate a disconnect + reconnect via page reload (same browser context => same localStorage token).
     await guest.reload();
-    await expect(guest.getByTestId("player-seat").filter({ hasText: "Guest" })).toContainText("3,000", {
-      timeout: 10_000,
-    });
-    // Only 2 seats should exist — no duplicate player was created on reconnect.
-    await expect(guest.getByTestId("player-seat")).toHaveCount(2);
+    await expect(guest.getByTestId("your-stack")).toContainText("3,000", { timeout: 10_000 });
+    // Only the one other seat (Host) should exist from Guest's view — no
+    // duplicate player was created on reconnect.
+    await expect(guest.getByTestId("player-seat")).toHaveCount(1);
 
     await hostCtx.close();
     await guestCtx.close();
@@ -209,7 +195,8 @@ test.describe("Felt poker table — full multiplayer flow", () => {
     const roomId = await createRoom(host, "Host");
     await joinRoom(guest, roomId, "Guest");
 
-    await expect(host.getByTestId("player-seat")).toHaveCount(2);
+    // From Host's view, only the one other player (Guest) renders as a seat.
+    await expect(host.getByTestId("player-seat")).toHaveCount(1);
 
     // Open settings, remove Guest via the players tab.
     await host.getByTestId("host-settings-trigger").click();
@@ -217,7 +204,7 @@ test.describe("Felt poker table — full multiplayer flow", () => {
     await host.getByRole("button", { name: "Remove" }).click();
     await host.keyboard.press("Escape");
 
-    await expect(host.getByTestId("player-seat")).toHaveCount(1);
+    await expect(host.getByTestId("player-seat")).toHaveCount(0);
 
     await hostCtx.close();
     await guestCtx.close();
@@ -238,7 +225,8 @@ test.describe("Felt poker table — full multiplayer flow", () => {
       await approveLatestRequest(pages[0], names[i]);
     }
 
-    await expect(pages[0].getByTestId("player-seat")).toHaveCount(names.length);
+    // From pages[0] (Host)'s view, everyone else renders as a seat — Host itself does not.
+    await expect(pages[0].getByTestId("player-seat")).toHaveCount(names.length - 1);
     await expect(pages[0].getByTestId("start-hand-button")).toBeEnabled();
 
     await pages[0].screenshot({ path: "e2e/screenshots/desktop-7-players.png" });
