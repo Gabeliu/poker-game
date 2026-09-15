@@ -1,45 +1,51 @@
 import type { PublicPlayer } from "./types";
 
-export interface SeatPosition {
-  player: PublicPlayer;
-  /** Percentage-based position within the table container. */
+export interface ArcPosition {
   xPct: number;
   yPct: number;
+}
+
+export interface SeatPosition extends ArcPosition {
+  player: PublicPlayer;
   isSelf: boolean;
 }
 
 /**
- * Lays out every player *other than the viewer* along the top arc of the
- * table dome, evenly spaced. The viewer isn't seated on the ring at all —
- * their identity is the large hole cards at bottom-center plus the stack
- * panel — so the arc only ever needs to fit "everyone else," and it widens
- * as more players join instead of wrapping fully around (which would put
- * seats behind/below the viewer's own cards).
+ * Pure positioning math: lays `count` slots along the top arc of the table
+ * dome, evenly spaced. The viewer isn't seated on the ring at all — their
+ * identity is the large hole cards at bottom-center plus the stack panel —
+ * so the arc only ever needs to fit "everyone else" (real players and/or
+ * empty-seat placeholders), and it widens as more slots are added instead
+ * of wrapping fully around (which would put seats behind/below the
+ * viewer's own cards).
  */
-export function computeSeatPositions(others: PublicPlayer[]): SeatPosition[] {
-  if (others.length === 0) return [];
+export function computeArcPositions(count: number): ArcPosition[] {
+  if (count === 0) return [];
 
-  const ordered = [...others].sort((a, b) => a.seat - b.seat);
-  const n = ordered.length;
-
-  // Arc widens as more players join, capped before it would wrap around
+  // Arc widens as more slots are added, capped before it would wrap around
   // into the viewer's own space at the bottom.
-  const arcSpan = Math.min(320, 130 + Math.max(0, n - 2) * 27);
+  const arcSpan = Math.min(320, 130 + Math.max(0, count - 2) * 27);
   const arcStart = 270 - arcSpan / 2;
 
-  // Radius grows a little as more players join, spreading seats over more
-  // of the available dome surface so adjacent seats don't crowd together.
-  const radiusX = Math.min(47, 40 + n * 0.6);
-  const radiusY = Math.min(38, 28 + n * 0.8);
+  // Radius grows a little as more slots are added, spreading seats over
+  // more of the available dome surface so adjacent seats don't crowd.
+  const radiusX = Math.min(47, 40 + count * 0.6);
+  const radiusY = Math.min(38, 28 + count * 0.8);
 
-  return ordered.map((player, i) => {
-    const angleDeg = n === 1 ? 270 : arcStart + ((i + 0.5) / n) * arcSpan;
+  return Array.from({ length: count }, (_, i) => {
+    const angleDeg = count === 1 ? 270 : arcStart + ((i + 0.5) / count) * arcSpan;
     const angleRad = (angleDeg * Math.PI) / 180;
     return {
-      player,
       xPct: 50 + radiusX * Math.cos(angleRad),
       yPct: 50 + radiusY * Math.sin(angleRad),
-      isSelf: false,
     };
   });
+}
+
+/** Lays out every player *other than the viewer*, sorted by seat. */
+export function computeSeatPositions(others: PublicPlayer[]): SeatPosition[] {
+  if (others.length === 0) return [];
+  const ordered = [...others].sort((a, b) => a.seat - b.seat);
+  const positions = computeArcPositions(ordered.length);
+  return ordered.map((player, i) => ({ player, isSelf: false, ...positions[i] }));
 }

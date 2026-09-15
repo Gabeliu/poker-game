@@ -64,14 +64,14 @@ export function BetControls({ minAmount, maxAmount, potTotal, actionLabel, onCon
       <div className="flex gap-1.5">
         {[
           { label: "½ Pot", value: potTotal / 2 },
-          { label: "¾ Pot", value: (potTotal * 3) / 4 },
           { label: "Pot", value: potTotal },
-          { label: "All In", value: maxAmount },
+          { label: "2× Pot", value: potTotal * 2 },
+          { label: "ALL-IN", value: maxAmount },
         ].map((opt) => (
           <button
             key={opt.label}
             onClick={() => setClamped(opt.value)}
-            className="flex-1 rounded-lg border border-white/10 bg-white/5 py-1.5 text-xs font-medium text-[var(--text-secondary)] transition-colors hover:bg-white/10 hover:text-[var(--text-primary)]"
+            className="flex-1 rounded-lg border border-white/10 bg-white/5 py-1.5 text-xs font-medium text-[var(--text-secondary)] transition-colors hover:border-white/20 hover:bg-white/10 hover:text-[var(--text-primary)] active:scale-[0.97]"
           >
             {opt.label}
           </button>

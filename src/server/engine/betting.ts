@@ -8,7 +8,11 @@ export interface LegalActionInfo {
 }
 
 /** Computes what actions a player may legally take right now. */
-export function getLegalActions(player: Player, hand: HandState, bigBlind: number): LegalActionInfo {
+export function getLegalActions(
+  player: Pick<Player, "chips" | "currentBet">,
+  hand: HandState,
+  bigBlind: number
+): LegalActionInfo {
   const toCall = Math.max(0, hand.currentBetAmount - player.currentBet);
   const callAmount = Math.min(toCall, player.chips);
   const canCheck = toCall === 0;

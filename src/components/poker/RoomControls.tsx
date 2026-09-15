@@ -3,8 +3,8 @@
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Link2, LogOut, Settings, Spade } from "lucide-react";
-import { toast } from "sonner";
 import type { ClientRoomView } from "@/lib/types";
+import { copyInviteLink } from "@/lib/invite";
 import { HostRequestsPanel } from "./HostRequestsPanel";
 import { HostSettingsDialog } from "./HostSettingsDialog";
 import { LedgerPanel } from "./LedgerPanel";
@@ -35,16 +35,6 @@ export function RoomControls({
   const me = room.players.find((p) => p.id === room.you.playerId);
   const pendingMine = room.buyInRequests.find((r) => r.playerId === me?.id && r.status === "pending");
 
-  const copyInvite = async () => {
-    const url = `${window.location.origin}/table/${room.id}`;
-    try {
-      await navigator.clipboard.writeText(url);
-      toast.success("Invite link copied");
-    } catch {
-      toast.error("Couldn't copy link — copy it from the address bar instead.");
-    }
-  };
-
   return (
     <header className="relative flex items-center justify-between gap-2 px-3 py-2.5 sm:px-4">
       <div className="flex min-w-0 flex-1 items-center gap-1.5">
@@ -64,7 +54,7 @@ export function RoomControls({
           variant="ghost"
           size="sm"
           className="gap-1.5 px-2 text-[var(--text-secondary)] hover:bg-white/8 hover:text-[var(--text-primary)] sm:px-3"
-          onClick={copyInvite}
+          onClick={() => copyInviteLink(room.id)}
         >
           <Link2 className="h-3.5 w-3.5" />
           <span className="hidden sm:inline">Invite Friends</span>

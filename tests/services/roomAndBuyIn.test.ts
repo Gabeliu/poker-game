@@ -144,3 +144,38 @@ describe("client view hole card visibility", () => {
     expect(guestView.players.find((p) => p.id === hostId)!.holeCards).toHaveLength(0);
   });
 });
+
+describe("hand history", () => {
+  it("records each player's own hand privately after it completes", () => {
+    const { room, playerId: hostId } = createRoom("Host", { smallBlind: 5, bigBlind: 10 });
+    const { playerId: guestId } = joinRoom(room.id, "Guest");
+    requestBuyIn(room, hostId, 1000, "initial");
+    resolveBuyInRequest(room, room.buyInRequests[0].id, true);
+    requestBuyIn(room, guestId, 1000, "initial");
+    resolveBuyInRequest(room, room.buyInRequests.find((r) => r.playerId === guestId)!.id, true);
+
+    startHand(room, new Deck());
+    // Heads-up: host is dealer/SB, acts first. Fold immediately to end the hand fast.
+    submitAction(room, new Deck(), room.hand.activePlayerId!, { action: "fold" });
+    expect(room.hand.phase).toBe("hand-complete");
+
+    const hostView = buildClientView(room, hostId);
+    const guestView = buildClientView(room, guestId);
+
+    expect(hostView.you.handHistory).toHaveLength(1);
+    expect(guestView.you.handHistory).toHaveLength(1);
+    // A player's history entry carries their own real hole cards.
+    expect(hostView.you.handHistory[0].holeCards).toHaveLength(2);
+    // But never leaks into what the OTHER player receives about them.
+    const guestSeesHostAsPublicPlayer = guestView.players.find((p) => p.id === hostId) as unknown as Record<
+      string,
+      unknown
+    >;
+    expect(guestSeesHostAsPublicPlayer.handHistory).toBeUndefined();
+
+    // Net changes should be opposite and sum to zero (a fold just moves the blinds).
+    const hostNet = hostView.you.handHistory[0].netChange;
+    const guestNet = guestView.you.handHistory[0].netChange;
+    expect(hostNet + guestNet).toBe(0);
+  });
+});

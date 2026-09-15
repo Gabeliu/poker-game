@@ -52,10 +52,12 @@ export interface Player {
   holeCards: Card[];
   /** Revealed at showdown for all remaining players. */
   holeCardsRevealed: boolean;
+  /** This player's own recent hands (their own cards only) — private, like holeCards. */
+  handHistory: HandHistoryEntry[];
 }
 
 /** Public-safe player view sent to clients who are not this player. */
-export type PublicPlayer = Omit<Player, "holeCards"> & {
+export type PublicPlayer = Omit<Player, "holeCards" | "handHistory"> & {
   holeCards: Card[]; // empty unless holeCardsRevealed, or length-known placeholders
   hasHoleCards: boolean;
 };
@@ -91,6 +93,35 @@ export interface LedgerEntry {
   balanceAfter: number;
   createdAt: number;
   note?: string;
+}
+
+// ---------- Chat / table activity ----------
+
+export type ChatMessageType = "chat" | "system";
+
+export interface ChatMessage {
+  id: string;
+  type: ChatMessageType;
+  /** Only present for type "chat". */
+  playerId?: string;
+  playerName?: string;
+  text: string;
+  createdAt: number;
+}
+
+// ---------- Hand history ----------
+
+/** One completed hand from a single player's own point of view — their own
+ * hole cards (never anyone else's) plus how their stack changed. Privacy
+ * mirrors hole cards: only ever sent to the player it belongs to. */
+export interface HandHistoryEntry {
+  handNumber: number;
+  holeCards: Card[];
+  /** Positive = won chips net, negative = lost, 0 = broke even (rare, e.g. no action taken). */
+  netChange: number;
+  /** True if this player reached showdown/won without folding; false if they folded. */
+  wasInHand: boolean;
+  createdAt: number;
 }
 
 // ---------- Room settings ----------
@@ -166,15 +197,17 @@ export interface RoomState {
   buyInRequests: BuyInRequest[];
   ledger: LedgerEntry[];
   hand: HandState;
+  chatMessages: ChatMessage[];
 }
 
 /** What's broadcast to a specific client: hole cards hidden for others. */
 export interface ClientRoomView extends Omit<RoomState, "players"> {
   players: PublicPlayer[];
-  /** The requesting client's own player id, and their own hole cards. */
+  /** The requesting client's own player id, and their own private info. */
   you: {
     playerId: string | null;
     holeCards: Card[];
+    handHistory: HandHistoryEntry[];
   };
 }
 

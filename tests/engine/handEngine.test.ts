@@ -30,6 +30,7 @@ function makePlayer(id: string, seat: number, chips: number, opts: Partial<Playe
     hasActedThisStreet: false,
     holeCards: [],
     holeCardsRevealed: false,
+    handHistory: [],
     ...opts,
   };
 }

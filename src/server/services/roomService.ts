@@ -61,6 +61,7 @@ function makePlayer(id: string, displayName: string, seat: number, isHost: boole
     hasActedThisStreet: false,
     holeCards: [],
     holeCardsRevealed: false,
+    handHistory: [],
   };
 }
 
@@ -85,6 +86,7 @@ export function createRoom(displayName: string, settingsPartial: Partial<RoomSet
     players: [player],
     buyInRequests: [],
     ledger: [],
+    chatMessages: [],
     hand: {
       phase: "waiting",
       handNumber: 0,
@@ -151,7 +153,7 @@ export function assertHost(room: RoomState, playerId: string): void {
 
 export function toPublicPlayer(player: Player, revealTo: "self" | "everyone" | "none"): PublicPlayer {
   const shouldRevealCards = revealTo === "everyone" || revealTo === "self" || player.holeCardsRevealed;
-  const { holeCards, ...rest } = player;
+  const { holeCards, handHistory: _handHistory, ...rest } = player;
   return {
     ...rest,
     holeCards: shouldRevealCards ? holeCards : [],
@@ -161,6 +163,7 @@ export function toPublicPlayer(player: Player, revealTo: "self" | "everyone" | "
 
 export function buildClientView(room: RoomState, viewerPlayerId: string | null): ClientRoomView {
   const { players, ...rest } = room;
+  const viewer = viewerPlayerId ? players.find((p) => p.id === viewerPlayerId) : undefined;
   return {
     ...rest,
     players: players.map((p) =>
@@ -168,7 +171,8 @@ export function buildClientView(room: RoomState, viewerPlayerId: string | null):
     ),
     you: {
       playerId: viewerPlayerId,
-      holeCards: viewerPlayerId ? players.find((p) => p.id === viewerPlayerId)?.holeCards ?? [] : [],
+      holeCards: viewer?.holeCards ?? [],
+      handHistory: viewer?.handHistory ?? [],
     },
   };
 }

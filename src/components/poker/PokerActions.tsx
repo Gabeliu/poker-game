@@ -90,14 +90,14 @@ export function PokerActions({ room, onAction }: PokerActionsProps) {
   return (
     <div className="flex flex-col items-center gap-1.5">
       {timerBar}
-      <div className="flex items-center gap-2 rounded-full border border-white/10 bg-black/45 px-2 py-2 shadow-[0_8px_24px_rgba(0,0,0,0.45)] backdrop-blur-xl sm:gap-3 sm:px-3">
+      <div className="flex items-center gap-2 sm:gap-2.5">
         <ActionButton
           testId="action-fold"
           label="Fold"
           shortcut="F"
           disabled={pending}
           onClick={() => run({ action: "fold" })}
-          className="text-[var(--danger)] hover:bg-[var(--danger)]/10"
+          tone="danger"
         />
 
         {info.legalActions.includes("check") && (
@@ -107,7 +107,7 @@ export function PokerActions({ room, onAction }: PokerActionsProps) {
             shortcut="C"
             disabled={pending}
             onClick={() => run({ action: "check" })}
-            className="text-[var(--text-primary)] hover:bg-white/10"
+            tone="neutral"
           />
         )}
         {info.legalActions.includes("call") && (
@@ -117,7 +117,7 @@ export function PokerActions({ room, onAction }: PokerActionsProps) {
             shortcut="C"
             disabled={pending}
             onClick={() => run({ action: "call" })}
-            className="text-[var(--text-primary)] hover:bg-white/10"
+            tone="neutral"
           />
         )}
 
@@ -128,8 +128,7 @@ export function PokerActions({ room, onAction }: PokerActionsProps) {
             shortcut="R"
             disabled={pending}
             onClick={() => setRaising(true)}
-            className="bg-[var(--positive)] text-black hover:bg-[var(--positive)]/90"
-            solid
+            tone="positive"
           />
         ) : (
           info.legalActions.includes("all-in") && (
@@ -139,8 +138,7 @@ export function PokerActions({ room, onAction }: PokerActionsProps) {
               shortcut="R"
               disabled={pending}
               onClick={() => run({ action: "all-in" })}
-              className="bg-[var(--danger)] text-white hover:bg-[var(--danger)]/90"
-              solid
+              tone="positive"
             />
           )
         )}
@@ -149,22 +147,29 @@ export function PokerActions({ room, onAction }: PokerActionsProps) {
   );
 }
 
+const TONE_CLASSES = {
+  danger:
+    "bg-gradient-to-b from-[oklch(0.5_0.19_25)] to-[oklch(0.4_0.18_25)] text-white shadow-[0_3px_0_oklch(0.32_0.16_25),0_8px_20px_rgba(0,0,0,0.4)] hover:brightness-110 active:shadow-[0_1px_0_oklch(0.32_0.16_25)] active:translate-y-[2px]",
+  neutral:
+    "bg-gradient-to-b from-[oklch(0.26_0.016_260)] to-[oklch(0.19_0.014_260)] text-[var(--text-primary)] border border-white/10 shadow-[0_3px_0_oklch(0.1_0.01_260),0_8px_20px_rgba(0,0,0,0.4)] hover:brightness-125 active:shadow-[0_1px_0_oklch(0.1_0.01_260)] active:translate-y-[2px]",
+  positive:
+    "bg-gradient-to-b from-[var(--positive)] to-[oklch(0.58_0.14_152)] text-black shadow-[0_3px_0_oklch(0.42_0.12_152),0_8px_20px_rgba(0,0,0,0.4)] hover:brightness-110 active:shadow-[0_1px_0_oklch(0.42_0.12_152)] active:translate-y-[2px]",
+} as const;
+
 function ActionButton({
   testId,
   label,
   shortcut,
   onClick,
   disabled,
-  className,
-  solid,
+  tone,
 }: {
   testId: string;
   label: string;
   shortcut: string;
   onClick: () => void;
   disabled?: boolean;
-  className?: string;
-  solid?: boolean;
+  tone: keyof typeof TONE_CLASSES;
 }) {
   return (
     <button
@@ -172,13 +177,12 @@ function ActionButton({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold transition-all active:scale-[0.97] disabled:opacity-50",
-        !solid && "bg-transparent",
-        className
+        "relative flex items-center gap-1.5 rounded-xl px-5 py-2.5 text-sm font-bold transition-all duration-100 disabled:opacity-50",
+        TONE_CLASSES[tone]
       )}
     >
       {label}
-      <kbd className="hidden rounded border border-current/25 px-1 text-[9px] font-normal opacity-50 sm:inline">
+      <kbd className="hidden rounded border border-current/25 px-1 text-[9px] font-normal opacity-60 sm:inline">
         {shortcut}
       </kbd>
     </button>

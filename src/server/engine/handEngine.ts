@@ -317,11 +317,28 @@ function runShowdown(room: RoomState): void {
   applyLedgerForHand(room, winningsByPlayer);
 }
 
+const MAX_HAND_HISTORY_PER_PLAYER = 25;
+
 function applyLedgerForHand(room: RoomState, winningsByPlayer: Map<string, number>): void {
   for (const player of room.players) {
     if (player.totalCommittedThisHand <= 0) continue;
     const winnings = winningsByPlayer.get(player.id) ?? 0;
     const net = winnings - player.totalCommittedThisHand;
+
+    // Every player who put chips in this hand gets a personal history entry
+    // (their own cards only — never shown to anyone else), regardless of
+    // whether it nets to exactly zero.
+    player.handHistory.push({
+      handNumber: room.hand.handNumber,
+      holeCards: player.holeCards,
+      netChange: net,
+      wasInHand: player.handStatus !== "folded",
+      createdAt: Date.now(),
+    });
+    if (player.handHistory.length > MAX_HAND_HISTORY_PER_PLAYER) {
+      player.handHistory.splice(0, player.handHistory.length - MAX_HAND_HISTORY_PER_PLAYER);
+    }
+
     if (net === 0) continue;
     addLedgerEntry(room, {
       playerId: player.id,

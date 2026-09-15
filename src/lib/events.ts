@@ -62,6 +62,11 @@ export interface ClientToServerEvents {
     payload: { roomId: string; action: ActionRequest },
     ack: (res: { ok: true } | { ok: false; error: string }) => void
   ) => void;
+
+  "chat:send": (
+    payload: { roomId: string; text: string },
+    ack: (res: { ok: true } | { ok: false; error: string }) => void
+  ) => void;
 }
 
 // ---- Server -> Client ----

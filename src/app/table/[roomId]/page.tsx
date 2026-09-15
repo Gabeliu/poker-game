@@ -13,6 +13,11 @@ import { RoomControls } from "@/components/poker/RoomControls";
 import { PokerTable } from "@/components/poker/PokerTable";
 import { ActionDock } from "@/components/poker/ActionDock";
 import { HostDisconnectedBanner } from "@/components/poker/HostDisconnectedBanner";
+import { AppShell } from "@/components/poker/AppShell";
+import { HandHistoryPanel } from "@/components/poker/HandHistoryPanel";
+import { PlayerListPanel } from "@/components/poker/PlayerListPanel";
+import { ChatPanel } from "@/components/poker/ChatPanel";
+import { LoadingExperience } from "@/components/poker/LoadingExperience";
 
 export default function TablePage({ params }: { params: Promise<{ roomId: string }> }) {
   const { roomId } = use(params);
@@ -33,10 +38,12 @@ export default function TablePage({ params }: { params: Promise<{ roomId: string
     transferOwnership,
     sitOut,
     submitAction,
+    sendChat,
   } = useRoomStore.getState();
 
   const [displayName, setDisplayName] = useState(() => getStoredDisplayName());
   const [joining, setJoining] = useState(false);
+  const [reconnecting, setReconnecting] = useState(() => Boolean(getStoredToken(roomId)));
   const attemptedAutoJoin = useRef(false);
 
   useEffect(() => {
@@ -48,7 +55,7 @@ export default function TablePage({ params }: { params: Promise<{ roomId: string
     const hasToken = Boolean(getStoredToken(roomId));
     if (hasToken) {
       attemptedAutoJoin.current = true;
-      joinRoom(roomId, getStoredDisplayName() || "Player");
+      joinRoom(roomId, getStoredDisplayName() || "Player").finally(() => setReconnecting(false));
     }
   }, [roomId, joinRoom]);
 
@@ -77,6 +84,10 @@ export default function TablePage({ params }: { params: Promise<{ roomId: string
   if (!isJoined) {
     return (
       <main className="ambient-page-bg flex min-h-screen flex-col items-center justify-center gap-6 px-4">
+        <LoadingExperience
+          show={reconnecting || joining}
+          text={reconnecting ? "Reconnecting…" : "Taking your seat…"}
+        />
         <div className="flex items-center gap-2">
           <Spade className="h-7 w-7 text-[var(--accent-lime)]" fill="currentColor" />
           <span className="text-xl font-bold text-[var(--text-primary)]">Felt</span>
@@ -143,14 +154,24 @@ export default function TablePage({ params }: { params: Promise<{ roomId: string
           onRequestBuyIn={requestBuyIn}
         />
 
-        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 px-3 py-2 sm:px-6">
-          <HostDisconnectedBanner room={room} />
-          <PokerTable room={room} canHostRemove={isHost} onRemovePlayer={removePlayer} />
-        </div>
+        <AppShell
+          left={
+            <>
+              <HandHistoryPanel entries={room.you.handHistory} />
+              <PlayerListPanel players={room.players} meId={room.you.playerId} />
+            </>
+          }
+          right={<ChatPanel messages={room.chatMessages} meId={room.you.playerId} onSend={sendChat} />}
+        >
+          <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 px-3 py-2 [container-type:size] sm:px-6">
+            <HostDisconnectedBanner room={room} />
+            <PokerTable room={room} canHostRemove={isHost} onRemovePlayer={removePlayer} />
+          </div>
 
-        <div className="px-3 pb-4 sm:px-6 sm:pb-6">
-          <ActionDock room={room} isHost={isHost} onAction={submitAction} onStartHand={startHand} onSitOut={sitOut} />
-        </div>
+          <div className="px-3 pb-4 sm:px-6 sm:pb-6">
+            <ActionDock room={room} isHost={isHost} onAction={submitAction} onStartHand={startHand} onSitOut={sitOut} />
+          </div>
+        </AppShell>
       </div>
     </main>
   );

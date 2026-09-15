@@ -13,6 +13,7 @@ import {
   updateSettings,
 } from "@/server/services/roomService";
 import { requestBuyIn, resolveBuyInRequest } from "@/server/services/buyInService";
+import { postChatMessage, postSystemMessage } from "@/server/services/chatService";
 import { HandEngineError, startHand, submitAction } from "@/server/engine/handEngine";
 import { broadcastRoomState, scheduleTurnTimer } from "./broadcast";
 
@@ -54,16 +55,14 @@ export function registerRoomHandlers(io: AppServer, socket: AppSocket): void {
       socket.data.playerToken = playerToken;
       roomStore.linkSocket(socket.id, room.id, playerId);
       ack({ ok: true, playerId, playerToken });
-      void broadcastRoomState(io, room.id);
+      const displayName = room.players.find((p) => p.id === playerId)?.displayName ?? "A player";
       if (reconnected) {
-        io.to(room.id).emit("toast", {
-          message: `${room.players.find((p) => p.id === playerId)?.displayName ?? "A player"} reconnected.`,
-        });
+        io.to(room.id).emit("toast", { message: `${displayName} reconnected.` });
       } else {
-        io.to(room.id).emit("toast", {
-          message: `${room.players.find((p) => p.id === playerId)?.displayName ?? "A player"} joined the table.`,
-        });
+        io.to(room.id).emit("toast", { message: `${displayName} joined the table.` });
+        postSystemMessage(room, `${displayName} joined the table`);
       }
+      void broadcastRoomState(io, room.id);
     } catch (err) {
       ack({ ok: false, error: errorMessage(err) });
     }
@@ -86,7 +85,16 @@ export function registerRoomHandlers(io: AppServer, socket: AppSocket): void {
       const room = getRoomOrThrow(payload.roomId);
       const playerId = requirePlayerId(socket);
       assertHost(room, playerId);
+      const request = room.buyInRequests.find((r) => r.id === payload.requestId);
       resolveBuyInRequest(room, payload.requestId, payload.approve);
+      if (request) {
+        postSystemMessage(
+          room,
+          payload.approve
+            ? `${request.playerDisplayName}'s ${request.amount.toLocaleString()} chip buy-in was approved`
+            : `${request.playerDisplayName}'s ${request.amount.toLocaleString()} chip buy-in was rejected`
+        );
+      }
       ack({ ok: true });
       void broadcastRoomState(io, room.id);
     } catch (err) {
@@ -127,7 +135,9 @@ export function registerRoomHandlers(io: AppServer, socket: AppSocket): void {
       const room = getRoomOrThrow(payload.roomId);
       const playerId = requirePlayerId(socket);
       assertHost(room, playerId);
+      const removedName = room.players.find((p) => p.id === payload.playerId)?.displayName;
       removePlayer(room, payload.playerId);
+      if (removedName) postSystemMessage(room, `${removedName} left the table`);
       ack({ ok: true });
       void broadcastRoomState(io, room.id);
       scheduleTurnTimer(io, room.id);
@@ -176,6 +186,18 @@ export function registerRoomHandlers(io: AppServer, socket: AppSocket): void {
       ack({ ok: true });
       void broadcastRoomState(io, room.id);
       scheduleTurnTimer(io, room.id);
+    } catch (err) {
+      ack({ ok: false, error: errorMessage(err) });
+    }
+  });
+
+  socket.on("chat:send", (payload, ack) => {
+    try {
+      const room = getRoomOrThrow(payload.roomId);
+      const playerId = requirePlayerId(socket);
+      postChatMessage(room, playerId, payload.text);
+      ack({ ok: true });
+      void broadcastRoomState(io, room.id);
     } catch (err) {
       ack({ ok: false, error: errorMessage(err) });
     }

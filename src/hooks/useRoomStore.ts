@@ -29,6 +29,7 @@ interface RoomStoreState {
   transferOwnership: (playerId: string) => Promise<Ack>;
   sitOut: (sittingOut: boolean) => Promise<Ack>;
   submitAction: (action: ActionRequest) => Promise<Ack>;
+  sendChat: (text: string) => Promise<Ack>;
   dismissToast: (id: number) => void;
 }
 
@@ -106,6 +107,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
   transferOwnership: (playerId) => emitWithAck("host:transferOwnership", { roomId: get().room!.id, playerId }),
   sitOut: (sittingOut) => emitWithAck("player:sitOut", { roomId: get().room!.id, sittingOut }),
   submitAction: (action) => emitWithAck("action:submit", { roomId: get().room!.id, action }),
+  sendChat: (text) => emitWithAck("chat:send", { roomId: get().room!.id, text }),
 
   dismissToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
 }));

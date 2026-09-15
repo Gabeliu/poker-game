@@ -3,12 +3,12 @@
 import { cn } from "@/lib/utils";
 
 const STATUS_STYLE: Record<string, string> = {
-  Called: "text-[var(--text-primary)] bg-white/10",
-  Checked: "text-[var(--text-secondary)] bg-white/8",
-  Raised: "text-[var(--accent-lime)] bg-[var(--accent-lime)]/10",
-  Bet: "text-[var(--accent-lime)] bg-[var(--accent-lime)]/10",
+  Called: "text-[var(--warning)] bg-[var(--warning)]/12",
+  Checked: "text-[var(--info)] bg-[var(--info)]/10",
+  Raised: "text-[var(--positive)] bg-[var(--positive)]/12",
+  Bet: "text-[var(--positive)] bg-[var(--positive)]/12",
   Folded: "text-[var(--danger)] bg-[var(--danger)]/10",
-  "All In": "text-[var(--danger)] bg-[var(--danger)]/15",
+  "All In": "text-[var(--accent-purple)] bg-[var(--accent-purple)]/15",
   Waiting: "text-[var(--text-secondary)] bg-white/8",
   Disconnected: "text-[var(--text-secondary)] bg-white/8",
 };
