@@ -164,28 +164,25 @@ export default function Home() {
           </div>
         </div>
 
-        <ol className="mt-14 flex w-full max-w-3xl flex-col gap-4 text-left sm:flex-row sm:justify-between sm:text-center">
-          <Step icon={<PlayCircle className="h-5 w-5" />} step="1" label="Create a room" />
-          <Step icon={<Link2 className="h-5 w-5" />} step="2" label="Share the link" />
-          <Step icon={<Users className="h-5 w-5" />} step="3" label="Friends join" />
-          <Step icon={<Coins className="h-5 w-5" />} step="4" label="Host approves buy-in" />
-          <Step icon={<Spade className="h-5 w-5" />} step="5" label="Play poker" />
+        <ol className="mt-14 flex w-full max-w-3xl list-none flex-col gap-4 text-left sm:flex-row sm:justify-between sm:text-center">
+          <Step icon={<PlayCircle className="h-5 w-5" />} label="Create a room" />
+          <Step icon={<Link2 className="h-5 w-5" />} label="Share the link" />
+          <Step icon={<Users className="h-5 w-5" />} label="Friends join" />
+          <Step icon={<Coins className="h-5 w-5" />} label="Host approves buy-in" />
+          <Step icon={<Spade className="h-5 w-5" />} label="Play poker" />
         </ol>
       </section>
     </main>
   );
 }
 
-function Step({ icon, step, label }: { icon: React.ReactNode; step: string; label: string }) {
+function Step({ icon, label }: { icon: React.ReactNode; label: string }) {
   return (
     <li className="flex items-center gap-3 sm:flex-col sm:items-center sm:gap-2">
       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--accent-lime)]/30 bg-card text-[var(--accent-lime)]">
         {icon}
       </span>
-      <span className="text-sm text-muted-foreground">
-        <span className="mr-1 font-semibold text-foreground">{step}.</span>
-        {label}
-      </span>
+      <span className="text-sm text-muted-foreground">{label}</span>
     </li>
   );
 }

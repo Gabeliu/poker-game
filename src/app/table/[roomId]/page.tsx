@@ -12,6 +12,7 @@ import { getStoredDisplayName, getStoredToken, storeDisplayName } from "@/lib/so
 import { RoomControls } from "@/components/poker/RoomControls";
 import { PokerTable } from "@/components/poker/PokerTable";
 import { ActionDock } from "@/components/poker/ActionDock";
+import { HostDisconnectedBanner } from "@/components/poker/HostDisconnectedBanner";
 
 export default function TablePage({ params }: { params: Promise<{ roomId: string }> }) {
   const { roomId } = use(params);
@@ -143,6 +144,7 @@ export default function TablePage({ params }: { params: Promise<{ roomId: string
         />
 
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 px-3 py-2 sm:px-6">
+          <HostDisconnectedBanner room={room} />
           <PokerTable room={room} canHostRemove={isHost} onRemovePlayer={removePlayer} />
         </div>
 
