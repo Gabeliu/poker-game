@@ -62,7 +62,13 @@ export function RoomControls({
         </Button>
 
         {me && (
-          <BuyInDialog player={me} settings={room.settings} pendingRequest={pendingMine} onRequest={onRequestBuyIn}>
+          <BuyInDialog
+            player={me}
+            settings={room.settings}
+            pendingRequest={pendingMine}
+            handInProgress={room.status === "in-hand"}
+            onRequest={onRequestBuyIn}
+          >
             <Button
               variant="ghost"
               size="sm"

@@ -171,6 +171,26 @@ describe("seat assignment", () => {
   });
 });
 
+describe("buy-ins only between hands", () => {
+  it("rejects a buy-in request while a hand is in progress, and allows it again once the hand ends", () => {
+    const { room, playerId: hostId } = createRoom("Host", { smallBlind: 5, bigBlind: 10 });
+    const { playerId: guestId } = joinRoom(room.id, "Guest");
+    takeSeat(room, guestId, 1);
+    requestBuyIn(room, hostId, 1000, "initial");
+    resolveBuyInRequest(room, room.buyInRequests[0].id, true);
+    requestBuyIn(room, guestId, 1000, "initial");
+    resolveBuyInRequest(room, room.buyInRequests.find((r) => r.playerId === guestId)!.id, true);
+
+    startHand(room, new Deck());
+    expect(room.status).toBe("in-hand");
+    expect(() => requestBuyIn(room, guestId, 500, "topup")).toThrow(RoomServiceError);
+
+    submitAction(room, new Deck(), room.hand.activePlayerId!, { action: "fold" });
+    expect(room.status).toBe("lobby");
+    expect(() => requestBuyIn(room, guestId, 500, "topup")).not.toThrow();
+  });
+});
+
 describe("client view hole card visibility", () => {
   it("shows a player their own hole cards, but hides other players' hole cards", () => {
     const { room, playerId: hostId } = createRoom("Host", { smallBlind: 5, bigBlind: 10 });

@@ -82,7 +82,14 @@ export async function playHandToCompletion(pages: Page[], maxSteps = 60): Promis
       .getByTestId("start-hand-button")
       .isVisible()
       .catch(() => false);
-    if (resultVisible || startNextVisible) return;
+    if (resultVisible || startNextVisible) {
+      // pages[0] (the host) reaching hand-complete doesn't mean every other
+      // client's broadcast has landed yet — give the rest a moment so
+      // callers relying on THEIR state (e.g. a non-host requesting a
+      // buy-in, which is only allowed between hands) don't race it.
+      await Promise.all(pages.map((p) => p.waitForTimeout(300)));
+      return;
+    }
 
     let actedThisRound = false;
     for (const page of pages) {

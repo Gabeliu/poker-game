@@ -20,11 +20,13 @@ interface BuyInDialogProps {
   player: PublicPlayer;
   settings: RoomSettings;
   pendingRequest: BuyInRequest | undefined;
+  /** Buy-ins are only allowed between hands — while true, requesting is disabled. */
+  handInProgress: boolean;
   onRequest: (amount: number, type: "initial" | "topup") => Promise<{ ok: true } | { ok: false; error: string }>;
   children: React.ReactNode;
 }
 
-export function BuyInDialog({ player, settings, pendingRequest, onRequest, children }: BuyInDialogProps) {
+export function BuyInDialog({ player, settings, pendingRequest, handInProgress, onRequest, children }: BuyInDialogProps) {
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState(() => String(settings.minBuyIn ?? settings.bigBlind * 100));
   const [submitting, setSubmitting] = useState(false);
@@ -73,40 +75,46 @@ export function BuyInDialog({ player, settings, pendingRequest, onRequest, child
             <DialogHeader>
               <DialogTitle>{isTopUp ? "Request more chips" : "Buy in"}</DialogTitle>
               <DialogDescription>
-                {isTopUp
-                  ? "Ask the host to add more chips to your stack."
-                  : "How many chips would you like to buy in for? The host must approve before you can play."}
+                {handInProgress
+                  ? "Buy-ins open back up as soon as the current hand finishes."
+                  : isTopUp
+                    ? "Ask the host to add more chips to your stack."
+                    : "How many chips would you like to buy in for? The host must approve before you can play."}
               </DialogDescription>
             </DialogHeader>
-            <div className="flex flex-col gap-2 py-2">
-              <Label htmlFor="buyin-amount">Amount</Label>
-              <Input
-                id="buyin-amount"
-                inputMode="numeric"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder="2,500"
-                autoFocus
-              />
-              {(settings.minBuyIn || settings.maxBuyIn) && (
-                <p className="text-xs text-muted-foreground">
-                  {settings.minBuyIn ? `Min ${formatChips(settings.minBuyIn)}` : ""}
-                  {settings.minBuyIn && settings.maxBuyIn ? " · " : ""}
-                  {settings.maxBuyIn ? `Max ${formatChips(settings.maxBuyIn)}` : ""}
-                </p>
-              )}
-              {error && <p className="text-xs text-destructive">{error}</p>}
-            </div>
-            <DialogFooter>
-              <Button
-                onClick={submit}
-                disabled={submitting}
-                data-testid="buyin-submit"
-                className="w-full bg-[var(--accent-lime)] text-[var(--accent-lime-foreground)] hover:bg-[var(--accent-lime)]/90"
-              >
-                {isTopUp ? "Request more chips" : "Request Buy-In"}
-              </Button>
-            </DialogFooter>
+            {!handInProgress && (
+              <div className="flex flex-col gap-2 py-2">
+                <Label htmlFor="buyin-amount">Amount</Label>
+                <Input
+                  id="buyin-amount"
+                  inputMode="numeric"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  placeholder="2,500"
+                  autoFocus
+                />
+                {(settings.minBuyIn || settings.maxBuyIn) && (
+                  <p className="text-xs text-muted-foreground">
+                    {settings.minBuyIn ? `Min ${formatChips(settings.minBuyIn)}` : ""}
+                    {settings.minBuyIn && settings.maxBuyIn ? " · " : ""}
+                    {settings.maxBuyIn ? `Max ${formatChips(settings.maxBuyIn)}` : ""}
+                  </p>
+                )}
+                {error && <p className="text-xs text-destructive">{error}</p>}
+              </div>
+            )}
+            {!handInProgress && (
+              <DialogFooter>
+                <Button
+                  onClick={submit}
+                  disabled={submitting}
+                  data-testid="buyin-submit"
+                  className="w-full bg-[var(--accent-lime)] text-[var(--accent-lime-foreground)] hover:bg-[var(--accent-lime)]/90"
+                >
+                  {isTopUp ? "Request more chips" : "Request Buy-In"}
+                </Button>
+              </DialogFooter>
+            )}
           </>
         )}
       </DialogContent>

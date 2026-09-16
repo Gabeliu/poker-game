@@ -115,74 +115,83 @@ export function PokerTable({ room, isHost, onRemovePlayer, onSit }: PokerTablePr
   };
 
   return (
-    <div className="relative mx-auto aspect-[3/4] h-[min(96cqh,600px,calc(100cqw*4/3))] w-auto max-w-full sm:aspect-[16/11] sm:h-[min(94cqh,720px,calc(100cqw*11/16))]">
-      <div className="table-dome-rim absolute inset-0 rounded-[46%] shadow-[0_24px_60px_rgba(0,0,0,0.6)]" />
-      <div className="table-dome-surface absolute inset-[4.5%] rounded-[46%]">
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 pt-[16%]">
-          <Pot pots={room.hand.pots} liveTotal={room.players.reduce((s, p) => s + p.totalCommittedThisHand, 0)} />
-          <CommunityCards cards={room.hand.communityCards} />
-          {room.hand.phase === "waiting" && (
-            <p className="max-w-[55%] text-center text-xs text-[var(--text-secondary)]">
-              {room.players.filter((p) => p.seat !== null).length < 2
-                ? `Waiting for players · Blinds ${room.settings.smallBlind}/${room.settings.bigBlind}`
-                : `Ready when you are · Blinds ${room.settings.smallBlind}/${room.settings.bigBlind}`}
-            </p>
-          )}
-        </div>
-        {/* Subtle centre branding, understated. */}
-        <div className="pointer-events-none absolute left-1/2 top-[8%] flex -translate-x-1/2 items-center gap-1.5 opacity-[0.35]">
-          <Spade className="h-3 w-3" style={{ color: "var(--table-branding)" }} fill="currentColor" />
-          <span
-            className="text-[10px] font-bold tracking-[0.3em]"
-            style={{ color: "var(--table-branding)" }}
-          >
-            FELT
-          </span>
+    <div className="flex min-h-0 flex-col items-center gap-1 sm:gap-1.5">
+      <div className="relative mx-auto aspect-[3/4] h-[min(88cqh,600px,calc(100cqw*4/3))] w-auto max-w-full sm:aspect-[16/11] sm:h-[min(84cqh,720px,calc(100cqw*11/16))]">
+        <div className="table-dome-rim absolute inset-0 rounded-[46%] shadow-[0_24px_60px_rgba(0,0,0,0.6)]" />
+        <div className="table-dome-surface absolute inset-[4.5%] rounded-[46%]">
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 pt-[16%]">
+            <Pot pots={room.hand.pots} liveTotal={room.players.reduce((s, p) => s + p.totalCommittedThisHand, 0)} />
+            <CommunityCards cards={room.hand.communityCards} />
+            {room.hand.phase === "waiting" && (
+              <p className="max-w-[55%] text-center text-xs text-[var(--text-secondary)]">
+                {room.players.filter((p) => p.seat !== null).length < 2
+                  ? `Waiting for players · Blinds ${room.settings.smallBlind}/${room.settings.bigBlind}`
+                  : `Ready when you are · Blinds ${room.settings.smallBlind}/${room.settings.bigBlind}`}
+              </p>
+            )}
+          </div>
+          {/* Subtle centre branding, understated. */}
+          <div className="pointer-events-none absolute left-1/2 top-[8%] flex -translate-x-1/2 items-center gap-1.5 opacity-[0.35]">
+            <Spade className="h-3 w-3" style={{ color: "var(--table-branding)" }} fill="currentColor" />
+            <span
+              className="text-[10px] font-bold tracking-[0.3em]"
+              style={{ color: "var(--table-branding)" }}
+            >
+              FELT
+            </span>
+          </div>
+
+          <Deck handNumber={room.hand.handNumber} className="absolute left-[68%] top-[6%] opacity-90" />
         </div>
 
-        <Deck handNumber={room.hand.handNumber} className="absolute left-[68%] top-[6%] opacity-90" />
-      </div>
-
-      {ringSeats.map(({ seat, position }) => {
-        const player = playerAtSeat(room.players, seat);
-        if (player) {
+        {ringSeats.map(({ seat, position }) => {
+          const player = playerAtSeat(room.players, seat);
+          if (player) {
+            return (
+              <PlayerSeat
+                key={seat}
+                player={player}
+                position={position}
+                badge={badgeFor(seat)}
+                isActiveTurn={player.id === room.hand.activePlayerId}
+                canHostRemove={isHost}
+                turnDeadline={room.hand.turnDeadline}
+                turnTimeLimitSeconds={room.settings.turnTimeLimitSeconds}
+                statusLabel={statusLabels[player.id]?.label ?? null}
+                statusKey={statusLabels[player.id]?.key ?? 0}
+                handDescription={room.hand.result?.revealedHands[player.id]?.description ?? null}
+                onRemove={() => onRemovePlayer(player.id)}
+              />
+            );
+          }
           return (
-            <PlayerSeat
+            <EmptySeat
               key={seat}
-              player={player}
               position={position}
-              badge={badgeFor(seat)}
-              isActiveTurn={player.id === room.hand.activePlayerId}
-              canHostRemove={isHost}
-              turnDeadline={room.hand.turnDeadline}
-              turnTimeLimitSeconds={room.settings.turnTimeLimitSeconds}
-              statusLabel={statusLabels[player.id]?.label ?? null}
-              statusKey={statusLabels[player.id]?.key ?? 0}
-              handDescription={room.hand.result?.revealedHands[player.id]?.description ?? null}
-              onRemove={() => onRemovePlayer(player.id)}
+              canSit={canSit}
+              onSit={() => onSit(seat)}
+              canInvite={isHost && !canSit}
+              onInvite={() => copyInviteLink(room.id)}
             />
           );
-        }
-        return (
-          <EmptySeat
-            key={seat}
-            position={position}
-            canSit={canSit}
-            onSit={() => onSit(seat)}
-            canInvite={isHost && !canSit}
-            onInvite={() => copyInviteLink(room.id)}
-          />
-        );
-      })}
+        })}
 
+        {flights.map((f) => (
+          <ChipFlight key={f.id} from={f.from} to={f.to} amount={f.amount} onDone={() => removeFlight(f.id)} />
+        ))}
+      </div>
+
+      {/* The viewer's own name + cards, in normal document flow (not
+          absolutely positioned like the ring seats above) — it needs real,
+          reserved space below the table so it can never overlap whatever
+          renders under PokerTable (the action dock's status text used to
+          get covered by this exact panel when it floated free). */}
       {me &&
         (mySeat !== null ? (
-          // Top-anchored (not bottom-anchored) so the gap below the table is
-          // always the fixed margin below, never `height - offset` creeping
-          // upward into the oval when the table itself shrinks at narrower
-          // viewports — bottom-anchoring let a tall, fixed-size hand overlap
-          // the community cards on a short table.
-          <div className="absolute left-1/2 top-full mt-1 flex -translate-x-1/2 flex-col items-center gap-1 sm:mt-2">
+          <div className="flex shrink-0 flex-col items-center gap-1">
+            <span className="text-xs font-semibold text-[var(--text-primary)] sm:text-sm">
+              {me.displayName} <span className="font-normal text-[var(--text-secondary)]">(you)</span>
+            </span>
             <HoleCards cards={me.holeCards} folded={me.handStatus === "folded"} />
             {room.hand.result?.revealedHands[me.id]?.description && (
               <span className="text-xs font-medium text-[var(--accent-lime)]">
@@ -191,14 +200,10 @@ export function PokerTable({ room, isHost, onRemovePlayer, onSit }: PokerTablePr
             )}
           </div>
         ) : (
-          <div className="absolute left-1/2 top-full mt-2 -translate-x-1/2 whitespace-nowrap text-xs font-medium text-[var(--text-secondary)] sm:mt-3">
-            Pick an open seat to join the table
+          <div className="whitespace-nowrap text-xs font-medium text-[var(--text-secondary)]">
+            {me.displayName}, pick an open seat to join the table
           </div>
         ))}
-
-      {flights.map((f) => (
-        <ChipFlight key={f.id} from={f.from} to={f.to} amount={f.amount} onDone={() => removeFlight(f.id)} />
-      ))}
     </div>
   );
 }

@@ -21,6 +21,7 @@ export function ActionDock({ room, isHost, onAction, onStartHand, onSitOut }: Ac
   const isMyTurn = Boolean(me) && room.hand.activePlayerId === me!.id;
   const handOver = room.hand.phase === "waiting" || room.hand.phase === "hand-complete";
   const eligibleCount = getEligiblePlayers(room.players).length;
+  const iAmSittingOut = Boolean(me?.sittingOut && me.hasBoughtIn);
 
   return (
     <div className="flex w-full items-end justify-between gap-2 px-1 sm:gap-3">
@@ -29,35 +30,47 @@ export function ActionDock({ room, isHost, onAction, onStartHand, onSitOut }: Ac
       <div className="flex flex-1 flex-col items-center gap-2">
         {isMyTurn ? (
           <PokerActions key={`${room.hand.activePlayerId}-${room.hand.phase}`} room={room} onAction={onAction} />
-        ) : handOver ? (
+        ) : (
           <>
-            {room.hand.result && room.hand.result.winners.length > 0 && <ResultSummary room={room} />}
-            {isHost ? (
-              <Button
-                size="lg"
-                disabled={eligibleCount < 2}
-                onClick={onStartHand}
-                data-testid="start-hand-button"
-                className="bg-[var(--accent-lime)] text-[var(--accent-lime-foreground)] hover:bg-[var(--accent-lime)]/90 font-semibold px-8 shadow-[0_8px_24px_rgba(0,0,0,0.4)]"
-              >
-                {room.hand.handNumber === 0 ? "Start Hand" : "Start Next Hand"}
-              </Button>
-            ) : (
-              <p className="text-sm text-[var(--text-secondary)]">Waiting for the host to start the next hand&hellip;</p>
+            {handOver && (
+              <>
+                {room.hand.result && room.hand.result.winners.length > 0 && <ResultSummary room={room} />}
+                {isHost ? (
+                  <Button
+                    size="lg"
+                    disabled={eligibleCount < 2}
+                    onClick={onStartHand}
+                    data-testid="start-hand-button"
+                    className="bg-[var(--accent-lime)] text-[var(--accent-lime-foreground)] hover:bg-[var(--accent-lime)]/90 font-semibold px-8 shadow-[0_8px_24px_rgba(0,0,0,0.4)]"
+                  >
+                    {room.hand.handNumber === 0 ? "Start Hand" : "Start Next Hand"}
+                  </Button>
+                ) : (
+                  !iAmSittingOut && (
+                    <p className="text-sm text-[var(--text-secondary)]">Waiting for the host to start the next hand&hellip;</p>
+                  )
+                )}
+                {eligibleCount < 2 && isHost && (
+                  <p className="text-xs text-[var(--text-secondary)]">Need at least 2 players with approved chips.</p>
+                )}
+              </>
             )}
-            {eligibleCount < 2 && isHost && (
-              <p className="text-xs text-[var(--text-secondary)]">Need at least 2 players with approved chips.</p>
+            {/* Shown whenever the viewer is sitting out — not just between
+                hands — so a player who sat out (maybe by mistake) always has
+                a way back in. Without this, two players where one sits out
+                permanently stalls the table: the host's "Start Hand" stays
+                disabled (fewer than 2 eligible) with no way to undo it. */}
+            {iAmSittingOut ? (
+              <div className="flex items-center gap-2">
+                <p className="text-sm text-[var(--text-secondary)]">You&apos;re sitting out.</p>
+                <Button size="sm" variant="outline" onClick={() => onSitOut(false)}>
+                  Sit back in
+                </Button>
+              </div>
+            ) : (
+              !handOver && <WaitingIndicator room={room} onSitOut={onSitOut} isSittable={me?.handStatus === "active"} />
             )}
           </>
-        ) : me?.sittingOut && me.hasBoughtIn ? (
-          <div className="flex items-center gap-2">
-            <p className="text-sm text-[var(--text-secondary)]">You&apos;re sitting out.</p>
-            <Button size="sm" variant="outline" onClick={() => onSitOut(false)}>
-              Sit back in
-            </Button>
-          </div>
-        ) : (
-          <WaitingIndicator room={room} onSitOut={onSitOut} isSittable={me?.handStatus === "active"} />
         )}
       </div>
 

@@ -17,6 +17,10 @@ export function requestBuyIn(
   const player = room.players.find((p) => p.id === playerId);
   if (!player) throw new RoomServiceError("Player not found in this room.");
 
+  if (room.status === "in-hand") {
+    throw new RoomServiceError("Buy-ins are only allowed between hands — try again once this hand finishes.");
+  }
+
   const roundedAmount = Math.floor(amount);
   if (!Number.isFinite(roundedAmount) || roundedAmount <= 0) {
     throw new RoomServiceError("Buy-in amount must be a positive number.");
