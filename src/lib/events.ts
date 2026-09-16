@@ -81,6 +81,10 @@ export interface ServerToClientEvents {
   "room:state": (view: ClientRoomView) => void;
   "room:error": (payload: { message: string }) => void;
   "room:closed": (payload: { reason: string }) => void;
+  /** Sent only to the specific player the host just removed, on their own
+   * (still-open) connection — distinct from "room:closed", which is about
+   * the whole room. Tells that one client to reset back to a fresh join. */
+  "you:removed": (payload: { reason: string }) => void;
   "toast": (payload: { message: string; variant?: "default" | "success" | "error" }) => void;
 }
 

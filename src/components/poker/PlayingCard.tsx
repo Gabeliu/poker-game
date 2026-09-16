@@ -21,12 +21,20 @@ const SUIT_COLOR: Record<Card["suit"], string> = {
 // otherwise keep a fixed pixel footprint while the table itself gets
 // narrower on mobile (it uses a taller, narrower aspect ratio there), which
 // was colliding with side-seated players' avatars at higher player counts.
+//
+// The `cqw` caps additionally shrink these two sizes with the table's own
+// *actual* rendered width (PokerTable establishes a nested container-query
+// context on its own box) rather than only the viewport's. A `sm:` (640px+)
+// viewport doesn't mean the table itself is wide — expanded desktop
+// sidebars can leave it well under 600px — and without this, community
+// cards stayed pinned to their full "sm:" pixel size on a table that had
+// already shrunk to fit, overlapping the side-seated players next to it.
 const SIZE_CLASSES = {
   xs: "w-[1.5rem] h-[2.25rem] text-[9px] rounded-[5px]",
   sm: "w-[2.25rem] h-[3.25rem] text-[11px] rounded-[7px]",
   md: "w-[3rem] h-[4.25rem] text-sm rounded-[9px]",
-  lg: "w-[2.75rem] h-[4rem] text-sm rounded-[8px] sm:w-[4rem] sm:h-[5.75rem] sm:text-lg sm:rounded-[11px]",
-  xl: "w-[4.25rem] h-[6.25rem] text-lg rounded-[10px] sm:w-[6rem] sm:h-[8.5rem] sm:text-2xl sm:rounded-[14px]",
+  lg: "w-[min(2.75rem,15cqw)] h-[min(4rem,21.8cqw)] text-sm rounded-[8px] sm:w-[min(4rem,11cqw)] sm:h-[min(5.75rem,15.8cqw)] sm:text-lg sm:rounded-[11px]",
+  xl: "w-[min(4.25rem,17cqw)] h-[min(6.25rem,25cqw)] text-lg rounded-[10px] sm:w-[min(6rem,15cqw)] sm:h-[min(8.5rem,21.3cqw)] sm:text-2xl sm:rounded-[14px]",
 } as const;
 
 interface PlayingCardProps {

@@ -42,6 +42,15 @@ export function storeToken(roomId: string, token: string): void {
   }
 }
 
+export function clearStoredToken(roomId: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(tokenStorageKey(roomId));
+  } catch {
+    // ignore
+  }
+}
+
 export function getStoredDisplayName(): string {
   if (typeof window === "undefined") return "";
   try {

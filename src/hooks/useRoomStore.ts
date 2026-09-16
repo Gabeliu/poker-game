@@ -8,7 +8,7 @@ import type {
   RoomSettings,
   SeatNumber,
 } from "@/lib/types";
-import { getSocket, getStoredToken, storeToken } from "@/lib/socketClient";
+import { clearStoredToken, getSocket, getStoredToken, storeToken } from "@/lib/socketClient";
 
 type Ack = { ok: true } | { ok: false; error: string };
 
@@ -60,6 +60,20 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
     socket.on("room:closed", (payload) => {
       const id = ++toastCounter;
       set((s) => ({ toasts: [...s.toasts, { id, message: payload.reason, variant: "error" }] }));
+    });
+    socket.on("you:removed", (payload) => {
+      const id = ++toastCounter;
+      const roomId = get().room?.id;
+      if (roomId) clearStoredToken(roomId);
+      // Reset back to a clean, unjoined state — without this, the page kept
+      // showing the (now-broken) table view: `room.you.playerId` stayed set
+      // to an id that no longer matched any player, so every control tied
+      // to "me" silently vanished with no way to rejoin or buy back in.
+      set((s) => ({
+        room: null,
+        myPlayerId: null,
+        toasts: [...s.toasts, { id, message: payload.reason, variant: "error" }],
+      }));
     });
     socket.on("toast", (payload) => {
       const id = ++toastCounter;

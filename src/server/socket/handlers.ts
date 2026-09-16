@@ -139,6 +139,24 @@ export function registerRoomHandlers(io: AppServer, socket: AppSocket): void {
       const removedName = room.players.find((p) => p.id === payload.playerId)?.displayName;
       removePlayer(room, payload.playerId);
       if (removedName) postSystemMessage(room, `${removedName} left the table`);
+
+      // The removed player's own connection stays open (they weren't
+      // disconnected) but must stop being treated as a player who no
+      // longer exists here — otherwise their client keeps a stale
+      // `you.playerId`, looks "still joined," and every action they take
+      // (including trying to buy back in) silently fails server-side with
+      // "Player not found," leaving them stuck with no way back in.
+      for (const socketId of roomStore.unlinkPlayer(room.id, payload.playerId)) {
+        const removedSocket = io.sockets.sockets.get(socketId);
+        if (removedSocket) {
+          removedSocket.leave(room.id);
+          removedSocket.data.roomId = undefined;
+          removedSocket.data.playerId = undefined;
+          removedSocket.data.playerToken = undefined;
+          removedSocket.emit("you:removed", { reason: "The host removed you from this table." });
+        }
+      }
+
       ack({ ok: true });
       void broadcastRoomState(io, room.id);
       scheduleTurnTimer(io, room.id);

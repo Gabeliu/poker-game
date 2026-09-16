@@ -116,7 +116,7 @@ export function PokerTable({ room, isHost, onRemovePlayer, onSit }: PokerTablePr
 
   return (
     <div className="flex min-h-0 flex-col items-center gap-1 sm:gap-1.5">
-      <div className="relative mx-auto aspect-[3/4] h-[min(88cqh,600px,calc(100cqw*4/3))] w-auto max-w-full sm:aspect-[16/11] sm:h-[min(84cqh,720px,calc(100cqw*11/16))]">
+      <div className="relative mx-auto aspect-[3/4] h-[min(88cqh,600px,calc(100cqw*4/3))] w-auto max-w-full [container-type:size] sm:aspect-[16/11] sm:h-[min(84cqh,720px,calc(100cqw*11/16))]">
         <div className="table-dome-rim absolute inset-0 rounded-[46%] shadow-[0_24px_60px_rgba(0,0,0,0.6)]" />
         <div className="table-dome-surface absolute inset-[4.5%] rounded-[46%]">
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 pt-[16%]">

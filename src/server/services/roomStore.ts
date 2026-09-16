@@ -75,6 +75,21 @@ export const roomStore = {
   getSocketLocation(socketId: string) {
     return socketLocations.get(socketId);
   },
+  /** Unlinks every socket currently mapped to a given player in a room —
+   * used when the host removes someone, so their (still-open) connection
+   * stops being treated as that now-nonexistent player for every future
+   * broadcast and action. Returns the affected socket ids so the caller can
+   * also make them leave the io room and notify them. */
+  unlinkPlayer(roomId: string, playerId: string): string[] {
+    const affected: string[] = [];
+    for (const [socketId, loc] of socketLocations) {
+      if (loc.roomId === roomId && loc.playerId === playerId) {
+        socketLocations.delete(socketId);
+        affected.push(socketId);
+      }
+    }
+    return affected;
+  },
 
   setTurnTimer(roomId: string, timer: ReturnType<typeof setTimeout>): void {
     clearTurnTimer(roomId);
