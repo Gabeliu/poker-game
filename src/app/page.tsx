@@ -64,10 +64,12 @@ export default function Home() {
     setCreating(true);
     setLoadingText("Creating your table…");
     storeDisplayName(name.trim());
+    const parsedSmallBlind = Number(smallBlind);
+    const parsedBigBlind = Number(bigBlind);
     const res = await createRoom(name.trim(), {
       roomName: roomName.trim() || "Poker Night",
-      smallBlind: Number(smallBlind) || 25,
-      bigBlind: Number(bigBlind) || 50,
+      smallBlind: Number.isFinite(parsedSmallBlind) && parsedSmallBlind > 0 ? parsedSmallBlind : 25,
+      bigBlind: Number.isFinite(parsedBigBlind) && parsedBigBlind > 0 ? parsedBigBlind : 50,
     });
     setCreating(false);
     if (res.ok && res.roomId) {
@@ -154,11 +156,11 @@ export default function Home() {
                     <div className="grid grid-cols-2 gap-3">
                       <div className="grid gap-1.5">
                         <Label htmlFor="sb">Small blind</Label>
-                        <Input id="sb" type="number" value={smallBlind} onChange={(e) => setSmallBlind(e.target.value)} />
+                        <Input id="sb" type="number" min={1} value={smallBlind} onChange={(e) => setSmallBlind(e.target.value)} />
                       </div>
                       <div className="grid gap-1.5">
                         <Label htmlFor="bb">Big blind</Label>
-                        <Input id="bb" type="number" value={bigBlind} onChange={(e) => setBigBlind(e.target.value)} />
+                        <Input id="bb" type="number" min={1} value={bigBlind} onChange={(e) => setBigBlind(e.target.value)} />
                       </div>
                     </div>
                     <p className="text-xs text-muted-foreground">
