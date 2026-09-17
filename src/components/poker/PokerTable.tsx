@@ -13,6 +13,12 @@ import { HoleCards } from "./HoleCards";
 import { ChipFlight } from "./ChipFlight";
 import { Deck } from "./Deck";
 import { Spade } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { getEligiblePlayers } from "@/server/engine/seats";
+import { formatChips } from "@/lib/format";
+import { PlayerAvatar } from "./PlayerAvatar";
+import { ChipStack } from "./ChipStack";
+import { cn } from "@/lib/utils";
 
 /** Where the pot visually sits within the table, in the same xPct/yPct
  * coordinate space as seat positions — used as the destination for bet
@@ -35,15 +41,19 @@ interface PokerTableProps {
   isHost: boolean;
   onRemovePlayer: (playerId: string) => void;
   onSit: (seat: SeatNumber) => void;
+  onStartHand: () => void;
 }
 
-export function PokerTable({ room, isHost, onRemovePlayer, onSit }: PokerTableProps) {
+export function PokerTable({ room, isHost, onRemovePlayer, onSit, onStartHand }: PokerTableProps) {
   const me = room.players.find((p) => p.id === room.you.playerId);
   const mySeat = me?.seat ?? null;
   const canSit = Boolean(me) && mySeat === null;
   const handInProgress = room.hand.phase !== "waiting" && room.hand.phase !== "hand-complete";
   const statusLabels = usePlayerStatusLabels(room.players, room.hand.lastAggressorId);
   const ringSeats = ringSeatPositions(mySeat);
+  const eligibleCount = getEligiblePlayers(room.players).length;
+  const waiting = room.hand.phase === "waiting";
+  const winners = room.hand.result?.winners ?? [];
 
   const seatPointFor = (playerId: string): ArcPosition | null => {
     if (playerId === room.you.playerId) return SELF_POINT;
@@ -115,23 +125,33 @@ export function PokerTable({ room, isHost, onRemovePlayer, onSit }: PokerTablePr
   };
 
   return (
-    <div className="flex min-h-0 flex-col items-center gap-1 sm:gap-1.5">
-      <div className="relative mx-auto aspect-[3/4] h-[min(88cqh,600px,calc(100cqw*4/3))] w-auto max-w-full [container-type:size] sm:aspect-[16/11] sm:h-[min(84cqh,720px,calc(100cqw*11/16))]">
+    <div className="poker-table-wrap">
+      <div className="poker-table">
         <div className="table-dome-rim absolute inset-0 rounded-[46%] shadow-[0_24px_60px_rgba(0,0,0,0.6)]" />
         <div className="table-dome-surface absolute inset-[4.5%] rounded-[46%]">
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 pt-[16%]">
+          <div className="table-board">
+            {!waiting && <>
             <Pot pots={room.hand.pots} liveTotal={room.players.reduce((s, p) => s + p.totalCommittedThisHand, 0)} />
             <CommunityCards cards={room.hand.communityCards} />
-            {room.hand.phase === "waiting" && (
-              <p className="max-w-[55%] text-center text-xs text-[var(--text-secondary)]">
-                {room.players.filter((p) => p.seat !== null).length < 2
-                  ? `Waiting for players · Blinds ${room.settings.smallBlind}/${room.settings.bigBlind}`
-                  : `Ready when you are · Blinds ${room.settings.smallBlind}/${room.settings.bigBlind}`}
-              </p>
+            </>}
+            {waiting && (
+              <div className="table-lobby">
+                <span className="room-eyebrow">Your private table</span>
+                <h1>{room.settings.roomName}</h1>
+                <p className="table-stakes">{formatChips(room.settings.smallBlind)} <span>/</span> {formatChips(room.settings.bigBlind)}</p>
+                <span className="room-eyebrow">No Limit Hold’em</span>
+                <div className="seated-count"><span />{room.players.filter((p) => p.seat !== null).length} / 8 players seated</div>
+                {isHost && eligibleCount >= 2 ? (
+                  <Button className="room-primary" onClick={onStartHand} data-testid="start-hand-button">Start Hand</Button>
+                ) : (
+                  <Button variant="outline" className="table-invite" onClick={() => copyInviteLink(room.id)}>Copy Invite Link</Button>
+                )}
+                <p className="lobby-hint">{eligibleCount < 2 ? "Waiting for players to buy in" : isHost ? "The table is ready. Deal them in." : "Waiting for the host to deal"}</p>
+              </div>
             )}
           </div>
           {/* Subtle centre branding, understated. */}
-          <div className="pointer-events-none absolute left-1/2 top-[8%] flex -translate-x-1/2 items-center gap-1.5 opacity-[0.35]">
+          <div className="table-watermark">
             <Spade className="h-3 w-3" style={{ color: "var(--table-branding)" }} fill="currentColor" />
             <span
               className="text-[10px] font-bold tracking-[0.3em]"
@@ -141,7 +161,7 @@ export function PokerTable({ room, isHost, onRemovePlayer, onSit }: PokerTablePr
             </span>
           </div>
 
-          <Deck handNumber={room.hand.handNumber} className="absolute left-[68%] top-[6%] opacity-90" />
+          <Deck handNumber={room.hand.handNumber} className="table-deck absolute left-[68%] top-[20%] opacity-90" />
         </div>
 
         {ringSeats.map(({ seat, position }) => {
@@ -154,6 +174,7 @@ export function PokerTable({ room, isHost, onRemovePlayer, onSit }: PokerTablePr
                 position={position}
                 badge={badgeFor(seat)}
                 isActiveTurn={player.id === room.hand.activePlayerId}
+                isWinner={winners.some((w) => w.playerId === player.id)}
                 canHostRemove={isHost}
                 turnDeadline={room.hand.turnDeadline}
                 turnTimeLimitSeconds={room.settings.turnTimeLimitSeconds}
@@ -179,20 +200,17 @@ export function PokerTable({ room, isHost, onRemovePlayer, onSit }: PokerTablePr
         {flights.map((f) => (
           <ChipFlight key={f.id} from={f.from} to={f.to} amount={f.amount} onDone={() => removeFlight(f.id)} />
         ))}
-      </div>
-
-      {/* The viewer's own name + cards, in normal document flow (not
-          absolutely positioned like the ring seats above) — it needs real,
-          reserved space below the table so it can never overlap whatever
-          renders under PokerTable (the action dock's status text used to
-          get covered by this exact panel when it floated free). */}
       {me &&
         (mySeat !== null ? (
-          <div className="flex shrink-0 flex-col items-center gap-1">
-            <span className="text-xs font-semibold text-[var(--text-primary)] sm:text-sm">
-              {me.displayName} <span className="font-normal text-[var(--text-secondary)]">(you)</span>
-            </span>
-            <HoleCards cards={me.holeCards} folded={me.handStatus === "folded"} />
+          <div className={cn("self-seat", me.id === room.hand.activePlayerId && "seat-active", winners.some((w) => w.playerId === me.id) && "seat-winner")}>
+            <div className="self-cards"><HoleCards cards={me.holeCards} folded={me.handStatus === "folded"} /></div>
+            {me.currentBet > 0 && <ChipStack amount={me.currentBet} variant="bet" className="self-bet" />}
+            <div className="self-identity">
+              <PlayerAvatar name={me.displayName} size="sm" />
+              <div><span className="self-name">{me.displayName} <small>(you)</small></span><ChipStack amount={me.chips} /></div>
+              {me.isHost && <span className="host-label">Host</span>}
+              {badgeFor(mySeat) && <span className={cn("dealer-puck", badgeFor(mySeat) !== "D" && "blind-puck")}>{badgeFor(mySeat)}</span>}
+            </div>
             {room.hand.result?.revealedHands[me.id]?.description && (
               <span className="text-xs font-medium text-[var(--accent-lime)]">
                 {room.hand.result.revealedHands[me.id].description}
@@ -200,10 +218,11 @@ export function PokerTable({ room, isHost, onRemovePlayer, onSit }: PokerTablePr
             )}
           </div>
         ) : (
-          <div className="whitespace-nowrap text-xs font-medium text-[var(--text-secondary)]">
+          <div className="spectator-hint">
             {me.displayName}, pick an open seat to join the table
           </div>
         ))}
+      </div>
     </div>
   );
 }

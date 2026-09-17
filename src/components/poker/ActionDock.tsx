@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { formatChips } from "@/lib/format";
 import type { ActionRequest, ClientRoomView } from "@/lib/types";
 import { PokerActions } from "./PokerActions";
-import { TurnTimer } from "./TurnTimer";
+import { PlayingCard } from "./PlayingCard";
 import { getEligiblePlayers } from "@/server/engine/seats";
 import { cn } from "@/lib/utils";
 
@@ -24,7 +24,7 @@ export function ActionDock({ room, isHost, onAction, onStartHand, onSitOut }: Ac
   const iAmSittingOut = Boolean(me?.sittingOut && me.hasBoughtIn);
 
   return (
-    <div className="flex w-full items-end justify-between gap-2 px-1 sm:gap-3">
+    <div className="action-dock flex w-full items-end justify-between gap-2 px-1 sm:gap-3">
       <div className="hidden w-24 shrink-0 sm:block sm:w-32" aria-hidden />
 
       <div className="flex flex-1 flex-col items-center gap-2">
@@ -35,7 +35,7 @@ export function ActionDock({ room, isHost, onAction, onStartHand, onSitOut }: Ac
             {handOver && (
               <>
                 {room.hand.result && room.hand.result.winners.length > 0 && <ResultSummary room={room} />}
-                {isHost ? (
+                {isHost && room.hand.phase !== "waiting" ? (
                   <Button
                     size="lg"
                     disabled={eligibleCount < 2}
@@ -46,11 +46,11 @@ export function ActionDock({ room, isHost, onAction, onStartHand, onSitOut }: Ac
                     {room.hand.handNumber === 0 ? "Start Hand" : "Start Next Hand"}
                   </Button>
                 ) : (
-                  !iAmSittingOut && (
+                  !isHost && !iAmSittingOut && (
                     <p className="text-sm text-[var(--text-secondary)]">Waiting for the host to start the next hand&hellip;</p>
                   )
                 )}
-                {eligibleCount < 2 && isHost && (
+                {eligibleCount < 2 && isHost && room.hand.phase !== "waiting" && (
                   <p className="text-xs text-[var(--text-secondary)]">Need at least 2 players with approved chips.</p>
                 )}
               </>
@@ -75,14 +75,6 @@ export function ActionDock({ room, isHost, onAction, onStartHand, onSitOut }: Ac
       </div>
 
       <div className="flex w-20 shrink-0 flex-col items-end gap-1.5 sm:w-32">
-        {isMyTurn && me?.handStatus === "active" && (
-          <TurnTimer
-            key={room.hand.turnDeadline ?? 0}
-            durationSeconds={room.settings.turnTimeLimitSeconds}
-            variant="pill"
-            className="hidden sm:flex"
-          />
-        )}
         {me?.hasBoughtIn && (
           <div
             data-testid="your-stack"
@@ -131,18 +123,14 @@ function ResultSummary({ room }: { room: ClientRoomView }) {
   const winnersByPlayer = new Map<string, number>();
   for (const w of result.winners) winnersByPlayer.set(w.playerId, (winnersByPlayer.get(w.playerId) ?? 0) + w.amount);
 
-  // At a real showdown, everyone who didn't fold shows their hand — not
-  // just whoever won. revealedHands covers exactly that group; an
-  // uncontested win (everyone else folded) has no revealedHands at all,
-  // so fall back to just the winner line in that case.
-  const revealed = Object.entries(result.revealedHands);
-  const playerIds = revealed.length > 0 ? revealed.map(([id]) => id) : [...winnersByPlayer.keys()];
+  // Other revealed hands remain at their seats, keeping this presentation compact.
+  const playerIds = [...winnersByPlayer.keys()];
 
   return (
     <div
       data-testid="hand-result-summary"
       className={cn(
-        "flex flex-col items-center gap-1.5 rounded-2xl border border-[var(--accent-lime)]/30 bg-black/55 px-5 py-3 text-center shadow-[0_12px_32px_rgba(0,0,0,0.5)] backdrop-blur-xl",
+        "winner-summary flex flex-wrap items-center justify-center gap-3 rounded-2xl border border-[var(--accent-lime)]/30 bg-black/55 px-5 py-3 text-center shadow-[0_12px_32px_rgba(0,0,0,0.5)] backdrop-blur-xl",
         winnersByPlayer.size === 1 && "animate-winner-pulse"
       )}
     >
@@ -154,7 +142,11 @@ function ResultSummary({ room }: { room: ClientRoomView }) {
           : result.revealedHands[playerId]?.description;
         const isWinner = Boolean(amountWon);
         return (
-          <p key={playerId} className="text-sm">
+          <div key={playerId} className="flex items-center gap-3 text-sm">
+            <div className="flex gap-1" aria-label="Winner's revealed cards">
+              {result.revealedHands[playerId]?.cards.map((card, i) => <PlayingCard key={i} card={card} size="sm" />)}
+            </div>
+            <p>
             <span className={cn("font-semibold", isWinner ? "text-[var(--accent-lime)]" : "text-[var(--text-primary)]")}>
               {player?.displayName ?? "Player"}
             </span>{" "}
@@ -166,7 +158,8 @@ function ResultSummary({ room }: { room: ClientRoomView }) {
               <span className="text-[var(--text-secondary)]">didn&apos;t win this one</span>
             )}
             {desc ? <span className="block text-xs text-[var(--text-secondary)]">{desc}</span> : null}
-          </p>
+            </p>
+          </div>
         );
       })}
     </div>

@@ -17,6 +17,7 @@ interface PlayerSeatProps {
   position: ArcPosition;
   badge: BadgeKind;
   isActiveTurn: boolean;
+  isWinner?: boolean;
   canHostRemove: boolean;
   onRemove?: () => void;
   turnDeadline?: number | null;
@@ -32,6 +33,7 @@ export function PlayerSeat({
   position,
   badge,
   isActiveTurn,
+  isWinner,
   canHostRemove,
   onRemove,
   turnDeadline,
@@ -48,36 +50,38 @@ export function PlayerSeat({
 
   return (
     <div
-      className="group absolute flex flex-col items-center"
+      className={cn("player-seat group absolute flex flex-col items-center", isActiveTurn && "seat-active", isWinner && "seat-winner", folded && "seat-folded")}
       data-testid="player-seat"
       data-player-name={player.displayName}
       data-player-chips={player.chips}
       data-player-status={player.handStatus}
+      data-bet-edge={position.yPct > 65 ? "bottom" : position.yPct < 35 ? "top" : position.xPct < 50 ? "left" : "right"}
+      data-bet-side={position.xPct < 50 ? "left" : "right"}
       style={{
         left: `${position.xPct}%`,
         top: `${position.yPct}%`,
         transform: "translate(-50%, -50%)",
       }}
     >
-      <div className={cn("relative flex flex-col items-center", folded && "animate-fold-away")}>
+      <div className="seat-panel relative flex flex-col items-center">
         <PlayerStatus label={statusLabel} statusKey={statusKey} />
 
         {/* Small card backs (or revealed showdown cards) peeking behind the
             avatar — hidden at the narrowest widths, where mobile prioritises
             the viewer's own cards over opponents'. */}
         {(showCardBacks || showRevealedCards) && (
-          <div className="mb-1 hidden gap-0.5 sm:flex">
+          <div className="opponent-cards flex gap-0.5">
             <PlayingCard
               card={showRevealedCards ? player.holeCards[0] : undefined}
               faceDown={!showRevealedCards}
-              size="xs"
+              size="sm"
               rotationDeg={-8}
               className="-mr-2"
             />
             <PlayingCard
               card={showRevealedCards ? player.holeCards[1] : undefined}
               faceDown={!showRevealedCards}
-              size="xs"
+              size="sm"
               rotationDeg={8}
               className="-ml-2"
             />
@@ -100,8 +104,8 @@ export function PlayerSeat({
           {badge && (
             <span
               className={cn(
-                "absolute -bottom-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-bold shadow",
-                badge === "D" ? "bg-[var(--accent-lime)] text-[var(--accent-lime-foreground)]" : "bg-white/20 text-white"
+                "dealer-puck absolute -bottom-1 -right-3",
+                badge !== "D" && "blind-puck"
               )}
             >
               {badge}
@@ -139,7 +143,7 @@ export function PlayerSeat({
         )}
 
         {player.currentBet > 0 && (
-          <ChipStack amount={player.currentBet} variant="bet" className="animate-chip-pop mt-0.5" />
+          <ChipStack amount={player.currentBet} variant="bet" className="seat-bet animate-chip-pop" />
         )}
       </div>
     </div>

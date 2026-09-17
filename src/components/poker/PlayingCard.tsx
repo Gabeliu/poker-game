@@ -61,7 +61,7 @@ export function PlayingCard({
   if (empty) {
     return (
       <div
-        className={cn(SIZE_CLASSES[size], "rounded-[9px] border border-dashed border-white/12", className)}
+        className={cn(SIZE_CLASSES[size], "card-placeholder rounded-[9px] border border-white/5", className)}
       />
     );
   }
@@ -70,6 +70,8 @@ export function PlayingCard({
 
   return (
     <div
+      role="img"
+      aria-label={showBack ? "Face-down card" : `${card.rank} of ${card.suit}`}
       className={cn(
         SIZE_CLASSES[size],
         "animate-deal-in relative shrink-0 select-none shadow-[0_6px_16px_rgba(0,0,0,0.55)]",
@@ -83,18 +85,14 @@ export function PlayingCard({
     >
       {showBack ? (
         <div
-          className="h-full w-full rounded-[inherit] border border-black/40"
-          style={{
-            background:
-              "repeating-linear-gradient(135deg, oklch(0.24 0.05 280) 0px, oklch(0.24 0.05 280) 3px, oklch(0.19 0.04 280) 3px, oklch(0.19 0.04 280) 6px)",
-          }}
+          className="card-back h-full w-full rounded-[inherit]"
         >
           <div className="flex h-full w-full items-center justify-center rounded-[inherit] border-2 border-white/8">
-            <div className="h-1/2 w-1/2 rounded-full border border-[var(--accent-purple)]/50" />
+            <div className="card-back-brand"><span>♠</span><small>FELT</small></div>
           </div>
         </div>
       ) : (
-        <div className="relative h-full w-full rounded-[inherit] border border-black/10 bg-[var(--card-face)] p-[9%] leading-none">
+        <div key={`${card.rank}-${card.suit}`} className="card-face-reveal relative h-full w-full rounded-[inherit] border border-black/10 bg-[var(--card-face)] p-[9%] leading-none">
           <span className={cn("absolute top-[8%] left-[10%] font-bold", SUIT_COLOR[card.suit])}>
             {card.rank}
           </span>

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { formatChips } from "@/lib/format";
 import type { SidePot } from "@/lib/types";
+import { PokerChip } from "./PokerChip";
 
 export function Pot({ pots, liveTotal }: { pots: SidePot[]; liveTotal: number }) {
   const total = pots.length > 0 ? pots.reduce((s, p) => s + p.amount, 0) : liveTotal;
@@ -20,12 +21,13 @@ export function Pot({ pots, liveTotal }: { pots: SidePot[]; liveTotal: number })
   if (total <= 0) return null;
 
   return (
-    <div className="flex flex-col items-center gap-0.5">
+    <div className="pot-display flex flex-col items-center gap-0.5">
       <span className="text-[11px] font-medium uppercase tracking-[0.2em] text-[var(--text-secondary)]">Pot</span>
       <span
         key={bump}
-        className="animate-pot-bump text-4xl font-bold tabular-nums text-[var(--text-primary)] drop-shadow-[0_2px_12px_rgba(0,0,0,0.6)] sm:text-5xl"
+        className="animate-pot-bump flex items-center gap-3 text-3xl font-bold tabular-nums text-[var(--text-primary)] drop-shadow-[0_2px_12px_rgba(0,0,0,0.6)] sm:text-4xl"
       >
+        <span className="pot-chips" aria-hidden><PokerChip size={25} denomination={25} /><PokerChip size={25} denomination={100} /><PokerChip size={25} denomination={1000} /></span>
         {formatChips(total)}
       </span>
       {pots.length > 1 && (

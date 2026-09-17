@@ -30,7 +30,7 @@ export function HandHistoryPanel({ entries }: { entries: HandHistoryEntry[] }) {
           {recent.map((entry, i) => (
             <div
               key={`${entry.handNumber}-${i}`}
-              className="flex items-center justify-between gap-2 rounded-lg px-1.5 py-1 hover:bg-white/[0.04]"
+              className="flex items-center justify-between gap-2 rounded-lg border border-white/5 bg-black/20 px-2 py-3 hover:bg-white/[0.04]"
             >
               <div className="flex items-center gap-1">
                 {entry.holeCards.length > 0 ? (
@@ -52,7 +52,7 @@ export function HandHistoryPanel({ entries }: { entries: HandHistoryEntry[] }) {
                 >
                   {formatSignedChips(entry.netChange)}
                 </span>
-                <span className="text-[9px] text-[var(--text-secondary)]">{timeAgo(entry.createdAt)}</span>
+                <span className="text-[9px] text-[var(--text-secondary)]">#{entry.handNumber} · {timeAgo(entry.createdAt)}</span>
               </div>
             </div>
           ))}

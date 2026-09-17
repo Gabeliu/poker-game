@@ -9,7 +9,7 @@ const NATURAL_TILT = [-3, 2, -1, 3, -2];
 
 export function CommunityCards({ cards }: { cards: Card[] }) {
   return (
-    <div className="flex gap-2">
+    <div className="community-board flex gap-2" aria-label="Community cards">
       {Array.from({ length: 5 }).map((_, i) => {
         const card = cards[i];
         return card ? (

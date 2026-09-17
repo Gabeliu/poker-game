@@ -2,6 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import { formatChips } from "@/lib/format";
+import { PokerChip } from "./PokerChip";
 
 interface ChipStackProps {
   amount: number;
@@ -23,13 +24,10 @@ export function ChipStack({ amount, variant = "stack", size = "sm", className }:
         className
       )}
     >
-      <span
-        className={cn(
-          "rounded-full",
-          size === "sm" ? "h-2 w-2" : "h-2.5 w-2.5",
-          variant === "stack" ? "bg-[var(--text-secondary)]" : "bg-[var(--accent-lime)]"
-        )}
-      />
+      <span className={cn("chip-mini-stack", variant === "bet" && "chip-mini-stack-bet")}>
+        {variant === "bet" && <PokerChip size={18} denomination={amount} className="absolute top-1" />}
+        <PokerChip size={variant === "bet" ? 18 : 13} denomination={amount} />
+      </span>
       {formatChips(amount)}
     </span>
   );

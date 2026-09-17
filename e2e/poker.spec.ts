@@ -13,7 +13,7 @@ test.describe("Felt poker table — full multiplayer flow", () => {
 
     // 1-3. Host creates a room and becomes owner.
     const roomId = await createRoom(host, "Gabriel");
-    await expect(host.getByText("Poker Night")).toBeVisible();
+    await expect(host.getByRole("heading", { name: "Poker Night" })).toBeVisible();
 
     // Host buys in.
     await requestBuyIn(host, 5000);

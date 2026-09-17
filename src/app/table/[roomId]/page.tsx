@@ -162,8 +162,8 @@ export default function TablePage({ params }: { params: Promise<{ roomId: string
   };
 
   return (
-    <main className="ambient-page-bg flex min-h-screen items-center justify-center p-2 sm:p-5">
-      <div className="relative flex h-[calc(100vh-1rem)] w-full max-w-[1400px] flex-col overflow-hidden rounded-[28px] border border-white/8 bg-[var(--surface-app)] shadow-[0_40px_100px_rgba(0,0,0,0.6)] sm:h-[calc(100vh-2.5rem)] sm:rounded-[36px]">
+    <main className="ambient-page-bg game-page">
+      <div className="game-client">
         <RoomControls
           room={room}
           isHost={isHost}
@@ -183,12 +183,12 @@ export default function TablePage({ params }: { params: Promise<{ roomId: string
           }
           right={<ChatPanel messages={room.chatMessages} meId={room.you.playerId} onSend={sendChat} />}
         >
-          <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 px-3 py-2 [container-type:size] sm:px-6">
+          <div className="table-stage">
             <HostDisconnectedBanner room={room} />
-            <PokerTable room={room} isHost={isHost} onRemovePlayer={removePlayer} onSit={handleSit} />
+            <PokerTable room={room} isHost={isHost} onRemovePlayer={removePlayer} onSit={handleSit} onStartHand={startHand} />
           </div>
 
-          <div className="px-3 pb-4 sm:px-6 sm:pb-6">
+          <div className="action-area">
             <ActionDock room={room} isHost={isHost} onAction={submitAction} onStartHand={startHand} onSitOut={sitOut} />
           </div>
         </AppShell>

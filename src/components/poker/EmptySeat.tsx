@@ -19,20 +19,20 @@ interface EmptySeatProps {
  * open chairs rather than an empty oval. */
 export function EmptySeat({ position, canSit, onSit, canInvite, onInvite }: EmptySeatProps) {
   const interactive = canSit || canInvite;
-  const label = canSit ? "Sit Here" : canInvite ? "Invite" : null;
+  const label = canSit ? "Sit Here" : canInvite ? "Invite Player" : "Open seat";
 
   const content = (
     <>
       <span
         className={cn(
-          "flex h-8 w-8 items-center justify-center rounded-full border border-dashed border-white/15 text-white/25 transition-colors sm:h-10 sm:w-10",
+          "empty-avatar flex items-center justify-center rounded-full transition-colors",
           interactive && "group-hover:border-[var(--accent-lime)]/50 group-hover:text-[var(--accent-lime)]"
         )}
       >
         <Plus className="h-3.5 w-3.5" />
       </span>
       {label && (
-        <span className="text-[10px] font-medium text-white/25 transition-colors group-hover:text-[var(--accent-lime)]">
+        <span className="empty-label text-[10px] font-medium transition-colors group-hover:text-[var(--accent-lime)]">
           {label}
         </span>
       )}
@@ -43,7 +43,7 @@ export function EmptySeat({ position, canSit, onSit, canInvite, onInvite }: Empt
 
   if (!interactive) {
     return (
-      <div className="pointer-events-none absolute flex flex-col items-center gap-1 opacity-70" style={style} data-testid="empty-seat">
+      <div className="empty-seat pointer-events-none absolute flex flex-col items-center gap-1 opacity-70" style={style} data-testid="empty-seat">
         {content}
       </div>
     );
@@ -52,7 +52,7 @@ export function EmptySeat({ position, canSit, onSit, canInvite, onInvite }: Empt
   return (
     <button
       onClick={canSit ? onSit : onInvite}
-      className="group absolute flex flex-col items-center gap-1"
+      className="empty-seat group absolute flex flex-col items-center gap-1"
       style={style}
       title={canSit ? "Take this seat" : "Invite a player to this seat"}
       data-testid="empty-seat"

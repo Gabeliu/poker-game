@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
+@import "./poker-room.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -84,19 +85,19 @@
 }
 
 .dark {
-  --background: oklch(0.15 0.014 255);
+  --background: #050607;
   --foreground: oklch(0.94 0.008 90);
-  --card: oklch(0.205 0.016 255);
+  --card: #121612;
   --card-foreground: oklch(0.94 0.008 90);
-  --popover: oklch(0.19 0.016 255);
+  --popover: #101512;
   --popover-foreground: oklch(0.94 0.008 90);
   --primary: oklch(0.87 0.19 128);
   --primary-foreground: oklch(0.16 0.03 128);
-  --secondary: oklch(0.27 0.018 255);
+  --secondary: #202923;
   --secondary-foreground: oklch(0.94 0.008 90);
-  --muted: oklch(0.24 0.016 255);
+  --muted: #18211c;
   --muted-foreground: oklch(0.64 0.02 250);
-  --accent: oklch(0.29 0.02 255);
+  --accent: #26362b;
   --accent-foreground: oklch(0.94 0.008 90);
   --destructive: oklch(0.62 0.22 25);
   --border: oklch(1 0 0 / 10%);
@@ -117,25 +118,25 @@
   --sidebar-ring: oklch(0.87 0.19 128 / 55%);
 
   /* ---- Poker-product design tokens ---- */
-  /* Ambient page background: near-black with a soft purple/lavender bloom
+  /* Ambient page background: near-black with soft emerald lighting
      behind the rounded app container (not a flat color). */
-  --ambient-bg: oklch(0.09 0.01 280);
-  --ambient-glow-a: oklch(0.42 0.16 300 / 55%);
-  --ambient-glow-b: oklch(0.5 0.14 260 / 30%);
+  --ambient-bg: #050607;
+  --ambient-glow-a: #14352666;
+  --ambient-glow-b: #0c2e2233;
 
   /* The big rounded app container itself. */
-  --surface-app: oklch(0.1 0.012 270);
+  --surface-app: #090d0b;
 
   /* The table: a layered dome, not a flat oval — a physical game object.
      Sophisticated dark emerald felt (not bright casino green), a near-black
-     padded rail, and a subtle purple glow kept for atmosphere. */
-  --table-rim-a: oklch(0.17 0.014 260);
-  --table-rim-b: oklch(0.06 0.008 260);
-  --table-rail-highlight: oklch(0.26 0.016 260);
-  --table-surface-a: oklch(0.31 0.075 155);
-  --table-surface-b: oklch(0.14 0.045 158);
+     padded rail, and a subtle green glow for atmosphere. */
+  --table-rim-a: #252c29;
+  --table-rim-b: #060907;
+  --table-rail-highlight: #39453e;
+  --table-surface-a: #155b43;
+  --table-surface-b: #082e22;
   --table-inner-border: oklch(0.4 0.09 152 / 45%);
-  --table-glow: oklch(0.58 0.15 295 / 22%);
+  --table-glow: #267c4e33;
   --table-branding: oklch(0.5 0.07 155 / 55%);
 
   /* Accents — used sparingly against the dark surfaces. */
@@ -148,7 +149,7 @@
   --info: oklch(0.75 0.04 250);
 
   --text-primary: oklch(0.96 0.006 90);
-  --text-secondary: oklch(0.68 0.02 270);
+  --text-secondary: #95a49b;
 
   --card-face: oklch(0.97 0.006 90);
   --card-face-text: oklch(0.16 0.01 0);
@@ -259,10 +260,10 @@
 @keyframes winner-pulse {
   0%,
   100% {
-    box-shadow: 0 0 0 2px var(--accent-lime), 0 0 24px 4px color-mix(in oklch, var(--accent-lime) 60%, transparent);
+    box-shadow: 0 0 0 1px var(--room-gold), 0 0 12px color-mix(in oklch, var(--room-gold) 12%, transparent);
   }
   50% {
-    box-shadow: 0 0 0 3px var(--accent-lime), 0 0 40px 10px color-mix(in oklch, var(--accent-lime) 85%, transparent);
+    box-shadow: 0 0 0 1px var(--room-gold), 0 0 24px 3px color-mix(in oklch, var(--room-gold) 28%, transparent);
   }
 }
 
@@ -286,19 +287,20 @@
 }
 
 .animate-deal-in {
-  animation: deal-in 340ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation: deal-in 260ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
 .animate-chip-pop {
   animation: chip-pop 260ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
 .animate-active-glow {
-  animation: active-glow 1.6s ease-in-out infinite;
+  animation: active-glow 250ms ease-out;
+  box-shadow: 0 0 0 2px var(--accent-lime), 0 0 18px #a3df3826;
 }
 .animate-status-pill {
   animation: status-pill 2.2s ease-in-out forwards;
 }
 .animate-winner-pulse {
-  animation: winner-pulse 1.4s ease-in-out infinite;
+  animation: winner-pulse 1.6s ease-out;
 }
 .animate-fold-away {
   animation: fold-away 320ms ease-in forwards;

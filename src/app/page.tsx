@@ -75,7 +75,7 @@ export default function Home() {
   };
 
   return (
-    <main className="ambient-page-bg relative flex min-h-screen flex-col overflow-hidden">
+    <main className="landing-page ambient-page-bg relative flex min-h-screen flex-col overflow-hidden">
       <LoadingExperience show={loadingText !== null} text={loadingText ?? ""} />
 
       <header className="relative z-10 flex items-center justify-between px-6 py-5 sm:px-10">
@@ -83,13 +83,14 @@ export default function Home() {
           <Spade className="h-6 w-6 text-[var(--accent-lime)]" fill="currentColor" />
           <span className="text-lg font-bold tracking-tight">Felt</span>
         </div>
+        <span className="landing-header-note"><span /> Private tables. Real friends.</span>
       </header>
 
-      <section className="relative flex flex-1 flex-col items-center justify-center px-4 pb-20 text-center">
-        <HeroDecoration />
+      <section className="landing-hero relative flex flex-1 flex-col items-center px-4 text-center">
 
-        <div className="relative z-10 flex flex-1 flex-col items-center justify-center">
-          <h1 className="max-w-2xl text-4xl font-bold leading-tight tracking-tight sm:text-5xl">
+        <div className="hero-copy relative z-10 flex flex-col items-center justify-center">
+          <p className="hero-eyebrow">THE BEST SEAT IS WITH YOUR FRIENDS</p>
+          <h1 className="max-w-3xl text-4xl font-bold leading-tight tracking-tight sm:text-6xl">
             Play Texas Hold&rsquo;em with your friends,
             <span className="text-[var(--accent-lime)]"> anywhere.</span>
           </h1>
@@ -219,7 +220,7 @@ export default function Home() {
             </AnimatePresence>
           </motion.div>
 
-          <ol className="mt-14 flex w-full max-w-3xl list-none flex-col gap-4 text-left sm:flex-row sm:justify-between sm:text-center">
+          <ol className="landing-steps mt-8 flex w-full max-w-3xl list-none flex-wrap justify-center gap-4 text-left sm:text-center">
             <Step icon={<PlayCircle className="h-5 w-5" />} label="Create a room" />
             <Step icon={<Link2 className="h-5 w-5" />} label="Share the link" />
             <Step icon={<Users className="h-5 w-5" />} label="Friends join" />
@@ -227,7 +228,9 @@ export default function Home() {
             <Step icon={<Spade className="h-5 w-5" />} label="Play poker" />
           </ol>
         </div>
+        <HeroDecoration />
       </section>
+      <footer className="landing-footer"><span>YOUR TABLE. YOUR PEOPLE. YOUR GAME.</span><span>Virtual chips · No real-money wagering</span></footer>
     </main>
   );
 }

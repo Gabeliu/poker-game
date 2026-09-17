@@ -37,16 +37,16 @@ export function RoomControls({
   const pendingMine = room.buyInRequests.find((r) => r.playerId === me?.id && r.status === "pending");
 
   return (
-    <header className="relative flex items-center justify-between gap-2 px-3 py-2.5 sm:px-4">
+    <header className="room-header relative flex items-center justify-between gap-2 px-3 py-2.5 sm:px-4">
       <div className="flex min-w-0 flex-1 items-center gap-1.5">
         <Spade className="h-4 w-4 shrink-0 text-[var(--accent-lime)]" fill="currentColor" />
         <span className="hidden text-sm font-semibold text-[var(--text-primary)] sm:inline">Felt</span>
       </div>
 
-      <div className="pointer-events-none absolute left-1/2 top-1/2 hidden max-w-[40%] -translate-x-1/2 -translate-y-1/2 text-center sm:block">
+      <div className="room-title">
         <p className="truncate text-sm font-medium text-[var(--text-primary)]">{room.settings.roomName}</p>
         <p className="text-[10px] text-[var(--text-secondary)]">
-          Blinds {room.settings.smallBlind}/{room.settings.bigBlind}
+          {room.settings.smallBlind} / {room.settings.bigBlind} · No Limit Hold’em
         </p>
       </div>
 
@@ -55,6 +55,7 @@ export function RoomControls({
           variant="ghost"
           size="sm"
           className="gap-1.5 px-2 text-[var(--text-secondary)] hover:bg-white/8 hover:text-[var(--text-primary)] sm:px-3"
+          aria-label="Invite Friends"
           onClick={() => copyInviteLink(room.id)}
         >
           <Link2 className="h-3.5 w-3.5" />
@@ -100,6 +101,7 @@ export function RoomControls({
               variant="ghost"
               size="icon"
               data-testid="host-settings-trigger"
+              aria-label="Table settings"
               className="text-[var(--text-secondary)] hover:bg-white/8 hover:text-[var(--text-primary)]"
             >
               <Settings className="h-4 w-4" />
@@ -113,6 +115,7 @@ export function RoomControls({
           variant="ghost"
           size="icon"
           className="text-[var(--text-secondary)] hover:bg-[var(--danger)]/10 hover:text-[var(--danger)]"
+          aria-label="Leave table"
           onClick={() => router.push("/")}
         >
           <LogOut className="h-4 w-4" />

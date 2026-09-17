@@ -84,12 +84,15 @@ export function PokerActions({ room, onAction }: PokerActionsProps) {
   // not just the small ring on other players' avatars or the desktop-only
   // "Your Turn!" pill.
   const timerBar = (
-    <TurnTimer
+    <div className="flex w-full flex-col items-center gap-2">
+      <TurnTimer key={`label-${room.hand.turnDeadline ?? 0}`} durationSeconds={room.settings.turnTimeLimitSeconds} variant="pill" />
+      <TurnTimer
       key={room.hand.turnDeadline ?? 0}
       durationSeconds={room.settings.turnTimeLimitSeconds}
       variant="bar"
       className="w-full max-w-xs"
-    />
+      />
+    </div>
   );
 
   if (raising && canBetOrRaise) {
@@ -198,7 +201,8 @@ function ActionButton({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "relative flex items-center gap-1.5 rounded-xl px-5 py-2.5 text-sm font-bold transition-all duration-100 disabled:opacity-50",
+        "poker-action relative flex items-center justify-center gap-1.5 rounded-xl px-5 py-2.5 text-sm font-bold transition-all duration-100 disabled:opacity-50",
+        `poker-action-${tone}`,
         TONE_CLASSES[tone]
       )}
     >

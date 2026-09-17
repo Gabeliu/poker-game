@@ -53,6 +53,7 @@ export function BetControls({ minAmount, maxAmount, potTotal, actionLabel, onCon
       </div>
 
       <input
+        aria-label="Bet amount slider"
         type="range"
         min={minAmount}
         max={Math.max(minAmount, maxAmount)}
@@ -64,6 +65,7 @@ export function BetControls({ minAmount, maxAmount, potTotal, actionLabel, onCon
       <div className="flex gap-1.5">
         {[
           { label: "½ Pot", value: potTotal / 2 },
+          { label: "⅔ Pot", value: potTotal * 2 / 3 },
           { label: "Pot", value: potTotal },
           { label: "2× Pot", value: potTotal * 2 },
           { label: "ALL-IN", value: maxAmount },
@@ -88,7 +90,7 @@ export function BetControls({ minAmount, maxAmount, potTotal, actionLabel, onCon
         <button
           onClick={() => onConfirm(amount)}
           className={cn(
-            "flex-1 rounded-lg bg-[var(--positive)] py-2 text-sm font-semibold text-black transition-transform active:scale-[0.98]"
+            "flex-1 rounded-lg bg-[var(--accent-lime)] py-2 text-sm font-semibold text-black transition-transform active:scale-[0.98]"
           )}
         >
           {actionLabel} {formatChips(amount)}

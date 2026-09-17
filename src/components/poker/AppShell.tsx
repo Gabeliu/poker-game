@@ -21,14 +21,16 @@ export function AppShell({ left, right, children }: AppShellProps) {
       {/* Desktop left sidebar */}
       <aside
         className={cn(
-          "hidden shrink-0 flex-col border-r border-white/8 py-3 transition-[width] duration-200 md:flex",
-          leftCollapsed ? "w-12 items-center" : "w-52 px-2.5"
+          "room-sidebar hidden shrink-0 flex-col border-r border-white/8 py-3 transition-[width] duration-200 md:flex",
+          leftCollapsed ? "w-12 items-center" : "w-56 px-4"
         )}
       >
         <button
           onClick={() => setLeftCollapsed((v) => !v)}
           className="mb-2 flex h-6 w-6 shrink-0 items-center justify-center self-end rounded-md text-[var(--text-secondary)] hover:bg-white/8 hover:text-[var(--text-primary)]"
           title={leftCollapsed ? "Expand" : "Collapse"}
+          aria-label={leftCollapsed ? "Expand players and history" : "Collapse players and history"}
+          aria-expanded={!leftCollapsed}
         >
           {leftCollapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
         </button>
@@ -45,14 +47,16 @@ export function AppShell({ left, right, children }: AppShellProps) {
       {/* Desktop right sidebar */}
       <aside
         className={cn(
-          "hidden shrink-0 flex-col border-l border-white/8 py-3 transition-[width] duration-200 md:flex",
-          rightCollapsed ? "w-12 items-center" : "w-60 px-2.5"
+          "room-sidebar hidden shrink-0 flex-col border-l border-white/8 py-3 transition-[width] duration-200 md:flex",
+          rightCollapsed ? "w-12 items-center" : "w-60 px-4"
         )}
       >
         <button
           onClick={() => setRightCollapsed((v) => !v)}
           className="mb-2 flex h-6 w-6 shrink-0 items-center justify-center self-start rounded-md text-[var(--text-secondary)] hover:bg-white/8 hover:text-[var(--text-primary)]"
           title={rightCollapsed ? "Expand" : "Collapse"}
+          aria-label={rightCollapsed ? "Expand chat" : "Collapse chat"}
+          aria-expanded={!rightCollapsed}
         >
           {rightCollapsed ? <ChevronLeft className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
         </button>
@@ -66,6 +70,7 @@ export function AppShell({ left, right, children }: AppShellProps) {
       {/* Mobile drawer triggers */}
       <div className="absolute left-2 top-2 z-30 flex gap-1.5 md:hidden">
         <button
+          aria-label="Open players and history"
           onClick={() => setMobileDrawer("left")}
           className="flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-black/50 text-[var(--text-secondary)] backdrop-blur"
         >
@@ -74,6 +79,7 @@ export function AppShell({ left, right, children }: AppShellProps) {
       </div>
       <div className="absolute right-2 top-2 z-30 flex gap-1.5 md:hidden">
         <button
+          aria-label="Open chat"
           onClick={() => setMobileDrawer("right")}
           className="flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-black/50 text-[var(--text-secondary)] backdrop-blur"
         >
@@ -92,6 +98,7 @@ export function AppShell({ left, right, children }: AppShellProps) {
             )}
           >
             <button
+              aria-label="Close sidebar"
               onClick={() => setMobileDrawer(null)}
               className="mb-2 flex h-7 w-7 shrink-0 items-center justify-center self-end rounded-md text-[var(--text-secondary)] hover:bg-white/8"
             >
