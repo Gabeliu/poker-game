@@ -93,14 +93,9 @@ export function PlayingCard({
         </div>
       ) : (
         <div key={`${card.rank}-${card.suit}`} className="card-face-reveal relative h-full w-full rounded-[inherit] border border-black/10 bg-[var(--card-face)] p-[9%] leading-none">
-          {/* Corner indices carry both rank and suit so that when a second,
-              overlapping card covers the big center pip (the fanned hole-card
-              layout does this by design), the sliver of this card that stays
-              exposed is still enough to identify it. */}
-          <div className={cn("absolute top-[6%] left-[8%] flex flex-col items-center gap-[0.08em]", SUIT_COLOR[card.suit])}>
-            <span className="font-bold">{card.rank}</span>
-            <span className="text-[0.62em] leading-none">{SUIT_SYMBOL[card.suit]}</span>
-          </div>
+          <span className={cn("absolute top-[8%] left-[10%] font-bold", SUIT_COLOR[card.suit])}>
+            {card.rank}
+          </span>
           <span
             className={cn(
               "absolute inset-0 flex items-center justify-center text-[2em] opacity-90",
@@ -109,10 +104,11 @@ export function PlayingCard({
           >
             {SUIT_SYMBOL[card.suit]}
           </span>
-          <div className={cn("absolute bottom-[6%] right-[8%] flex rotate-180 flex-col items-center gap-[0.08em]", SUIT_COLOR[card.suit])}>
-            <span className="font-bold">{card.rank}</span>
-            <span className="text-[0.62em] leading-none">{SUIT_SYMBOL[card.suit]}</span>
-          </div>
+          <span
+            className={cn("absolute bottom-[8%] right-[10%] rotate-180 font-bold", SUIT_COLOR[card.suit])}
+          >
+            {card.rank}
+          </span>
         </div>
       )}
     </div>
