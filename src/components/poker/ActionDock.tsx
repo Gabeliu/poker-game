@@ -2,11 +2,12 @@
 
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { formatChips } from "@/lib/format";
-import type { ActionRequest, ClientRoomView } from "@/lib/types";
+import { formatChips, formatSignedChips } from "@/lib/format";
+import type { ActionRequest, ClientRoomView, RunItChoice } from "@/lib/types";
 import { PokerActions } from "./PokerActions";
 import { PlayingCard } from "./PlayingCard";
 import { BuyInDialog } from "./BuyInDialog";
+import { RunItPrompt } from "./RunItPrompt";
 import { getStartHandError } from "@/server/engine/seats";
 import { cn } from "@/lib/utils";
 
@@ -17,9 +18,10 @@ interface ActionDockProps {
   onStartHand: () => void;
   onSitOut: (sittingOut: boolean) => void;
   onRequestBuyIn: (amount: number, type: "initial" | "topup") => Promise<{ ok: true } | { ok: false; error: string }>;
+  onChooseRunIt: (choice: RunItChoice) => Promise<{ ok: true } | { ok: false; error: string }>;
 }
 
-export function ActionDock({ room, isHost, onAction, onStartHand, onSitOut, onRequestBuyIn }: ActionDockProps) {
+export function ActionDock({ room, isHost, onAction, onStartHand, onSitOut, onRequestBuyIn, onChooseRunIt }: ActionDockProps) {
   const me = room.players.find((p) => p.id === room.you.playerId);
   const isMyTurn = Boolean(me) && room.hand.activePlayerId === me!.id;
   const handOver = room.hand.phase === "waiting" || room.hand.phase === "hand-complete";
@@ -33,7 +35,11 @@ export function ActionDock({ room, isHost, onAction, onStartHand, onSitOut, onRe
       <div className="hidden w-24 shrink-0 sm:block sm:w-32" aria-hidden />
 
       <div className="flex flex-1 flex-col items-center gap-2">
-        {me && !me.hasBoughtIn ? (
+        {me && !me.hasBoughtIn && Boolean(me.pendingChipTopUp) ? (
+          <p className="text-sm font-medium text-[var(--accent-lime)]" data-testid="buyin-approved-next-hand">
+            Buy-in approved — {formatChips(me.pendingChipTopUp!)} chips available next hand.
+          </p>
+        ) : me && !me.hasBoughtIn ? (
           <div className="flex flex-col items-center gap-2">
             <p className="text-sm text-[var(--text-secondary)]">
               {pendingBuyIn ? "Your host still needs to approve it." : "Buy in to join the action."}
@@ -55,13 +61,24 @@ export function ActionDock({ room, isHost, onAction, onStartHand, onSitOut, onRe
               </Button>
             </BuyInDialog>
           </div>
+        ) : room.hand.runItDecision ? (
+          <RunItPrompt
+            decision={room.hand.runItDecision}
+            players={room.players}
+            myPlayerId={room.you.playerId}
+            onChoose={onChooseRunIt}
+          />
+        ) : room.hand.runout ? (
+          <p className="text-sm text-[var(--text-secondary)]" data-testid="runout-indicator">
+            Running it {room.hand.runout.runs === 2 ? "twice" : "out"}&hellip;
+          </p>
         ) : isMyTurn ? (
           <PokerActions key={`${room.hand.activePlayerId}-${room.hand.phase}`} room={room} onAction={onAction} />
         ) : (
           <>
             {handOver && (
               <>
-                {room.hand.result && room.hand.result.winners.length > 0 && <ResultSummary room={room} />}
+                {room.hand.result && <ResultSummary room={room} />}
                 {isHost && room.hand.phase !== "waiting" ? (
                   <Button
                     size="lg"
@@ -108,6 +125,7 @@ export function ActionDock({ room, isHost, onAction, onStartHand, onSitOut, onRe
             <div
               data-testid="your-stack"
               data-your-chips={me.chips}
+              data-pending-topup={me.pendingChipTopUp ?? 0}
               className="flex flex-col items-end rounded-xl border border-white/10 bg-black/40 px-2 py-1 backdrop-blur sm:px-3 sm:py-1.5"
             >
               <span className="text-[8px] font-medium uppercase tracking-wider text-[var(--text-secondary)] sm:text-[9px]">
@@ -116,6 +134,11 @@ export function ActionDock({ room, isHost, onAction, onStartHand, onSitOut, onRe
               <span className="text-sm font-bold tabular-nums text-[var(--text-primary)] sm:text-lg">
                 {formatChips(me.chips)}
               </span>
+              {Boolean(me.pendingChipTopUp) && (
+                <span className="text-[9px] font-semibold text-[var(--accent-lime)] sm:text-[10px]">
+                  +{formatChips(me.pendingChipTopUp!)} next hand
+                </span>
+              )}
             </div>
             <BuyInDialog
               player={me}
@@ -132,7 +155,7 @@ export function ActionDock({ room, isHost, onAction, onStartHand, onSitOut, onRe
                 className="h-auto gap-1 px-2 py-1 text-[10px] font-medium text-[var(--text-secondary)] hover:bg-white/8 hover:text-[var(--accent-lime)] sm:text-xs"
               >
                 <Plus className="h-3 w-3 shrink-0" />
-                {pendingBuyIn ? "Request sent" : "Buy More Chips"}
+                {pendingBuyIn ? (pendingBuyIn.deferredToNextHand ? "Sent — next hand" : "Request sent") : "Buy More Chips"}
               </Button>
             </BuyInDialog>
           </>
@@ -168,43 +191,51 @@ function WaitingIndicator({
 
 function ResultSummary({ room }: { room: ClientRoomView }) {
   const result = room.hand.result!;
-  const winnersByPlayer = new Map<string, number>();
-  for (const w of result.winners) winnersByPlayer.set(w.playerId, (winnersByPlayer.get(w.playerId) ?? 0) + w.amount);
+  const secondResult = room.hand.secondBoard?.result;
 
-  // Other revealed hands remain at their seats, keeping this presentation compact.
-  const playerIds = [...winnersByPlayer.keys()];
+  // Net result (what a player actually walks away up or down), not gross pot
+  // proceeds — a player who contributed 50 and got 50 back broke even, not
+  // "won 50". Combine both boards' winnings when the hand ran it twice, so
+  // a player who won one board and lost the other still nets correctly.
+  const winningsByPlayer = new Map<string, number>();
+  for (const w of result.winners) winningsByPlayer.set(w.playerId, (winningsByPlayer.get(w.playerId) ?? 0) + w.amount);
+  if (secondResult) {
+    for (const w of secondResult.winners) winningsByPlayer.set(w.playerId, (winningsByPlayer.get(w.playerId) ?? 0) + w.amount);
+  }
+
+  // Show everyone who put chips in this hand, winner or not, so a player
+  // who lost can see their real loss instead of just disappearing.
+  const contributors = room.players.filter((p) => p.totalCommittedThisHand > 0);
+
+  const boardAWinnerIds = new Set(result.winners.map((w) => w.playerId));
+  const boardBWinnerIds = secondResult ? new Set(secondResult.winners.map((w) => w.playerId)) : null;
 
   return (
     <div
       data-testid="hand-result-summary"
       className={cn(
         "winner-summary flex flex-wrap items-center justify-center gap-3 rounded-2xl border border-[var(--accent-lime)]/30 bg-black/55 px-5 py-3 text-center shadow-[0_12px_32px_rgba(0,0,0,0.5)] backdrop-blur-xl",
-        winnersByPlayer.size === 1 && "animate-winner-pulse"
+        !boardBWinnerIds && winningsByPlayer.size === 1 && "animate-winner-pulse"
       )}
     >
-      {playerIds.map((playerId) => {
-        const player = room.players.find((p) => p.id === playerId);
-        const amountWon = winnersByPlayer.get(playerId);
-        const desc = amountWon
-          ? result.winners.find((w) => w.playerId === playerId)?.handDescription
-          : result.revealedHands[playerId]?.description;
-        const isWinner = Boolean(amountWon);
+      {contributors.map((player) => {
+        const amountWon = winningsByPlayer.get(player.id) ?? 0;
+        const net = amountWon - player.totalCommittedThisHand;
+        const desc = result.revealedHands[player.id]?.description;
+        const netColorClass =
+          net > 0 ? "text-[var(--accent-lime)]" : net < 0 ? "text-[var(--danger)]" : "text-[var(--text-secondary)]";
+        const scooped = boardBWinnerIds && boardAWinnerIds.has(player.id) && boardBWinnerIds.has(player.id);
         return (
-          <div key={playerId} className="flex items-center gap-3 text-sm">
-            <div className="flex gap-1" aria-label="Winner's revealed cards">
-              {result.revealedHands[playerId]?.cards.map((card, i) => <PlayingCard key={i} card={card} size="sm" />)}
+          <div key={player.id} data-testid="result-row" data-player-name={player.displayName} className="flex items-center gap-3 text-sm">
+            <div className="flex gap-1" aria-label="Revealed cards">
+              {result.revealedHands[player.id]?.cards.map((card, i) => <PlayingCard key={i} card={card} size="sm" />)}
             </div>
             <p>
-            <span className={cn("font-semibold", isWinner ? "text-[var(--accent-lime)]" : "text-[var(--text-primary)]")}>
-              {player?.displayName ?? "Player"}
-            </span>{" "}
-            {isWinner && amountWon !== undefined ? (
-              <>
-                wins <span className="font-semibold text-[var(--text-primary)]">{formatChips(amountWon)}</span>
-              </>
-            ) : (
-              <span className="text-[var(--text-secondary)]">didn&apos;t win this one</span>
-            )}
+            <span className="font-semibold text-[var(--text-primary)]">{player.displayName}</span>{" "}
+            <span className={cn("font-semibold tabular-nums", netColorClass)} data-net-change={net}>
+              {formatSignedChips(net)}
+            </span>
+            {scooped && <span className="ml-1 rounded bg-[var(--room-gold)]/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[var(--room-gold)]">Scoop</span>}
             {desc ? <span className="block text-xs text-[var(--text-secondary)]">{desc}</span> : null}
             </p>
           </div>

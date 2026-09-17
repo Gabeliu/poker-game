@@ -1,9 +1,19 @@
-import type { ActionRequest, Card, HandResult, LedgerEntry, Player, PotWinner, RoomState } from "@/lib/types";
+import type { ActionRequest, Card, HandResult, LedgerEntry, Player, PotWinner, RoomState, RunItChoice, SidePot } from "@/lib/types";
 import { Deck } from "./deck";
 import { applyAction, getLegalActions } from "./betting";
-import { calculateSidePots, splitPotAmount, type PotContribution } from "./pots";
+import { calculateSidePots, splitPotAcrossRuns, splitPotAmount, type PotContribution } from "./pots";
 import { compareHandScores, evaluateBestHand } from "./evaluator";
 import { getEligiblePlayers, getStartHandError, getPlayersStillInHand, getPlayersWhoCanAct, nextPlayerAfterSeat } from "./seats";
+
+/** Optional behavior flags threaded through the flow-advancing entry points.
+ * Absent (the default) preserves today's exact synchronous behavior — an
+ * all-in runout resolves the whole hand to completion in one call, which is
+ * what every existing caller and test relies on. Only the socket handlers
+ * pass `{ paced: true }`, which instead suspends at an all-in for a
+ * server-driven, one-street-at-a-time reveal (see beginRunout/continueRunout). */
+export interface HandFlowOptions {
+  paced?: boolean;
+}
 
 export class HandEngineError extends Error {}
 
@@ -17,8 +27,35 @@ function addLedgerEntry(room: RoomState, entry: Omit<LedgerEntry, "id" | "create
   room.ledger.push({ ...entry, id: nextLedgerId(), createdAt: Date.now() });
 }
 
+/** Credits chips a host approved while this player was mid-hand (see
+ * buyInService's deferred-topup path) — never applied to an active stack,
+ * only ever here, between hands. */
+function applyPendingChipTopUps(room: RoomState): void {
+  for (const player of room.players) {
+    if (player.pendingChipTopUp && player.pendingChipTopUp > 0) {
+      player.chips += player.pendingChipTopUp;
+      player.pendingChipTopUp = 0;
+      player.hasBoughtIn = true;
+    }
+  }
+}
+
 /** Starts a new hand: rotates dealer/blinds, deals hole cards, sets first actor. */
 export function startHand(room: RoomState, deck: Deck): void {
+  // A staged all-in reveal takes real time to play out server-side (see
+  // beginRunout/continueRunout) — unlike the old instant-runout behavior,
+  // it's now reachable for the host to try to start a new hand while one is
+  // still resolving, which would replace the deck out from under it.
+  if (room.status === "in-hand") {
+    throw new HandEngineError("A hand is already in progress.");
+  }
+
+  // Safety net: chips approved mid-hand (see buyInService's deferred
+  // top-up path) are normally applied by finalizeHand before status ever
+  // gets here, but apply them here too in case a hand reaches "lobby"
+  // through any other path.
+  applyPendingChipTopUps(room);
+
   const startError = getStartHandError(room.players);
   if (startError) throw new HandEngineError(startError);
   const eligible = getEligiblePlayers(room.players);
@@ -71,6 +108,9 @@ export function startHand(room: RoomState, deck: Deck): void {
     turnDeadline: null,
     lastAggressorId: null,
     result: null,
+    runItDecision: null,
+    runout: null,
+    secondBoard: null,
   };
 
   const sbPlayer = room.players.find((p) => p.seat === smallBlindSeat)!;
@@ -103,7 +143,8 @@ export function submitAction(
   room: RoomState,
   deck: Deck,
   playerId: string,
-  action: ActionRequest
+  action: ActionRequest,
+  opts?: HandFlowOptions
 ): SubmitActionResult {
   if (room.hand.activePlayerId !== playerId) {
     return { ok: false, error: "It's not your turn." };
@@ -123,12 +164,12 @@ export function submitAction(
   }
 
   // Only a seated player can ever be the active player, so this is always non-null.
-  advanceGameFlow(room, deck, player.seat!);
+  advanceGameFlow(room, deck, player.seat!, opts);
   return { ok: true };
 }
 
 /** Called by the room's turn timer when a player fails to act in time. */
-export function forceTimeoutAction(room: RoomState, deck: Deck): void {
+export function forceTimeoutAction(room: RoomState, deck: Deck, opts?: HandFlowOptions): void {
   const playerId = room.hand.activePlayerId;
   if (!playerId) return;
   const player = room.players.find((p) => p.id === playerId);
@@ -136,7 +177,7 @@ export function forceTimeoutAction(room: RoomState, deck: Deck): void {
 
   const info = getLegalActions(player, room.hand, room.settings.bigBlind);
   const action: ActionRequest = info.legalActions.includes("check") ? { action: "check" } : { action: "fold" };
-  submitAction(room, deck, playerId, action);
+  submitAction(room, deck, playerId, action, opts);
 }
 
 /**
@@ -144,7 +185,7 @@ export function forceTimeoutAction(room: RoomState, deck: Deck): void {
  * a new street. `fromSeat` is the seat to search forward from when picking
  * the next player to act.
  */
-export function advanceGameFlow(room: RoomState, deck: Deck, fromSeat: number): void {
+export function advanceGameFlow(room: RoomState, deck: Deck, fromSeat: number, opts?: HandFlowOptions): void {
   if (checkForImmediateHandEnd(room)) return;
 
   const canAct = getPlayersWhoCanAct(room.players);
@@ -177,8 +218,149 @@ export function advanceGameFlow(room: RoomState, deck: Deck, fromSeat: number): 
     return;
   }
 
+  // Betting is over with streets still left to deal. Unpaced (the default —
+  // every existing caller/test), this resolves the whole hand synchronously
+  // in one call, exactly as before. Paced (socket handlers only), it
+  // suspends here for a server-driven, one-street-at-a-time reveal instead.
+  if (opts?.paced && canAct.length <= 1) {
+    beginRunout(room);
+    return;
+  }
+
   dealNextStreetCards(room, deck);
-  advanceGameFlow(room, deck, room.hand.dealerSeat);
+  advanceGameFlow(room, deck, room.hand.dealerSeat, opts);
+}
+
+const RUN_IT_DECISION_SECONDS = 10;
+export const REVEAL_STREET_DELAY_MS = 900;
+export const REVEAL_RESOLVE_DELAY_MS = 1300;
+
+function streetsRemainingFor(communityCardCount: number): number {
+  if (communityCardCount === 0) return 3; // flop + turn + river
+  if (communityCardCount === 3) return 2; // turn + river
+  if (communityCardCount === 4) return 1; // river
+  return 0;
+}
+
+/**
+ * Entry point once betting is over and streets remain: reveals hole cards
+ * (only for players still in the hand — a folded player's cards stay
+ * hidden), then either offers the two remaining players a run-it-once/twice
+ * decision, or goes straight into a paced single-run reveal.
+ */
+export function beginRunout(room: RoomState): void {
+  const stillIn = getPlayersStillInHand(room.players);
+  for (const player of stillIn) player.holeCardsRevealed = true;
+
+  room.hand.activePlayerId = null;
+  room.hand.turnDeadline = null;
+
+  const streetsRemaining = streetsRemainingFor(room.hand.communityCards.length);
+
+  if (room.settings.runItTwiceEnabled && stillIn.length === 2 && streetsRemaining > 0) {
+    room.hand.phase = "showdown";
+    room.hand.runItDecision = {
+      eligiblePlayerIds: stillIn.map((p) => p.id),
+      choices: {},
+      deadline: Date.now() + RUN_IT_DECISION_SECONDS * 1000,
+    };
+    return;
+  }
+
+  startRunout(room, 1);
+}
+
+function startRunout(room: RoomState, runs: 1 | 2): void {
+  room.hand.runItDecision = null;
+
+  if (runs === 2) {
+    // Share whatever's already on the table — run-it-twice only re-runs the
+    // remaining streets, it doesn't re-deal a flop that already happened.
+    room.hand.secondBoard = { communityCards: [...room.hand.communityCards], result: null };
+  }
+
+  const count = room.hand.communityCards.length;
+  room.hand.phase = count === 0 ? "preflop" : count === 3 ? "flop" : count === 4 ? "turn" : "river";
+
+  room.hand.runout = {
+    runs,
+    streetsRemaining: streetsRemainingFor(count),
+    nextRevealAt: Date.now() + REVEAL_STREET_DELAY_MS,
+  };
+}
+
+/** Deals the next street of a paced runout (both boards, if running twice),
+ * or — once every street is dealt — runs showdown and finalizes the hand.
+ * Called on a timer (see broadcast.ts's scheduleHandFlowTimer), one street
+ * per call, so every client sees the reveal at the same real pace. */
+export function continueRunout(room: RoomState, deck: Deck): { done: boolean } {
+  const runout = room.hand.runout;
+  if (!runout) return { done: true };
+
+  if (runout.streetsRemaining === 0) {
+    runShowdown(room);
+    room.hand.runout = null;
+    finalizeHand(room);
+    return { done: true };
+  }
+
+  const countBefore = room.hand.communityCards.length;
+  const dealCount = countBefore === 0 ? 3 : 1;
+  dealNextStreetCards(room, deck); // board 1: burns, appends, advances phase
+
+  if (runout.runs === 2 && room.hand.secondBoard) {
+    dealStreetInto(deck, room.hand.secondBoard.communityCards, dealCount);
+  }
+
+  runout.streetsRemaining -= 1;
+  runout.nextRevealAt = Date.now() + (runout.streetsRemaining === 0 ? REVEAL_RESOLVE_DELAY_MS : REVEAL_STREET_DELAY_MS);
+  return { done: false };
+}
+
+/** Records one of the two all-in players' run-it-once/twice choice. Any
+ * "once" resolves immediately to a single run without waiting on the other
+ * player; only when both choose "twice" does it resolve to two runs. */
+export function chooseRunIt(
+  room: RoomState,
+  playerId: string,
+  choice: RunItChoice
+): { ok: boolean; error?: string; resolved: boolean } {
+  const decision = room.hand.runItDecision;
+  if (!decision) return { ok: false, error: "There's no run-it decision to make right now.", resolved: false };
+  if (!decision.eligiblePlayerIds.includes(playerId)) {
+    return { ok: false, error: "You're not one of the players deciding this.", resolved: false };
+  }
+
+  decision.choices[playerId] = choice;
+  return { ok: true, resolved: tryResolveRunItDecision(room) };
+}
+
+/** Called by the room's reveal timer when the run-it decision's deadline
+ * passes — whoever hasn't answered defaults to "once", which (per the
+ * any-once-wins rule) always resolves to a single run on timeout. */
+export function resolveRunItByTimeout(room: RoomState): void {
+  const decision = room.hand.runItDecision;
+  if (!decision) return;
+  for (const id of decision.eligiblePlayerIds) {
+    if (!decision.choices[id]) decision.choices[id] = "once";
+  }
+  tryResolveRunItDecision(room);
+}
+
+function tryResolveRunItDecision(room: RoomState): boolean {
+  const decision = room.hand.runItDecision;
+  if (!decision) return false;
+
+  const choices = decision.eligiblePlayerIds.map((id) => decision.choices[id]);
+  if (choices.some((c) => c === "once")) {
+    startRunout(room, 1);
+    return true;
+  }
+  if (choices.every((c) => c === "twice")) {
+    startRunout(room, 2);
+    return true;
+  }
+  return false;
 }
 
 /**
@@ -198,18 +380,22 @@ export function checkForImmediateHandEnd(room: RoomState): boolean {
   return false;
 }
 
+/** Burns one card and deals `count` into `target` — the primitive both the
+ * primary board and (during a run-it-twice reveal) the second board use. */
+function dealStreetInto(deck: Deck, target: Card[], count: number): void {
+  deck.draw(); // burn
+  target.push(...deck.drawMany(count));
+}
+
 function dealNextStreetCards(room: RoomState, deck: Deck): void {
   if (room.hand.phase === "preflop") {
-    deck.draw(); // burn
-    room.hand.communityCards.push(...deck.drawMany(3));
+    dealStreetInto(deck, room.hand.communityCards, 3);
     room.hand.phase = "flop";
   } else if (room.hand.phase === "flop") {
-    deck.draw(); // burn
-    room.hand.communityCards.push(...deck.drawMany(1));
+    dealStreetInto(deck, room.hand.communityCards, 1);
     room.hand.phase = "turn";
   } else if (room.hand.phase === "turn") {
-    deck.draw(); // burn
-    room.hand.communityCards.push(...deck.drawMany(1));
+    dealStreetInto(deck, room.hand.communityCards, 1);
     room.hand.phase = "river";
   }
 
@@ -240,6 +426,12 @@ function buildContributions(room: RoomState): PotContribution[] {
 function awardUncontestedPot(room: RoomState, winner: Player | null): void {
   const totalPot = room.players.reduce((sum, p) => sum + p.totalCommittedThisHand, 0);
   room.hand.pots = [];
+  // A fold-out can happen mid-reveal (e.g. the host removes a disconnected
+  // player between hands, or a future path force-folds someone) — clear any
+  // in-flight reveal state so nothing stale survives into hand-complete.
+  room.hand.runout = null;
+  room.hand.runItDecision = null;
+  room.hand.secondBoard = null;
 
   if (!winner || totalPot === 0) {
     room.hand.result = { winners: [], revealedHands: {} };
@@ -262,17 +454,29 @@ function awardUncontestedPot(room: RoomState, winner: Player | null): void {
   applyLedgerForHand(room, new Map([[winner.id, totalPot]]));
 }
 
-function runShowdown(room: RoomState): void {
-  const stillIn = getPlayersStillInHand(room.players);
-  const contributions = buildContributions(room);
-  const pots = calculateSidePots(contributions);
-  room.hand.pots = pots;
+interface BoardOutcome {
+  result: HandResult;
+  winningsByPlayer: Map<string, number>;
+}
 
+/** Evaluates one board (the primary board, or the second run in a run-it-
+ * twice reveal) against the hand's pots, crediting chips as it goes.
+ * `runIndex`/`runs` divide each pot's amount across runs first (odd chip to
+ * run 0) — with `runs === 1` this is a no-op and behavior is identical to
+ * evaluating a single board, so every existing single-board hand is
+ * unaffected. */
+function evaluateBoard(
+  room: RoomState,
+  communityCards: Card[],
+  pots: SidePot[],
+  stillIn: Player[],
+  runIndex: number,
+  runs: number
+): BoardOutcome {
   const scores = new Map<string, ReturnType<typeof evaluateBestHand>>();
   for (const player of stillIn) {
-    const allCards: Card[] = [...player.holeCards, ...room.hand.communityCards];
+    const allCards: Card[] = [...player.holeCards, ...communityCards];
     scores.set(player.id, evaluateBestHand(allCards));
-    player.holeCardsRevealed = true;
   }
 
   const winners: PotWinner[] = [];
@@ -288,7 +492,8 @@ function runShowdown(room: RoomState): void {
       if (compareHandScores(score, bestScore) > 0) bestScore = score;
     }
     const potWinnerIds = contenders.filter((id) => compareHandScores(scores.get(id)!, bestScore) === 0);
-    const split = splitPotAmount(pot.amount, potWinnerIds);
+    const potShareForThisRun = splitPotAcrossRuns(pot.amount, runs)[runIndex];
+    const split = splitPotAmount(potShareForThisRun, potWinnerIds);
 
     for (const [playerId, amount] of Object.entries(split)) {
       const player = room.players.find((p) => p.id === playerId)!;
@@ -310,11 +515,45 @@ function runShowdown(room: RoomState): void {
       cards: player.holeCards,
       description: score.description,
       rank: score.category,
+      bestFive: score.cards,
     };
   }
 
-  room.hand.result = { winners, revealedHands };
-  applyLedgerForHand(room, winningsByPlayer);
+  return { result: { winners, revealedHands }, winningsByPlayer };
+}
+
+function sumWinnings(a: Map<string, number>, b: Map<string, number>): Map<string, number> {
+  const combined = new Map(a);
+  for (const [id, amount] of b) {
+    combined.set(id, (combined.get(id) ?? 0) + amount);
+  }
+  return combined;
+}
+
+function runShowdown(room: RoomState): void {
+  const stillIn = getPlayersStillInHand(room.players);
+  const contributions = buildContributions(room);
+  const pots = calculateSidePots(contributions);
+  room.hand.pots = pots;
+
+  // Set here too (not just beginRunout) so the still-instant/unpaced path —
+  // every existing caller and test — keeps revealing cards exactly as before.
+  for (const player of stillIn) player.holeCardsRevealed = true;
+
+  const runs = room.hand.secondBoard ? 2 : 1;
+  const boardA = evaluateBoard(room, room.hand.communityCards, pots, stillIn, 0, runs);
+  room.hand.result = boardA.result;
+
+  let combinedWinnings = boardA.winningsByPlayer;
+  if (room.hand.secondBoard) {
+    const boardB = evaluateBoard(room, room.hand.secondBoard.communityCards, pots, stillIn, 1, runs);
+    room.hand.secondBoard.result = boardB.result;
+    combinedWinnings = sumWinnings(boardA.winningsByPlayer, boardB.winningsByPlayer);
+  }
+
+  // Applied once with the combined total across both boards, so history and
+  // the room ledger reflect one net number for the hand, not two.
+  applyLedgerForHand(room, combinedWinnings);
 }
 
 const MAX_HAND_HISTORY_PER_PLAYER = 25;
@@ -353,7 +592,18 @@ function finalizeHand(room: RoomState): void {
   room.hand.phase = "hand-complete";
   room.hand.activePlayerId = null;
   room.hand.turnDeadline = null;
+  room.hand.runout = null;
+  room.hand.runItDecision = null;
+  // secondBoard is deliberately left populated — the client still needs
+  // both boards visible through hand-complete; startHand replaces the whole
+  // hand object anyway when the next hand begins.
   room.status = "lobby";
+
+  // Apply chips a host approved while this hand was still running before
+  // deciding who's sitting out — otherwise a player who busted this hand
+  // but has an approved top-up waiting would get stamped "sitting-out"
+  // while silently holding chips they can't play with yet.
+  applyPendingChipTopUps(room);
 
   for (const player of room.players) {
     player.currentBet = 0;

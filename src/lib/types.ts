@@ -61,6 +61,9 @@ export interface Player {
   holeCardsRevealed: boolean;
   /** This player's own recent hands (their own cards only) — private, like holeCards. */
   handHistory: HandHistoryEntry[];
+  /** Host-approved chips that couldn't be applied mid-hand without touching an
+   * active stack — credited automatically at the start of the next hand. */
+  pendingChipTopUp?: number;
 }
 
 /** Public-safe player view sent to clients who are not this player. */
@@ -83,6 +86,9 @@ export interface BuyInRequest {
   status: BuyInRequestStatus;
   createdAt: number;
   resolvedAt?: number;
+  /** Created (or resolved) while a hand was already in progress — the chips
+   * apply at the start of the next hand rather than immediately. */
+  deferredToNextHand?: boolean;
 }
 
 export type LedgerEntryType =
@@ -142,6 +148,9 @@ export interface RoomSettings {
   allowAdditionalBuyIns: boolean;
   allowJoinDuringHand: boolean;
   turnTimeLimitSeconds: number;
+  /** When exactly two players are all-in with community cards left, let them
+   * agree to run the remaining board twice instead of once. */
+  runItTwiceEnabled: boolean;
 }
 
 // ---------- Hand / betting state machine ----------
@@ -171,7 +180,48 @@ export interface PotWinner {
 
 export interface HandResult {
   winners: PotWinner[];
-  revealedHands: Record<string, { cards: Card[]; description: string; rank: number }>;
+  revealedHands: Record<string, {
+    cards: Card[];
+    description: string;
+    rank: number;
+    /** The specific best 5 of the player's 7 cards that make this hand —
+     * lets the UI highlight exactly which board/hole cards won. */
+    bestFive?: Card[];
+  }>;
+}
+
+// ---------- Run it once / twice ----------
+
+export type RunItChoice = "once" | "twice";
+
+/** Present only while exactly two all-in players are choosing how many times
+ * to run the remaining board. Cleared once resolved (by either an explicit
+ * "once", both choosing "twice", or the decision timing out). */
+export interface RunItDecision {
+  eligiblePlayerIds: string[];
+  choices: Record<string, RunItChoice>;
+  deadline: number; // epoch ms
+}
+
+/** A second run of the remaining community cards, sharing whatever was
+ * already dealt on the primary board (HandState.communityCards) up to the
+ * point the run-it-twice decision was made. Only ever a second board — the
+ * primary board's own communityCards/pots/result fields are unchanged and
+ * used exactly as before when this is absent. */
+export interface BoardRun {
+  communityCards: Card[];
+  result: HandResult | null;
+}
+
+/** Present only while the server is pacing an all-in reveal one street at a
+ * time instead of resolving the hand instantly. */
+export interface RunoutState {
+  runs: 1 | 2;
+  /** Streets still to be dealt (3/2/1/0 depending on how far the hand had
+   * gotten when the last bet was called). */
+  streetsRemaining: number;
+  /** Epoch ms of the next scheduled reveal step — presentation only. */
+  nextRevealAt: number | null;
 }
 
 export interface HandState {
@@ -188,6 +238,9 @@ export interface HandState {
   turnDeadline: number | null; // epoch ms
   lastAggressorId: string | null;
   result: HandResult | null;
+  runItDecision?: RunItDecision | null;
+  runout?: RunoutState | null;
+  secondBoard?: BoardRun | null;
 }
 
 // ---------- Room ----------
@@ -216,6 +269,10 @@ export interface ClientRoomView extends Omit<RoomState, "players"> {
     holeCards: Card[];
     handHistory: HandHistoryEntry[];
   };
+  /** Monotonic per-room broadcast counter — not on RoomState itself (that
+   * would touch every server-side literal that builds one); the client uses
+   * it to drop a stale view that arrives after a newer one already landed. */
+  stateVersion: number;
 }
 
 // ---------- Player actions ----------

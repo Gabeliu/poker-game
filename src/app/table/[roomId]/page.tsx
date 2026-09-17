@@ -41,6 +41,7 @@ export default function TablePage({ params }: { params: Promise<{ roomId: string
     submitAction,
     sendChat,
     takeSeat,
+    chooseRunIt,
   } = useRoomStore.getState();
 
   // Seeded empty (not read from localStorage) so the client's first render
@@ -187,7 +188,7 @@ export default function TablePage({ params }: { params: Promise<{ roomId: string
             <PokerTable room={room} isHost={isHost} onRemovePlayer={removePlayer} onSit={handleSit} onStartHand={startHand} />
           </div>
 
-          <div className="action-area">
+          <div className={`action-area${room.hand.activePlayerId === room.you.playerId ? " action-area-my-turn" : ""}`}>
             <ActionDock
               room={room}
               isHost={isHost}
@@ -195,6 +196,7 @@ export default function TablePage({ params }: { params: Promise<{ roomId: string
               onStartHand={startHand}
               onSitOut={sitOut}
               onRequestBuyIn={requestBuyIn}
+              onChooseRunIt={chooseRunIt}
             />
           </div>
         </AppShell>

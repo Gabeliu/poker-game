@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 import type { ArcPosition } from "@/lib/seatLayout";
 import type { PublicPlayer } from "@/lib/types";
@@ -8,6 +9,7 @@ import { PlayerAvatar } from "./PlayerAvatar";
 import { ChipStack } from "./ChipStack";
 import { PlayerStatus } from "./PlayerStatus";
 import { TurnTimer } from "./TurnTimer";
+import { ConfirmRemoveDialog } from "./ConfirmRemoveDialog";
 import { Crown, WifiOff, X } from "lucide-react";
 
 type BadgeKind = "D" | "SB" | "BB" | null;
@@ -18,6 +20,9 @@ interface PlayerSeatProps {
   badge: BadgeKind;
   isActiveTurn: boolean;
   isWinner?: boolean;
+  /** Reached showdown but won nothing on any board — dimmed once the hand
+   * is fully resolved, distinct from folding (which dims immediately). */
+  isLoser?: boolean;
   canHostRemove: boolean;
   onRemove?: () => void;
   turnDeadline?: number | null;
@@ -34,6 +39,7 @@ export function PlayerSeat({
   badge,
   isActiveTurn,
   isWinner,
+  isLoser,
   canHostRemove,
   onRemove,
   turnDeadline,
@@ -42,6 +48,7 @@ export function PlayerSeat({
   statusKey,
   handDescription,
 }: PlayerSeatProps) {
+  const [confirmingRemove, setConfirmingRemove] = useState(false);
   const folded = player.handStatus === "folded";
   const allIn = player.handStatus === "all-in";
   const sittingOut = player.sittingOut || player.handStatus === "sitting-out" || !player.hasBoughtIn;
@@ -50,7 +57,7 @@ export function PlayerSeat({
 
   return (
     <div
-      className={cn("player-seat group absolute flex flex-col items-center", isActiveTurn && "seat-active", isWinner && "seat-winner", folded && "seat-folded")}
+      className={cn("player-seat group absolute flex flex-col items-center", isActiveTurn && "seat-active", isWinner && "seat-winner", isLoser && "seat-loser", folded && "seat-folded")}
       data-testid="player-seat"
       data-player-name={player.displayName}
       data-player-chips={player.chips}
@@ -119,7 +126,7 @@ export function PlayerSeat({
           )}
           {canHostRemove && (
             <button
-              onClick={onRemove}
+              onClick={() => setConfirmingRemove(true)}
               className="absolute -bottom-1 -left-1 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--danger)] text-white opacity-0 transition-opacity group-hover:opacity-100"
               title="Remove player"
             >
@@ -146,6 +153,14 @@ export function PlayerSeat({
           <ChipStack amount={player.currentBet} variant="bet" className="seat-bet animate-chip-pop" />
         )}
       </div>
+      {canHostRemove && (
+        <ConfirmRemoveDialog
+          playerName={player.displayName}
+          open={confirmingRemove}
+          onOpenChange={setConfirmingRemove}
+          onConfirm={() => onRemove?.()}
+        />
+      )}
     </div>
   );
 }

@@ -104,6 +104,9 @@ export function PokerActions({ room, onAction }: PokerActionsProps) {
           maxAmount={info.maxRaiseToAmount ?? myPlayer.chips}
           potTotal={potTotal}
           actionLabel={raiseVerb}
+          currentBetAmount={room.hand.currentBetAmount}
+          playerChips={myPlayer.chips}
+          playerCurrentBet={myPlayer.currentBet}
           onCancel={() => setRaising(false)}
           onConfirm={(amount) => run({ action: raiseVerb === "Bet" ? "bet" : "raise", amount })}
         />
@@ -158,7 +161,10 @@ export function PokerActions({ room, onAction }: PokerActionsProps) {
           info.legalActions.includes("all-in") && (
             <ActionButton
               testId="action-allin"
-              label={`All In ${formatChips(myPlayer.chips)}`}
+              // Total committed this street after shoving — matches BetControls'
+              // own ALL-IN preset amount (currentBet + chips), not just the
+              // chips still behind, so the number means the same thing everywhere.
+              label={`All In ${formatChips(myPlayer.currentBet + myPlayer.chips)}`}
               shortcut="R"
               disabled={pending}
               onClick={() => run({ action: "all-in" })}

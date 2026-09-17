@@ -1,6 +1,5 @@
 import type { ClientRoomView, Player, PublicPlayer, RoomSettings, RoomState, SeatNumber } from "@/lib/types";
 import { MAX_SEATS } from "@/lib/types";
-import { advanceGameFlow, checkForImmediateHandEnd } from "@/server/engine/handEngine";
 import { roomStore } from "./roomStore";
 import { generatePlayerId, generatePlayerToken, generateRoomId } from "@/server/utils/ids";
 
@@ -15,6 +14,7 @@ const DEFAULT_SETTINGS: RoomSettings = {
   allowAdditionalBuyIns: true,
   allowJoinDuringHand: true,
   turnTimeLimitSeconds: 30,
+  runItTwiceEnabled: true,
 };
 
 function sanitizeSettings(partial: Partial<RoomSettings>): RoomSettings {
@@ -28,6 +28,7 @@ function sanitizeSettings(partial: Partial<RoomSettings>): RoomSettings {
     allowAdditionalBuyIns: Boolean(merged.allowAdditionalBuyIns),
     allowJoinDuringHand: Boolean(merged.allowJoinDuringHand),
     turnTimeLimitSeconds: clampPositiveInt(merged.turnTimeLimitSeconds, 5, 300),
+    runItTwiceEnabled: Boolean(merged.runItTwiceEnabled),
   };
 }
 
@@ -209,6 +210,7 @@ export function buildClientView(room: RoomState, viewerPlayerId: string | null):
       holeCards: viewer?.holeCards ?? [],
       handHistory: viewer?.handHistory ?? [],
     },
+    stateVersion: roomStore.getVersion(room.id),
   };
 }
 
@@ -226,31 +228,18 @@ export function transferOwnership(room: RoomState, toPlayerId: string): void {
 }
 
 /**
- * Removes a player from the room, safely handling the case where a hand is
- * currently in progress. All-in players can't be removed mid-hand — their
- * chips are already committed to a pot they're still eligible to win, and
- * removing them would corrupt the pot/showdown math.
+ * Removes a player from the room. Never allowed mid-hand — a kick is a
+ * disruptive, host-only action, and a mid-hand removal would either corrupt
+ * a pot an all-in player is still eligible to win, or force-fold an active
+ * player out from under them without any warning. The host can always kick
+ * once the current hand finishes.
  */
 export function removePlayer(room: RoomState, playerId: string): void {
   const player = room.players.find((p) => p.id === playerId);
   if (!player) throw new RoomServiceError("Player not found in this room.");
 
   if (room.status === "in-hand") {
-    if (player.handStatus === "all-in") {
-      throw new RoomServiceError("Can't remove a player who is all-in until the current hand finishes.");
-    }
-    if (player.handStatus === "active") {
-      const deck = roomStore.getOrCreateDeck(room.id);
-      if (room.hand.activePlayerId === player.id) {
-        player.handStatus = "folded";
-        player.hasActedThisStreet = true;
-        // Only a seated player can ever be mid-hand-active, so this is always non-null.
-        advanceGameFlow(room, deck, player.seat!);
-      } else {
-        player.handStatus = "folded";
-        checkForImmediateHandEnd(room);
-      }
-    }
+    throw new RoomServiceError("Can't remove a player while a hand is in progress — wait until the hand finishes.");
   }
 
   room.players = room.players.filter((p) => p.id !== playerId);

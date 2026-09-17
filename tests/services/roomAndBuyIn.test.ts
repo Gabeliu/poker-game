@@ -103,6 +103,31 @@ describe("room + buy-in lifecycle", () => {
     expect(room.players.find((p) => p.id === guestId)).toBeUndefined();
   });
 
+  it("blocks removing an active (non-all-in) player mid-hand too — kicks are lobby-only", () => {
+    const { room, playerId: hostId } = createRoom("Host", { smallBlind: 5, bigBlind: 10 });
+    const { playerId: guestId } = joinRoom(room.id, "Guest");
+    takeSeat(room, guestId, 1);
+    requestBuyIn(room, hostId, 100, "initial");
+    resolveBuyInRequest(room, room.buyInRequests[0].id, true);
+    requestBuyIn(room, guestId, 100, "initial");
+    resolveBuyInRequest(room, room.buyInRequests.find((r) => r.playerId === guestId)!.id, true);
+
+    const deck = new Deck();
+    startHand(room, deck);
+    expect(room.status).toBe("in-hand");
+    expect(room.players.find((p) => p.id === guestId)!.handStatus).toBe("active");
+
+    // Neither player is all-in — removePlayer used to force-fold an active
+    // player through advanceGameFlow here; now it's simply refused, full stop.
+    expect(() => removePlayer(room, guestId)).toThrow(RoomServiceError);
+    expect(() => removePlayer(room, hostId)).toThrow(RoomServiceError);
+    expect(room.players).toHaveLength(2);
+
+    submitAction(room, deck, hostId, { action: "fold" });
+    expect(room.hand.phase).toBe("hand-complete");
+    expect(() => removePlayer(room, guestId)).not.toThrow();
+  });
+
   it("host can remove a player who has not bought in without issue", () => {
     const { room } = createRoom("Gabriel", {});
     const { playerId: bobId } = joinRoom(room.id, "Bob");
@@ -171,8 +196,8 @@ describe("seat assignment", () => {
   });
 });
 
-describe("buy-ins only between hands", () => {
-  it("rejects a buy-in request while a hand is in progress, and allows it again once the hand ends", () => {
+describe("mid-hand rebuy — never touch an active stack, queue for next hand", () => {
+  it("allows a top-up request mid-hand, marks it deferred, and never touches the live stack on approval", () => {
     const { room, playerId: hostId } = createRoom("Host", { smallBlind: 5, bigBlind: 10 });
     const { playerId: guestId } = joinRoom(room.id, "Guest");
     takeSeat(room, guestId, 1);
@@ -180,14 +205,59 @@ describe("buy-ins only between hands", () => {
     resolveBuyInRequest(room, room.buyInRequests[0].id, true);
     requestBuyIn(room, guestId, 1000, "initial");
     resolveBuyInRequest(room, room.buyInRequests.find((r) => r.playerId === guestId)!.id, true);
+    const chipsAtHandStart = room.players.find((p) => p.id === guestId)!.chips;
 
     startHand(room, new Deck());
     expect(room.status).toBe("in-hand");
-    expect(() => requestBuyIn(room, guestId, 500, "topup")).toThrow(RoomServiceError);
 
+    // Requesting mid-hand now succeeds (previously threw) and is marked deferred.
+    expect(() => requestBuyIn(room, guestId, 500, "topup")).not.toThrow();
+    const req = room.buyInRequests.find((r) => r.playerId === guestId && r.status === "pending")!;
+    expect(req.deferredToNextHand).toBe(true);
+
+    const chipsBeforeApproval = room.players.find((p) => p.id === guestId)!.chips;
+    resolveBuyInRequest(room, req.id, true);
+    const guestAfterApproval = room.players.find((p) => p.id === guestId)!;
+    // The active stack is untouched — the chips are queued, not applied.
+    expect(guestAfterApproval.chips).toBe(chipsBeforeApproval);
+    expect(guestAfterApproval.pendingChipTopUp).toBe(500);
+    expect(room.ledger.at(-1)!.type).toBe("additional-buy-in");
+
+    // Once the hand ends, the queued chips land automatically, on top of
+    // whatever the hand itself paid out (host folds, so guest also wins the
+    // blinds — isolate the topup by comparing against that hand's own net,
+    // relative to guest's chips before blinds were even posted).
     submitAction(room, new Deck(), room.hand.activePlayerId!, { action: "fold" });
     expect(room.status).toBe("lobby");
-    expect(() => requestBuyIn(room, guestId, 500, "topup")).not.toThrow();
+    const guestNet = buildClientView(room, guestId).you.handHistory.at(-1)!.netChange;
+    const guestAfterHand = room.players.find((p) => p.id === guestId)!;
+    expect(guestAfterHand.chips).toBe(chipsAtHandStart + guestNet + 500);
+    expect(guestAfterHand.pendingChipTopUp).toBe(0);
+  });
+
+  it("reconciles a busted player's approved top-up before handStatus is (re)decided, so they never get stuck sitting out while holding queued chips", () => {
+    const { room, playerId: hostId } = createRoom("Host", { smallBlind: 5, bigBlind: 10 });
+    const { playerId: guestId } = joinRoom(room.id, "Guest");
+    takeSeat(room, guestId, 1);
+    requestBuyIn(room, hostId, 1000, "initial");
+    resolveBuyInRequest(room, room.buyInRequests[0].id, true);
+
+    // Simulate a player who busted in an earlier hand (0 chips, already
+    // bought in once) and had a rebuy approved while sitting at 0 chips —
+    // this is exactly the state applyPendingChipTopUps must reconcile
+    // before handStatus is decided, per finalizeHand/startHand's ordering.
+    const guest = room.players.find((p) => p.id === guestId)!;
+    guest.hasBoughtIn = true;
+    guest.chips = 0;
+    guest.handStatus = "sitting-out";
+    guest.pendingChipTopUp = 500;
+
+    startHand(room, new Deck());
+    const guestNow = room.players.find((p) => p.id === guestId)!;
+    expect(guestNow.pendingChipTopUp).toBe(0);
+    // The topup landed (500), then the new hand posted guest's blind (BB=10).
+    expect(guestNow.chips).toBe(500 - 10);
+    expect(guestNow.handStatus).toBe("active");
   });
 });
 

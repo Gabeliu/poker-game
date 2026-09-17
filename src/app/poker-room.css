@@ -55,7 +55,15 @@ button:active:not(:disabled) { translate: 0 1px; }
 .seated-count > span, .landing-header-note > span { width: 5px; height: 5px; border-radius: 50%; background: var(--accent-lime); box-shadow: 0 0 10px #b3ee4940; }
 .table-invite { background: #071e1580; border: 1px solid #bdde9d35; color: #e1ebd7; font-size: 12px; height: 36px; padding-inline: 20px; }
 .lobby-hint { color: #9caf9f; font-size: 10px; }
-.community-board { border-radius: 14px; padding: 10px; background: #00190a16; }
+.community-board { border-radius: 14px; padding: 10px; background: #00190a16; position: relative; }
+.community-board-dimmed { opacity: .5; transition: opacity 300ms; }
+.board-run-label { position: absolute; top: -16px; left: 50%; transform: translateX(-50%); font-size: 9px; letter-spacing: .18em; text-transform: uppercase; color: #a1b9a6; white-space: nowrap; }
+/* Two boards stacked with a little breathing room; each half scales down
+   so the pair fits the same vertical band a single board used to occupy. */
+.dual-board { display: flex; flex-direction: column; gap: 20px; align-items: center; }
+.dual-board .community-board { transform: scale(.82); }
+.card-winning { box-shadow: 0 0 0 2px var(--room-gold), 0 0 14px #d9c08255; border-radius: inherit; }
+.seat-loser .seat-panel, .self-seat.seat-loser { opacity: .55; filter: saturate(.65); transition: opacity 300ms, filter 300ms; }
 .card-placeholder { background: #061b140b; }
 .card-back { border: 3px solid #c5ccae; background: repeating-linear-gradient(45deg, transparent 0 5px, #c6df9940 5px 6px, transparent 6px 11px), repeating-linear-gradient(-45deg, #153f2a 0 5px, #c6df9925 5px 6px, #153f2a 6px 11px); padding: 3px; box-shadow: inset 0 0 8px #0009; }
 .card-back-brand { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 80%; aspect-ratio: 1; border-radius: 50%; background: #102b1d; color: #c9ddac; border: 1px solid #b2cf8970; }
@@ -85,8 +93,12 @@ button:active:not(:disabled) { translate: 0 1px; }
 .seat-winner .seat-panel, .self-seat.seat-winner { border-color: var(--room-gold); animation: winner-pulse 1.6s ease-out; }
 .seat-winner .opponent-cards, .self-seat.seat-winner .self-cards { filter: drop-shadow(0 0 9px #d9c08280); }
 .seat-folded .seat-panel { opacity: .6; }
-.opponent-cards { position: absolute; bottom: calc(100% - 5px); left: 50%; transform: translateX(-50%); }
-.seat-bet { position: absolute; top: calc(100% + 9px); white-space: nowrap; }
+.opponent-cards { position: absolute; z-index: 1; bottom: calc(100% - 5px); left: 50%; transform: translateX(-50%); }
+.seat-bet { position: absolute; z-index: 2; top: calc(100% + 9px); white-space: nowrap; }
+/* Explicit stacking so the status pill (z-index: 20, in PlayerStatus.tsx)
+   always paints above card backs and the bet chip — both occupy the same
+   vertical band just above the seat panel, and without an explicit order
+   here the later-in-DOM card backs would win by default and hide the pill. */
 .player-seat[data-bet-edge="bottom"] .seat-bet { top: 40%; }
 .player-seat[data-bet-edge="bottom"][data-bet-side="left"] .seat-bet { left: calc(100% + 12px); }
 .player-seat[data-bet-edge="bottom"][data-bet-side="right"] .seat-bet { right: calc(100% + 12px); }
@@ -108,7 +120,11 @@ button:active:not(:disabled) { translate: 0 1px; }
 .self-cards [role="img"] + [role="img"] { margin-left: -14px; }
 .self-bet { position: absolute; left: calc(100% + 12px); top: 0; white-space: nowrap; }
 .spectator-hint { position: absolute; top: 102%; left: 50%; transform: translateX(-50%); white-space: nowrap; font-size: 11px; color: var(--text-secondary); }
-.action-area { flex-shrink: 0; position: relative; z-index: 10; padding: 16px 22px 22px; background: linear-gradient(0deg, #060a08, #0d1511d9); border-top: 1px solid #ffffff06; }
+.action-area { flex-shrink: 0; position: relative; z-index: 10; padding: 16px 22px 22px; background: linear-gradient(0deg, #060a08, #0d1511d9); border-top: 1px solid #ffffff06; transition: border-color 220ms, box-shadow 220ms; }
+/* First-time players kept missing that it was their turn — the ring on their
+   own avatar is easy to miss below the fold, so give the whole action bar an
+   unmistakable glow too, not just the seat. */
+.action-area-my-turn { border-top-color: var(--accent-lime); box-shadow: 0 -8px 30px #b5ea4822, inset 0 1px 0 #ade74a55; }
 .action-dock { min-height: 60px; }
 .poker-action { min-width: 115px; height: 52px; text-transform: uppercase; letter-spacing: .04em; }
 .poker-action-danger { background: linear-gradient(#302422, #211a19); color: #d6aaa4; border: 1px solid #90534a55; box-shadow: 0 3px 0 #110e0d, 0 8px 20px #0006; }
@@ -222,6 +238,9 @@ button:active:not(:disabled) { translate: 0 1px; }
   .table-invite, .table-lobby .room-primary { font-size: 10px; height: 30px; padding-inline: 12px; }
   .lobby-hint { font-size: 8px; }
   .empty-seat, .seat-panel { width: 66px; min-height: 61px; border-radius: 11px; padding: 6px 3px; }
+  /* The shrunken 66x61 panel plus 29px-tall card backs leaves the pill's
+     default -24px offset almost no clearance — push it up further. */
+  .player-status-pill { top: -34px; font-size: 8px; padding: 0 5px; }
   .empty-avatar { width: 22px; height: 22px; }
   .empty-label { font-size: 8px; }
   .seat-panel > .relative > div:not(.absolute) { width: 25px; height: 25px; font-size: 9px; }
@@ -244,13 +263,19 @@ button:active:not(:disabled) { translate: 0 1px; }
   .blind-puck { font-size: 7px; }
   .community-board { padding: 4px; gap: 4px; }
   .community-board > div { width: 30px; height: 44px; font-size: 12px; border-radius: 5px; }
+  .dual-board { gap: 10px; }
+  .dual-board .community-board { transform: scale(.72); }
+  .board-run-label { font-size: 7px; top: -11px; }
   .pot-display > span:nth-child(2) { font-size: 23px; gap: 6px; }
   .pot-chips { transform: scale(.75); width: 35px; }
   .action-area { padding: 12px 10px max(16px, env(safe-area-inset-bottom)); }
   .action-dock { min-height: 48px; flex-wrap: wrap; }
   .action-dock > div:last-child { width: auto; }
   .action-dock:has(.poker-action) > div:last-child { display: none; }
-  .poker-action { min-width: 90px; height: 46px; font-size: 11px; padding: 8px 10px; }
+  .poker-action { min-width: 90px; height: 52px; font-size: 11px; padding: 8px 10px; }
+  /* With every contributor now listed (not just winners), the summary can
+     run to several rows on a narrow screen — keep it scrollable and compact. */
+  .winner-summary { max-height: 96px; gap: 8px; padding: 8px 10px; font-size: 11px; }
   .landing-header-note { font-size: 9px; }
   .landing-page header { padding: 20px; }
   .landing-hero { padding-top: 32px; text-align: center; }

@@ -17,10 +17,6 @@ export function requestBuyIn(
   const player = room.players.find((p) => p.id === playerId);
   if (!player) throw new RoomServiceError("Player not found in this room.");
 
-  if (room.status === "in-hand") {
-    throw new RoomServiceError("Buy-ins are only allowed between hands — try again once this hand finishes.");
-  }
-
   const roundedAmount = Math.floor(amount);
   if (!Number.isFinite(roundedAmount) || roundedAmount <= 0) {
     throw new RoomServiceError("Buy-in amount must be a positive number.");
@@ -59,6 +55,10 @@ export function requestBuyIn(
     type,
     status: "pending",
     createdAt: Date.now(),
+    // A hand already running couldn't have this player's chips changed
+    // mid-hand even once approved — mark it now so the client can show
+    // "available next hand" right away, before the host even resolves it.
+    deferredToNextHand: room.status === "in-hand",
   });
 }
 
@@ -75,10 +75,21 @@ export function resolveBuyInRequest(room: RoomState, requestId: string, approve:
   const player = room.players.find((p) => p.id === request.playerId);
   if (!player) return;
 
-  player.chips += request.amount;
-  player.hasBoughtIn = true;
-  if (player.handStatus === "waiting" || player.handStatus === "sitting-out") {
-    player.handStatus = "waiting";
+  // Re-check at resolution time (not just creation time) — a hand may have
+  // started or finished in between while the request sat pending.
+  const deferred = room.status === "in-hand";
+  request.deferredToNextHand = deferred;
+
+  if (deferred) {
+    // Never touch an active stack mid-hand: queue it, applied automatically
+    // by the engine at the start of the next hand (applyPendingChipTopUps).
+    player.pendingChipTopUp = (player.pendingChipTopUp ?? 0) + request.amount;
+  } else {
+    player.chips += request.amount;
+    player.hasBoughtIn = true;
+    if (player.handStatus === "waiting" || player.handStatus === "sitting-out") {
+      player.handStatus = "waiting";
+    }
   }
 
   room.ledger.push({
@@ -86,7 +97,8 @@ export function resolveBuyInRequest(room: RoomState, requestId: string, approve:
     playerId: player.id,
     type: request.type === "initial" ? "initial-buy-in" : "additional-buy-in",
     amount: request.amount,
-    balanceAfter: player.chips,
+    balanceAfter: player.chips + (deferred ? request.amount : 0),
     createdAt: Date.now(),
+    note: deferred ? "Applies at the start of the next hand" : undefined,
   });
 }

@@ -34,6 +34,7 @@ export function HostRequestsPanel({ requests, onResolve }: HostRequestsPanelProp
             playerName={newest.playerDisplayName}
             amount={newest.amount}
             type={newest.type}
+            deferred={newest.deferredToNextHand}
             onApprove={() => resolve(newest.id, true)}
             onReject={() => resolve(newest.id, false)}
           />
@@ -70,6 +71,7 @@ export function HostRequestsPanel({ requests, onResolve }: HostRequestsPanelProp
                     playerName={req.playerDisplayName}
                     amount={req.amount}
                     type={req.type}
+                    deferred={req.deferredToNextHand}
                     onApprove={() => resolve(req.id, true)}
                     onReject={() => resolve(req.id, false)}
                     className="w-full animate-none"

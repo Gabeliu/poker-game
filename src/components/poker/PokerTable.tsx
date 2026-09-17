@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { ClientRoomView, SeatNumber } from "@/lib/types";
+import type { Card, ClientRoomView, HandResult, SeatNumber } from "@/lib/types";
 import { playerAtSeat, ringPositionForSeat, ringSeatPositions, type ArcPosition } from "@/lib/seatLayout";
 import { copyInviteLink } from "@/lib/invite";
 import { usePlayerStatusLabels } from "@/hooks/usePlayerStatusLabels";
+import { useRoomStore } from "@/hooks/useRoomStore";
 import { PlayerSeat } from "./PlayerSeat";
 import { EmptySeat } from "./EmptySeat";
 import { CommunityCards } from "./CommunityCards";
@@ -24,6 +25,12 @@ import { cn } from "@/lib/utils";
  * coordinate space as seat positions — used as the destination for bet
  * flights and the origin for payout flights. */
 const POT_POINT: ArcPosition = { xPct: 50, yPct: 40 };
+/** Payout-flight origins when a hand ran two boards — bets themselves
+ * always land in the single shared POT_POINT above (the pot doesn't split
+ * physically until payout), these are only where each board's winnings
+ * visually appear to come from. */
+const POT_POINT_RUN_1: ArcPosition = { xPct: 50, yPct: 35 };
+const POT_POINT_RUN_2: ArcPosition = { xPct: 50, yPct: 45 };
 /** The viewer's own seat is never drawn as a ring seat — their identity is
  * the large hole cards + stack panel below the table — so their chip
  * flights originate/land at that panel's position instead. */
@@ -49,12 +56,27 @@ export function PokerTable({ room, isHost, onRemovePlayer, onSit, onStartHand }:
   const mySeat = me?.seat ?? null;
   const canSit = Boolean(me) && mySeat === null;
   const handInProgress = room.hand.phase !== "waiting" && room.hand.phase !== "hand-complete";
-  const statusLabels = usePlayerStatusLabels(room.players, room.hand.lastAggressorId);
+  const resyncNonce = useRoomStore((s) => s.resyncNonce);
+  const statusLabels = usePlayerStatusLabels(
+    room.players,
+    room.hand.lastAggressorId,
+    `${room.hand.handNumber}:${resyncNonce}`
+  );
   const ringSeats = ringSeatPositions(mySeat);
   const eligibleCount = getEligiblePlayers(room.players).length;
   const startError = getStartHandError(room.players);
   const waiting = room.hand.phase === "waiting";
-  const winners = room.hand.result?.winners ?? [];
+  const result = room.hand.result;
+  const secondResult = room.hand.secondBoard?.result ?? null;
+  const winners = result?.winners ?? [];
+  const allWinnerIds = new Set([...winners, ...(secondResult?.winners ?? [])].map((w) => w.playerId));
+  // Reached showdown (present in revealedHands) but didn't win a share of
+  // either board, and the hand is fully resolved — dim distinctly from a
+  // fold, which dims immediately rather than only once the hand ends.
+  const isLoser = (playerId: string) =>
+    room.hand.phase === "hand-complete" &&
+    Boolean(result?.revealedHands[playerId]) &&
+    !allWinnerIds.has(playerId);
 
   const seatPointFor = (playerId: string): ArcPosition | null => {
     if (playerId === room.you.playerId) return SELF_POINT;
@@ -67,6 +89,7 @@ export function PokerTable({ room, isHost, onRemovePlayer, onSit, onStartHand }:
   const prevBetsRef = useRef<Record<string, number>>({});
   const prevHandNumberRef = useRef(room.hand.handNumber);
   const prevResultRef = useRef(room.hand.result);
+  const prevSecondResultRef = useRef(secondResult);
   const flightIdRef = useRef(0);
 
   const betSignature = room.players.map((p) => `${p.id}:${p.currentBet}`).join("|");
@@ -97,25 +120,62 @@ export function PokerTable({ room, isHost, onRemovePlayer, onSit, onStartHand }:
   }, [betSignature]);
 
   useEffect(() => {
-    const result = room.hand.result;
-    if (result && result !== prevResultRef.current) {
-      const spawned: Flight[] = result.winners
+    const current = room.hand.result;
+    if (current && current !== prevResultRef.current) {
+      const from = room.hand.secondBoard ? POT_POINT_RUN_1 : POT_POINT;
+      const spawned: Flight[] = current.winners
         .map((w) => {
           const to = seatPointFor(w.playerId);
           if (!to) return null;
           flightIdRef.current += 1;
-          return { id: `win-${w.playerId}-${w.potId}-${flightIdRef.current}`, from: POT_POINT, to, amount: w.amount };
+          return { id: `win-${w.playerId}-${w.potId}-${flightIdRef.current}`, from, to, amount: w.amount };
         })
         .filter((f): f is Flight => f !== null);
       if (spawned.length > 0) {
         setTimeout(() => setFlights((f) => [...f, ...spawned]), 0);
       }
     }
-    prevResultRef.current = result;
+    prevResultRef.current = current;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally only reacts to the result object changing identity
   }, [room.hand.result]);
 
+  // Second board's payout, when the hand ran it twice — same mechanics as
+  // above, its own ref/effect so the two never clobber each other, distinct
+  // flight ids, and a different visual origin point.
+  useEffect(() => {
+    const current = room.hand.secondBoard?.result ?? null;
+    if (current && current !== prevSecondResultRef.current) {
+      const spawned: Flight[] = current.winners
+        .map((w) => {
+          const to = seatPointFor(w.playerId);
+          if (!to) return null;
+          flightIdRef.current += 1;
+          return { id: `win2-${w.playerId}-${w.potId}-${flightIdRef.current}`, from: POT_POINT_RUN_2, to, amount: w.amount };
+        })
+        .filter((f): f is Flight => f !== null);
+      if (spawned.length > 0) {
+        setTimeout(() => setFlights((f) => [...f, ...spawned]), 0);
+      }
+    }
+    prevSecondResultRef.current = current;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally only reacts to the secondBoard result object changing identity
+  }, [room.hand.secondBoard?.result]);
+
   const removeFlight = (id: string) => setFlights((f) => f.filter((fl) => fl.id !== id));
+
+  /** The specific board cards that made up a board's winning hand(s), so
+   * CommunityCards can outline just those — bestFive includes hole cards
+   * too, but CommunityCards only ever matches against its own rendered
+   * community cards, so passing the full set through is safe. */
+  const highlightForBoard = (boardResult: HandResult | null): Card[] | undefined => {
+    if (!boardResult) return undefined;
+    const cards: Card[] = [];
+    for (const w of boardResult.winners) {
+      const best = boardResult.revealedHands[w.playerId]?.bestFive;
+      if (best) cards.push(...best);
+    }
+    return cards.length > 0 ? cards : undefined;
+  };
 
   const badgeFor = (seatNum: number): "D" | "SB" | "BB" | null => {
     if (!handInProgress) return null;
@@ -133,7 +193,22 @@ export function PokerTable({ room, isHost, onRemovePlayer, onSit, onStartHand }:
           <div className="table-board">
             {!waiting && <>
             <Pot pots={room.hand.pots} liveTotal={room.players.reduce((s, p) => s + p.totalCommittedThisHand, 0)} />
-            <CommunityCards cards={room.hand.communityCards} />
+            {room.hand.secondBoard ? (
+              <div className="dual-board" data-boards="2">
+                <CommunityCards
+                  cards={room.hand.communityCards}
+                  label="Run 1"
+                  highlightCards={highlightForBoard(result)}
+                />
+                <CommunityCards
+                  cards={room.hand.secondBoard.communityCards}
+                  label="Run 2"
+                  highlightCards={highlightForBoard(secondResult)}
+                />
+              </div>
+            ) : (
+              <CommunityCards cards={room.hand.communityCards} highlightCards={highlightForBoard(result)} />
+            )}
             </>}
             {waiting && (
               <div className="table-lobby">
@@ -175,7 +250,8 @@ export function PokerTable({ room, isHost, onRemovePlayer, onSit, onStartHand }:
                 position={position}
                 badge={badgeFor(seat)}
                 isActiveTurn={player.id === room.hand.activePlayerId}
-                isWinner={winners.some((w) => w.playerId === player.id)}
+                isWinner={allWinnerIds.has(player.id)}
+                isLoser={isLoser(player.id)}
                 canHostRemove={isHost}
                 turnDeadline={room.hand.turnDeadline}
                 turnTimeLimitSeconds={room.settings.turnTimeLimitSeconds}
@@ -203,7 +279,7 @@ export function PokerTable({ room, isHost, onRemovePlayer, onSit, onStartHand }:
         ))}
       {me &&
         (mySeat !== null ? (
-          <div className={cn("self-seat", me.id === room.hand.activePlayerId && "seat-active", winners.some((w) => w.playerId === me.id) && "seat-winner")}>
+          <div className={cn("self-seat", me.id === room.hand.activePlayerId && "seat-active", allWinnerIds.has(me.id) && "seat-winner", isLoser(me.id) && "seat-loser")}>
             <div className="self-cards"><HoleCards cards={me.holeCards} folded={me.handStatus === "folded"} /></div>
             {me.currentBet > 0 && <ChipStack amount={me.currentBet} variant="bet" className="self-bet" />}
             <div className="self-identity">

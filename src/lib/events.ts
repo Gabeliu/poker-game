@@ -8,7 +8,7 @@
  * broadcast to update the UI (server is the single source of truth).
  */
 
-import type { ActionRequest, BuyInRequestType, ClientRoomView, RoomSettings, SeatNumber } from "./types";
+import type { ActionRequest, BuyInRequestType, ClientRoomView, RoomSettings, RunItChoice, SeatNumber } from "./types";
 
 // ---- Client -> Server ----
 
@@ -70,6 +70,21 @@ export interface ClientToServerEvents {
 
   "chat:send": (
     payload: { roomId: string; text: string },
+    ack: (res: { ok: true } | { ok: false; error: string }) => void
+  ) => void;
+
+  /** Asks for the current authoritative snapshot without the side effects of
+   * room:join (no display-name validation, no room-wide toast/broadcast
+   * unless a genuine disconnect->reconnect transition is happening). Used
+   * to resync after a mobile tab was backgrounded, on window focus, and on
+   * the underlying socket reconnecting. */
+  "room:resync": (
+    payload: { roomId: string; playerToken?: string },
+    ack: (res: { ok: true; view: ClientRoomView } | { ok: false; error: string }) => void
+  ) => void;
+
+  "runIt:choose": (
+    payload: { roomId: string; choice: RunItChoice },
     ack: (res: { ok: true } | { ok: false; error: string }) => void
   ) => void;
 }

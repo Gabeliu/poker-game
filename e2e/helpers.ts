@@ -53,8 +53,17 @@ export async function rejectLatestRequest(hostPage: Page, playerName: string): P
   await hostPage.keyboard.press("Escape");
 }
 
-/** If it's this page's turn, take the safest available action (check > call > fold). */
+/** If it's this page's turn, take the safest available action (check > call > fold).
+ * Also resolves a run-it-once/twice prompt with "once" if one is showing, so
+ * bot-driven hands in other specs don't stall on it now that
+ * `runItTwiceEnabled` defaults to true and any 2-player all-in can trigger it. */
 export async function actIfMyTurn(page: Page): Promise<boolean> {
+  const runItOnce = page.getByTestId("runit-once");
+  if (await runItOnce.isVisible().catch(() => false)) {
+    await runItOnce.click();
+    return true;
+  }
+
   const check = page.getByTestId("action-check");
   const call = page.getByTestId("action-call");
   const fold = page.getByTestId("action-fold");
@@ -72,6 +81,30 @@ export async function actIfMyTurn(page: Page): Promise<boolean> {
     return true;
   }
   return false;
+}
+
+/** Pushes all remaining chips in, whichever legal path gets there: opening a
+ * raise and dragging it to the ALL-IN preset, or just calling/going all-in
+ * when that's already the only way to put in the rest of the stack. */
+export async function goAllIn(page: Page): Promise<void> {
+  const raise = page.getByTestId("action-raise");
+  if (await raise.isVisible().catch(() => false)) {
+    await raise.click();
+    await page.getByTestId("betcontrols-allin-preset").click();
+    await page.getByTestId("betcontrols-confirm").click();
+    return;
+  }
+  const call = page.getByTestId("action-call");
+  if (await call.isVisible().catch(() => false)) {
+    await call.click();
+    return;
+  }
+  const allIn = page.getByTestId("action-allin");
+  if (await allIn.isVisible().catch(() => false)) {
+    await allIn.click();
+    return;
+  }
+  throw new Error("No legal path to go all-in was visible");
 }
 
 /** Drives all pages through a full hand (check/call bot) until it reaches hand-complete. */

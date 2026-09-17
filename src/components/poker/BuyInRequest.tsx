@@ -7,13 +7,16 @@ interface BuyInRequestProps {
   playerName: string;
   amount: number;
   type: "initial" | "topup";
+  /** A hand is currently in progress — approving this won't touch the
+   * player's active stack, it'll queue the chips for the next hand instead. */
+  deferred?: boolean;
   onApprove: () => void;
   onReject: () => void;
   className?: string;
 }
 
 /** A single buy-in/top-up request, styled as a compact floating notification. */
-export function BuyInRequest({ playerName, amount, type, onApprove, onReject, className }: BuyInRequestProps) {
+export function BuyInRequest({ playerName, amount, type, deferred, onApprove, onReject, className }: BuyInRequestProps) {
   return (
     <div
       className={cn(
@@ -21,9 +24,19 @@ export function BuyInRequest({ playerName, amount, type, onApprove, onReject, cl
         className
       )}
     >
-      <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[var(--accent-purple)]">
-        Buy-in request
-      </p>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[var(--accent-purple)]">
+          Buy-in request
+        </p>
+        {deferred && (
+          <span
+            data-testid="buyin-deferred-badge"
+            className="rounded-full bg-[var(--accent-lime)]/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-[var(--accent-lime)]"
+          >
+            Next hand
+          </span>
+        )}
+      </div>
       <p className="mt-1 text-sm font-medium text-[var(--text-primary)]">{playerName}</p>
       <p className="text-xl font-bold tabular-nums text-[var(--accent-lime)]">
         {formatChips(amount)} <span className="text-xs font-normal text-[var(--text-secondary)]">chips</span>

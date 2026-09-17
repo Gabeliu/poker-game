@@ -1,5 +1,19 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import { approveLatestRequest, createRoom, joinRoom, playHandToCompletion, rejectLatestRequest, requestBuyIn } from "./helpers";
+
+async function foldWhoeversTurn(pages: Page[]): Promise<void> {
+  for (let attempt = 0; attempt < 20; attempt++) {
+    for (const page of pages) {
+      const fold = page.getByTestId("action-fold");
+      if (await fold.isVisible().catch(() => false)) {
+        await fold.click();
+        return;
+      }
+    }
+    await pages[0].waitForTimeout(250);
+  }
+  throw new Error("No page had a visible fold button");
+}
 
 test.describe("Felt poker table — full multiplayer flow", () => {
   test("create, join, buy-in approval, reject/resubmit, and a full hand to showdown", async ({ browser }) => {
@@ -111,16 +125,133 @@ test.describe("Felt poker table — full multiplayer flow", () => {
     // From Host's view, only the one other player (Guest) renders as a seat.
     await expect(host.getByTestId("player-seat")).toHaveCount(1);
 
-    // Open settings, remove Guest via the players tab.
+    // Open settings, remove Guest via the players tab — a confirmation step
+    // sits in front of the actual removal to avoid an accidental kick.
     await host.getByTestId("host-settings-trigger").click();
     await host.getByRole("tab", { name: "Players" }).click();
     await host.getByRole("button", { name: "Remove" }).click();
+    await host.getByTestId("confirm-remove-player").click();
     await host.keyboard.press("Escape");
 
     await expect(host.getByTestId("player-seat")).toHaveCount(0);
 
     await hostCtx.close();
     await guestCtx.close();
+  });
+
+  test("post-hand summary shows net profit/loss (not gross pot) for every contributor, signed and opposite", async ({ browser }) => {
+    const hostCtx = await browser.newContext();
+    const guestCtx = await browser.newContext();
+    const host = await hostCtx.newPage();
+    const guest = await guestCtx.newPage();
+
+    const roomId = await createRoom(host, "Host");
+    await requestBuyIn(host, 1000);
+    await approveLatestRequest(host, "Host");
+    await joinRoom(guest, roomId, "Guest");
+    await requestBuyIn(guest, 1000);
+    await approveLatestRequest(host, "Guest");
+    await expect(guest.getByTestId("your-stack")).toContainText("1,000", { timeout: 10_000 });
+
+    await host.getByTestId("start-hand-button").click();
+    await foldWhoeversTurn([host, guest]);
+    await expect(host.getByTestId("hand-result-summary")).toBeVisible({ timeout: 10_000 });
+
+    const hostRow = host.locator('[data-testid="result-row"][data-player-name="Host"]');
+    const guestRow = host.locator('[data-testid="result-row"][data-player-name="Guest"]');
+    const hostNet = Number(await hostRow.locator("[data-net-change]").getAttribute("data-net-change"));
+    const guestNet = Number(await guestRow.locator("[data-net-change]").getAttribute("data-net-change"));
+
+    // One player is up, the other down by exactly the same amount — a fold
+    // just moves the blinds around, it can't create or destroy chips.
+    expect(hostNet).not.toBe(0);
+    expect(guestNet).not.toBe(0);
+    expect(hostNet + guestNet).toBe(0);
+
+    await hostCtx.close();
+    await guestCtx.close();
+  });
+
+  test("a mid-hand rebuy request never touches the active stack — it's queued and applied at the next hand", async ({ browser }) => {
+    const hostCtx = await browser.newContext();
+    const guestCtx = await browser.newContext();
+    const host = await hostCtx.newPage();
+    const guest = await guestCtx.newPage();
+
+    const roomId = await createRoom(host, "Host");
+    await requestBuyIn(host, 1000);
+    await approveLatestRequest(host, "Host");
+    await joinRoom(guest, roomId, "Guest");
+    await requestBuyIn(guest, 1000);
+    await approveLatestRequest(host, "Guest");
+    await expect(guest.getByTestId("your-stack")).toContainText("1,000", { timeout: 10_000 });
+    // Captured before blinds are posted, so the later net-change comparison
+    // isn't thrown off by the hand's own blind post already being deducted.
+    const chipsAtHandStart = Number(await guest.getByTestId("your-stack").getAttribute("data-your-chips"));
+
+    await host.getByTestId("start-hand-button").click();
+    await expect(host.getByTestId("player-seat").first()).toBeVisible();
+
+    // Guest requests more chips while the hand is still live.
+    const chipsBeforeRequest = Number(await guest.getByTestId("your-stack").getAttribute("data-your-chips"));
+    await requestBuyIn(guest, 400);
+    await approveLatestRequest(host, "Guest");
+
+    // The host's approval is marked "next hand", and the guest's own stack
+    // panel shows the queued amount without changing the live number.
+    await expect(guest.getByTestId("your-stack")).toHaveAttribute("data-pending-topup", "400", { timeout: 10_000 });
+    expect(Number(await guest.getByTestId("your-stack").getAttribute("data-your-chips"))).toBe(chipsBeforeRequest);
+
+    await foldWhoeversTurn([host, guest]);
+    await expect(host.getByTestId("hand-result-summary")).toBeVisible({ timeout: 10_000 });
+
+    // Once the hand ends, the queued chips land automatically.
+    await expect
+      .poll(async () => Number(await guest.getByTestId("your-stack").getAttribute("data-pending-topup")))
+      .toBe(0);
+    const guestNet = Number(
+      await host
+        .locator('[data-testid="result-row"][data-player-name="Guest"]')
+        .locator("[data-net-change]")
+        .getAttribute("data-net-change")
+    );
+    expect(Number(await guest.getByTestId("your-stack").getAttribute("data-your-chips"))).toBe(
+      chipsAtHandStart + guestNet + 400
+    );
+
+    await hostCtx.close();
+    await guestCtx.close();
+  });
+
+  test("a network drop and recovery resyncs the client automatically, without a manual reload", async ({ browser }) => {
+    const hostCtx = await browser.newContext();
+    const guestCtx = await browser.newContext();
+    const carolCtx = await browser.newContext();
+    const host = await hostCtx.newPage();
+    const guest = await guestCtx.newPage();
+    const carol = await carolCtx.newPage();
+
+    const roomId = await createRoom(host, "Host");
+    await joinRoom(guest, roomId, "Guest");
+    await expect(guest.getByTestId("player-seat")).toHaveCount(1); // sees Host
+
+    // Simulate the guest's tab losing connectivity, e.g. a phone getting
+    // backgrounded long enough for the OS to suspend its network access.
+    await guestCtx.setOffline(true);
+
+    // While offline, a new player joins and takes a seat — something the
+    // guest's client has no way to learn about until it resyncs.
+    await joinRoom(carol, roomId, "Carol");
+
+    // Restore connectivity — socket.io reconnects the transport, and the
+    // resync protocol (room:resync + stateVersion guard) should pick up the
+    // missed state with no manual reload required.
+    await guestCtx.setOffline(false);
+    await expect(guest.getByTestId("player-seat")).toHaveCount(2, { timeout: 15_000 });
+
+    await hostCtx.close();
+    await guestCtx.close();
+    await carolCtx.close();
   });
 
   test("table layout stays usable with a larger player count", async ({ browser }) => {

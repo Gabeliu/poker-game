@@ -20,6 +20,12 @@ const playerTokensByRoom = new Map<string, Map<string, string>>();
 const socketLocations = new Map<string, { roomId: string; playerId: string }>();
 /** roomId -> active turn timer, so we can clear it when the turn changes. */
 const turnTimers = new Map<string, ReturnType<typeof setTimeout>>();
+/** roomId -> active reveal/runout timer (all-in staged reveal, run-it decision) — a
+ * separate slot from turnTimers so the two systems can never clobber each other. */
+const revealTimers = new Map<string, ReturnType<typeof setTimeout>>();
+/** roomId -> monotonic broadcast counter, so a client can tell a stale snapshot
+ * (e.g. a slow resync ack landing after a newer push) from the current one. */
+const stateVersions = new Map<string, number>();
 
 export const roomStore = {
   get(roomId: string): RoomState | undefined {
@@ -32,7 +38,9 @@ export const roomStore = {
     rooms.delete(roomId);
     decks.delete(roomId);
     playerTokensByRoom.delete(roomId);
+    stateVersions.delete(roomId);
     clearTurnTimer(roomId);
+    clearRevealTimer(roomId);
   },
   has(roomId: string): boolean {
     return rooms.has(roomId);
@@ -95,6 +103,25 @@ export const roomStore = {
     clearTurnTimer(roomId);
     turnTimers.set(roomId, timer);
   },
+
+  setRevealTimer(roomId: string, timer: ReturnType<typeof setTimeout>): void {
+    clearRevealTimer(roomId);
+    revealTimers.set(roomId, timer);
+  },
+  clearRevealTimer(roomId: string): void {
+    clearRevealTimer(roomId);
+  },
+
+  /** Bumps and returns a room's broadcast version — call once per outgoing
+   * `room:state` broadcast, before building views. */
+  bumpVersion(roomId: string): number {
+    const next = (stateVersions.get(roomId) ?? 0) + 1;
+    stateVersions.set(roomId, next);
+    return next;
+  },
+  getVersion(roomId: string): number {
+    return stateVersions.get(roomId) ?? 0;
+  },
 };
 
 function clearTurnTimer(roomId: string): void {
@@ -102,6 +129,14 @@ function clearTurnTimer(roomId: string): void {
   if (existing) {
     clearTimeout(existing);
     turnTimers.delete(roomId);
+  }
+}
+
+function clearRevealTimer(roomId: string): void {
+  const existing = revealTimers.get(roomId);
+  if (existing) {
+    clearTimeout(existing);
+    revealTimers.delete(roomId);
   }
 }
 

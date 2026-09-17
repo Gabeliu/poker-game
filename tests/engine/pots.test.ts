@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calculateSidePots, splitPotAmount, type PotContribution } from "@/server/engine/pots";
+import { calculateSidePots, splitPotAcrossRuns, splitPotAmount, type PotContribution } from "@/server/engine/pots";
 
 describe("calculateSidePots", () => {
   it("creates a single main pot when everyone contributes equally", () => {
@@ -102,5 +102,26 @@ describe("splitPotAmount", () => {
 
   it("returns empty object for no winners", () => {
     expect(splitPotAmount(500, [])).toEqual({});
+  });
+});
+
+describe("splitPotAcrossRuns", () => {
+  it("splits evenly with no remainder", () => {
+    expect(splitPotAcrossRuns(100, 2)).toEqual([50, 50]);
+  });
+
+  it("gives the odd chip to the first run", () => {
+    expect(splitPotAcrossRuns(101, 2)).toEqual([51, 50]);
+  });
+
+  it("passes the amount through unchanged for a single run", () => {
+    expect(splitPotAcrossRuns(101, 1)).toEqual([101]);
+  });
+
+  it("always sums back to the original amount", () => {
+    for (const amount of [0, 1, 2, 99, 100, 101, 999]) {
+      const [a, b] = splitPotAcrossRuns(amount, 2);
+      expect(a + b).toBe(amount);
+    }
   });
 });

@@ -20,7 +20,7 @@ export function PlayerStatus({ label, statusKey }: { label: string | null; statu
     <div
       key={statusKey}
       className={cn(
-        "animate-status-pill pointer-events-none absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide backdrop-blur-sm",
+        "player-status-pill animate-status-pill pointer-events-none absolute -top-6 left-1/2 z-20 -translate-x-1/2 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide backdrop-blur-sm",
         STATUS_STYLE[label] ?? "text-[var(--text-secondary)] bg-white/8"
       )}
     >

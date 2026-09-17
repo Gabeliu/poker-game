@@ -16,6 +16,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatChips } from "@/lib/format";
 import type { PublicPlayer, RoomSettings } from "@/lib/types";
+import { ConfirmRemoveDialog } from "./ConfirmRemoveDialog";
 
 interface HostSettingsDialogProps {
   settings: RoomSettings;
@@ -38,6 +39,8 @@ export function HostSettingsDialog({
 }: HostSettingsDialogProps) {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(settings);
+  const [pendingRemoveId, setPendingRemoveId] = useState<string | null>(null);
+  const pendingRemovePlayer = players.find((p) => p.id === pendingRemoveId);
 
   const save = () => {
     onUpdateSettings(form);
@@ -77,16 +80,18 @@ export function HostSettingsDialog({
                 <Label>Small blind</Label>
                 <Input
                   type="number"
+                  min={1}
                   value={form.smallBlind}
-                  onChange={(e) => setForm({ ...form, smallBlind: Number(e.target.value) })}
+                  onChange={(e) => setForm({ ...form, smallBlind: Math.max(1, Number(e.target.value) || 1) })}
                 />
               </div>
               <div className="grid gap-1.5">
                 <Label>Big blind</Label>
                 <Input
                   type="number"
+                  min={1}
                   value={form.bigBlind}
-                  onChange={(e) => setForm({ ...form, bigBlind: Number(e.target.value) })}
+                  onChange={(e) => setForm({ ...form, bigBlind: Math.max(1, Number(e.target.value) || 1) })}
                 />
               </div>
             </div>
@@ -138,6 +143,16 @@ export function HostSettingsDialog({
                 onCheckedChange={(v) => setForm({ ...form, allowJoinDuringHand: v })}
               />
             </div>
+            <div className="flex items-center justify-between rounded-lg border border-white/10 px-3 py-2">
+              <Label htmlFor="run-it-twice" className="text-sm font-normal">
+                Allow run it twice
+              </Label>
+              <Switch
+                id="run-it-twice"
+                checked={form.runItTwiceEnabled}
+                onCheckedChange={(v) => setForm({ ...form, runItTwiceEnabled: v })}
+              />
+            </div>
             <DialogFooter className="pt-2">
               <Button onClick={save} className="w-full bg-[var(--accent-lime)] text-[var(--accent-lime-foreground)] hover:bg-[var(--accent-lime)]/90">
                 Save settings
@@ -164,7 +179,7 @@ export function HostSettingsDialog({
                         size="sm"
                         variant="outline"
                         className="border-destructive/40 text-destructive hover:bg-destructive/10"
-                        onClick={() => onRemovePlayer(p.id)}
+                        onClick={() => setPendingRemoveId(p.id)}
                       >
                         Remove
                       </Button>
@@ -176,6 +191,14 @@ export function HostSettingsDialog({
           </TabsContent>
         </Tabs>
       </DialogContent>
+      {pendingRemovePlayer && (
+        <ConfirmRemoveDialog
+          playerName={pendingRemovePlayer.displayName}
+          open={Boolean(pendingRemoveId)}
+          onOpenChange={(v) => { if (!v) setPendingRemoveId(null); }}
+          onConfirm={() => onRemovePlayer(pendingRemovePlayer.id)}
+        />
+      )}
     </Dialog>
   );
 }

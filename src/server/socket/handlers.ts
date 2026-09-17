@@ -15,8 +15,8 @@ import {
 } from "@/server/services/roomService";
 import { requestBuyIn, resolveBuyInRequest } from "@/server/services/buyInService";
 import { postChatMessage, postSystemMessage } from "@/server/services/chatService";
-import { HandEngineError, startHand, submitAction } from "@/server/engine/handEngine";
-import { broadcastRoomState, scheduleTurnTimer } from "./broadcast";
+import { chooseRunIt, HandEngineError, startHand, submitAction } from "@/server/engine/handEngine";
+import { broadcastRoomState, scheduleHandFlowTimer, scheduleTurnTimer } from "./broadcast";
 
 type AppServer = Server<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData>;
 type AppSocket = Socket<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData>;
@@ -121,6 +121,7 @@ export function registerRoomHandlers(io: AppServer, socket: AppSocket): void {
       const room = getRoomOrThrow(payload.roomId);
       const playerId = requirePlayerId(socket);
       assertHost(room, playerId);
+      roomStore.clearRevealTimer(room.id);
       const deck = roomStore.replaceDeck(room.id);
       startHand(room, deck);
       ack({ ok: true });
@@ -211,7 +212,7 @@ export function registerRoomHandlers(io: AppServer, socket: AppSocket): void {
       const room = getRoomOrThrow(payload.roomId);
       const playerId = requirePlayerId(socket);
       const deck = roomStore.getOrCreateDeck(room.id);
-      const result = submitAction(room, deck, playerId, payload.action);
+      const result = submitAction(room, deck, playerId, payload.action, { paced: true });
       if (!result.ok) {
         ack({ ok: false, error: result.error ?? "Invalid action." });
         return;
@@ -219,6 +220,80 @@ export function registerRoomHandlers(io: AppServer, socket: AppSocket): void {
       ack({ ok: true });
       void broadcastRoomState(io, room.id);
       scheduleTurnTimer(io, room.id);
+      scheduleHandFlowTimer(io, room.id);
+    } catch (err) {
+      ack({ ok: false, error: errorMessage(err) });
+    }
+  });
+
+  socket.on("runIt:choose", (payload, ack) => {
+    try {
+      const room = getRoomOrThrow(payload.roomId);
+      const playerId = requirePlayerId(socket);
+      const result = chooseRunIt(room, playerId, payload.choice);
+      if (!result.ok) {
+        ack({ ok: false, error: result.error ?? "Can't choose right now." });
+        return;
+      }
+      ack({ ok: true });
+      if (result.resolved) {
+        postSystemMessage(room, room.hand.runout?.runs === 2 ? "Running it twice." : "Running it once.");
+      }
+      void broadcastRoomState(io, room.id);
+      // Re-derives its own target from live state — an early "once" cancels
+      // the decision timer and installs the first reveal timer automatically.
+      scheduleHandFlowTimer(io, room.id);
+    } catch (err) {
+      ack({ ok: false, error: errorMessage(err) });
+    }
+  });
+
+  socket.on("room:resync", (payload, ack) => {
+    try {
+      const room = getRoomOrThrow(payload.roomId);
+      const loc = roomStore.getSocketLocation(socket.id);
+
+      // Fast path: this socket is still correctly linked — the common case,
+      // since most visibility/focus/online events fire without the
+      // transport actually having dropped. Just the latest snapshot, no
+      // broadcast, no toast.
+      if (loc && loc.roomId === room.id && room.players.some((p) => p.id === loc.playerId)) {
+        ack({ ok: true, view: buildClientView(room, loc.playerId) });
+        return;
+      }
+
+      // Slow path: the transport genuinely dropped and reconnected as a new
+      // Socket.IO connection, so this socket has fresh, empty socket.data.
+      // Re-link exactly like room:join does, but skip its display-name
+      // validation and its always-broadcast/always-toast side effects —
+      // those would spam every player each time someone's phone screen
+      // locks, when nothing actually needs telling.
+      if (!payload.playerToken) {
+        ack({ ok: false, error: "Not linked to a player in this room." });
+        return;
+      }
+      const playerId = roomStore.resolveToken(room.id, payload.playerToken);
+      const player = playerId ? room.players.find((p) => p.id === playerId) : undefined;
+      if (!player) {
+        ack({ ok: false, error: "Not linked to a player in this room." });
+        return;
+      }
+
+      socket.join(room.id);
+      socket.data.roomId = room.id;
+      socket.data.playerId = player.id;
+      socket.data.playerToken = payload.playerToken;
+      roomStore.linkSocket(socket.id, room.id, player.id);
+
+      const wasDisconnected = player.connectionStatus === "disconnected";
+      player.connectionStatus = "connected";
+
+      ack({ ok: true, view: buildClientView(room, player.id) });
+
+      if (wasDisconnected) {
+        io.to(room.id).emit("toast", { message: `${player.displayName} reconnected.` });
+        void broadcastRoomState(io, room.id);
+      }
     } catch (err) {
       ack({ ok: false, error: errorMessage(err) });
     }

@@ -38,10 +38,24 @@ function snapshotOf(players: PublicPlayer[]): Map<string, Snapshot> {
  */
 export function usePlayerStatusLabels(
   players: PublicPlayer[],
-  lastAggressorId: string | null
+  lastAggressorId: string | null,
+  resetKey?: string | number
 ): Record<string, LabelEntry> {
   const [prevSnapshot, setPrevSnapshot] = useState<Map<string, Snapshot>>(() => snapshotOf(players));
   const [labels, setLabels] = useState<Record<string, LabelEntry>>({});
+  const [prevResetKey, setPrevResetKey] = useState(resetKey);
+
+  // A resync (or a new hand) can jump the snapshot across an arbitrary gap —
+  // diffing against whatever was seen before the gap can produce a stale or
+  // misleading label (e.g. "Folded" resurfacing for a fold that happened
+  // minutes ago). Reseed silently instead of diffing across the gap.
+  if (resetKey !== prevResetKey) {
+    const resyncedSnapshot = snapshotOf(players);
+    setPrevResetKey(resetKey);
+    setPrevSnapshot(resyncedSnapshot);
+    setLabels({});
+    return {};
+  }
 
   const nextSnapshot = snapshotOf(players);
   let snapshotChanged = nextSnapshot.size !== prevSnapshot.size;

@@ -104,3 +104,18 @@ export function splitPotAmount(amount: number, winnerIds: string[]): Record<stri
   }
   return result;
 }
+
+/**
+ * Divides one pot's amount evenly across N runs of the board (run it
+ * twice), with the odd chip going to the first run. This is a separate
+ * concern from splitPotAmount's odd-chip rule above: that one splits a
+ * single board's pot amount across multiple winners of that board, this one
+ * splits the pot amount itself across multiple independent boards, each of
+ * which is then evaluated and (potentially) split among winners on its own.
+ */
+export function splitPotAcrossRuns(amount: number, runs: number): number[] {
+  if (runs <= 1) return [amount];
+  const share = Math.floor(amount / runs);
+  const remainder = amount - share * runs;
+  return Array.from({ length: runs }, (_, i) => share + (i < remainder ? 1 : 0));
+}
