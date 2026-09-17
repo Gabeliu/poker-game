@@ -14,7 +14,7 @@ import { ChipFlight } from "./ChipFlight";
 import { Deck } from "./Deck";
 import { Spade } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { getEligiblePlayers } from "@/server/engine/seats";
+import { getEligiblePlayers, getStartHandError } from "@/server/engine/seats";
 import { formatChips } from "@/lib/format";
 import { PlayerAvatar } from "./PlayerAvatar";
 import { ChipStack } from "./ChipStack";
@@ -52,6 +52,7 @@ export function PokerTable({ room, isHost, onRemovePlayer, onSit, onStartHand }:
   const statusLabels = usePlayerStatusLabels(room.players, room.hand.lastAggressorId);
   const ringSeats = ringSeatPositions(mySeat);
   const eligibleCount = getEligiblePlayers(room.players).length;
+  const startError = getStartHandError(room.players);
   const waiting = room.hand.phase === "waiting";
   const winners = room.hand.result?.winners ?? [];
 
@@ -142,11 +143,11 @@ export function PokerTable({ room, isHost, onRemovePlayer, onSit, onStartHand }:
                 <span className="room-eyebrow">No Limit Hold’em</span>
                 <div className="seated-count"><span />{room.players.filter((p) => p.seat !== null).length} / 8 players seated</div>
                 {isHost && eligibleCount >= 2 ? (
-                  <Button className="room-primary" onClick={onStartHand} data-testid="start-hand-button">Start Hand</Button>
+                  <Button className="room-primary" disabled={Boolean(startError)} aria-describedby="start-hand-status" onClick={onStartHand} data-testid="start-hand-button">Start Hand</Button>
                 ) : (
                   <Button variant="outline" className="table-invite" onClick={() => copyInviteLink(room.id)}>Copy Invite Link</Button>
                 )}
-                <p className="lobby-hint">{eligibleCount < 2 ? "Waiting for players to buy in" : isHost ? "The table is ready. Deal them in." : "Waiting for the host to deal"}</p>
+                <p id="start-hand-status" className="lobby-hint" role="status">{startError ?? (isHost ? "The table is ready. Deal them in." : "Waiting for the host to deal")}</p>
               </div>
             )}
           </div>

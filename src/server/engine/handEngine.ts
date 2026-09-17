@@ -3,7 +3,7 @@ import { Deck } from "./deck";
 import { applyAction, getLegalActions } from "./betting";
 import { calculateSidePots, splitPotAmount, type PotContribution } from "./pots";
 import { compareHandScores, evaluateBestHand } from "./evaluator";
-import { getEligiblePlayers, getPlayersStillInHand, getPlayersWhoCanAct, nextPlayerAfterSeat } from "./seats";
+import { getEligiblePlayers, getStartHandError, getPlayersStillInHand, getPlayersWhoCanAct, nextPlayerAfterSeat } from "./seats";
 
 export class HandEngineError extends Error {}
 
@@ -19,10 +19,9 @@ function addLedgerEntry(room: RoomState, entry: Omit<LedgerEntry, "id" | "create
 
 /** Starts a new hand: rotates dealer/blinds, deals hole cards, sets first actor. */
 export function startHand(room: RoomState, deck: Deck): void {
+  const startError = getStartHandError(room.players);
+  if (startError) throw new HandEngineError(startError);
   const eligible = getEligiblePlayers(room.players);
-  if (eligible.length < 2) {
-    throw new HandEngineError("At least 2 players with approved chips are required to start a hand.");
-  }
 
   // Reset every player's hand-scoped state first.
   for (const player of room.players) {

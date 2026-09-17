@@ -13,6 +13,18 @@ export function getEligiblePlayers<T extends Pick<Player, "hasBoughtIn" | "sitti
     .sort((a, b) => a.seat - b.seat);
 }
 
+/** Shared pre-deal validation; never drops reserved seats or changes eligibility. */
+export function getStartHandError<T extends Pick<Player, "hasBoughtIn" | "sittingOut" | "chips" | "seat" | "connectionStatus">>(players: T[]): string | null {
+  // Keep disconnected seats reserved. Spectators do not block the table.
+  if (players.some((player) => player.seat !== null && player.connectionStatus !== "connected")) {
+    return "Waiting for all seated players to reconnect.";
+  }
+  if (getEligiblePlayers(players).length < 2) {
+    return "At least 2 players with approved chips are required to start a hand.";
+  }
+  return null;
+}
+
 /** Returns the next player, in ascending seat order (wrapping), from a candidate pool. */
 export function nextPlayerAfterSeat<T extends Pick<Player, "seat">>(pool: T[], fromSeat: number): T | null {
   const seated = pool.filter((p) => p.seat !== null);

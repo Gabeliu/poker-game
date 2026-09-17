@@ -5,7 +5,7 @@ import { formatChips } from "@/lib/format";
 import type { ActionRequest, ClientRoomView } from "@/lib/types";
 import { PokerActions } from "./PokerActions";
 import { PlayingCard } from "./PlayingCard";
-import { getEligiblePlayers } from "@/server/engine/seats";
+import { getStartHandError } from "@/server/engine/seats";
 import { cn } from "@/lib/utils";
 
 interface ActionDockProps {
@@ -20,7 +20,7 @@ export function ActionDock({ room, isHost, onAction, onStartHand, onSitOut }: Ac
   const me = room.players.find((p) => p.id === room.you.playerId);
   const isMyTurn = Boolean(me) && room.hand.activePlayerId === me!.id;
   const handOver = room.hand.phase === "waiting" || room.hand.phase === "hand-complete";
-  const eligibleCount = getEligiblePlayers(room.players).length;
+  const startError = getStartHandError(room.players);
   const iAmSittingOut = Boolean(me?.sittingOut && me.hasBoughtIn);
 
   return (
@@ -38,7 +38,8 @@ export function ActionDock({ room, isHost, onAction, onStartHand, onSitOut }: Ac
                 {isHost && room.hand.phase !== "waiting" ? (
                   <Button
                     size="lg"
-                    disabled={eligibleCount < 2}
+                    disabled={Boolean(startError)}
+                    aria-describedby={startError ? "next-hand-status" : undefined}
                     onClick={onStartHand}
                     data-testid="start-hand-button"
                     className="bg-[var(--accent-lime)] text-[var(--accent-lime-foreground)] hover:bg-[var(--accent-lime)]/90 font-semibold px-8 shadow-[0_8px_24px_rgba(0,0,0,0.4)]"
@@ -50,8 +51,8 @@ export function ActionDock({ room, isHost, onAction, onStartHand, onSitOut }: Ac
                     <p className="text-sm text-[var(--text-secondary)]">Waiting for the host to start the next hand&hellip;</p>
                   )
                 )}
-                {eligibleCount < 2 && isHost && room.hand.phase !== "waiting" && (
-                  <p className="text-xs text-[var(--text-secondary)]">Need at least 2 players with approved chips.</p>
+                {startError && isHost && room.hand.phase !== "waiting" && (
+                  <p id="next-hand-status" role="status" className="text-center text-xs text-[var(--text-secondary)]">{startError}</p>
                 )}
               </>
             )}

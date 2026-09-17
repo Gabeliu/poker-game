@@ -21,7 +21,7 @@ interface ChipFlightProps {
  * used for player→pot bets and pot→winner payouts. Position is animated via
  * CSS transition on left/top percentages (which naturally scale with the
  * table's own responsive size) rather than pixel math. */
-export function ChipFlight({ from, to, amount, durationMs = 550, onDone }: ChipFlightProps) {
+export function ChipFlight({ from, to, amount, durationMs = 280, onDone }: ChipFlightProps) {
   const [pos, setPos] = useState(from);
 
   useEffect(() => {
@@ -39,7 +39,7 @@ export function ChipFlight({ from, to, amount, durationMs = 550, onDone }: ChipF
       className="pointer-events-none absolute z-30 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-0.5 transition-[left,top] ease-out"
       style={{ left: `${pos.xPct}%`, top: `${pos.yPct}%`, transitionDuration: `${durationMs}ms` }}
     >
-      <PokerChip size={22} />
+      <PokerChip size={22} denomination={amount} />
       <span className="rounded-full bg-black/60 px-1.5 py-px text-[9px] font-semibold tabular-nums text-[var(--accent-lime)]">
         {formatChips(amount)}
       </span>

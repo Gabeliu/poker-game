@@ -219,6 +219,43 @@ button:active:not(:disabled) { translate: 0 1px; }
   .hero-deck { transform: rotate(-15deg); }
   .landing-footer { padding: 16px 20px; font-size: 8px; flex-direction: column; gap: 6px; }
 }
+/* Material polish only: these layers leave all layout boxes and seat coordinates intact. */
+.dark {
+  --room-leather: #202923;
+  --room-felt-light: #36795a36;
+  --room-soft-glow: #aee44b1c;
+}
+.landing-page { background: radial-gradient(ellipse at 50% 69%, #164c3640, transparent 66%), radial-gradient(ellipse at 50% 25%, #18382628, transparent 65%), #070a08; }
+.landing-hero::before { content: ""; position: absolute; pointer-events: none; inset: 0; background: radial-gradient(ellipse at 50% 66%, #29734c12, transparent 68%), repeating-linear-gradient(110deg, #b7d5b902 0 1px, transparent 1px 4px); mask-image: linear-gradient(transparent, #000 25%, #000 85%, transparent); }
+.hero-scene::before { content: ""; position: absolute; pointer-events: none; inset: -35% 6% 0; background: radial-gradient(ellipse at 50% 68%, #2b79432b, transparent 66%); filter: blur(25px); }
+.table-dome-rim { background: radial-gradient(ellipse at 50% 0, #68736532, transparent 62%), repeating-linear-gradient(100deg, #ffffff02 0 1px, transparent 1px 3px), linear-gradient(180deg, #343e36, var(--room-leather) 24%, #0a100c 85%); box-shadow: 0 10px 0 #060907, 0 13px 0 #3c473b70, 0 30px 42px #000c, 0 46px 85px #28573425, inset 0 3px 4px #c0d0bd26, inset 0 -9px 12px #000d, inset 0 0 0 5px #0000001a; }
+.table-dome-rim::after { border-color: #bcc6af20; box-shadow: inset 0 1px 0 #0006, 0 1px 0 #ffffff05; }
+.table-dome-surface { background: radial-gradient(ellipse at 46% 28%, var(--room-felt-light), transparent 66%), repeating-linear-gradient(25deg, #ffffff03 0 1px, transparent 1px 3px), repeating-linear-gradient(115deg, #0000000c 0 1px, transparent 1px 3px), radial-gradient(ellipse, #16573f, #082e22); box-shadow: inset 0 0 0 1px #97b27a40, inset 0 0 0 5px #00000016, inset 0 8px 25px #000a, inset 0 0 75px #0005; }
+.table-dome-surface::after { border-color: #b9cba429; box-shadow: 0 1px 0 #0003; }
+.card-face-reveal { background: linear-gradient(135deg, #fffdf4, var(--card-face) 52%, #e3e4d9); box-shadow: inset 0 1px 0 #fff, inset 0 -2px 2px #7c817526, 0 1px 0 #b4b8aa; }
+.card-back { box-shadow: inset 0 1px 0 #ffffff80, inset 0 -2px 4px #0008, 0 1px 0 #a5b096; }
+.physical-chip::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; background: linear-gradient(135deg, #ffffff25, transparent 48%, #0004); box-shadow: inset 0 1px 1px #fff8, inset 0 -1px 1px #0009; }
+.dealer-puck { background: radial-gradient(ellipse at 35% 20%, #fff9e5, #ddd0a6 65%, #b3a27b); box-shadow: inset 0 1px 2px #fff, inset 0 -1px 1px #74654466, 0 3px 0 #88774f, 0 5px 9px #0009; text-shadow: 0 1px 0 #fff8; }
+.blind-puck { background: linear-gradient(#37483b, #19251e); box-shadow: inset 0 1px 1px #a9b9a633, 0 3px 0 #080d0a, 0 5px 8px #0007; text-shadow: 0 1px 1px #000; }
+.seat-panel, .self-seat { background: radial-gradient(ellipse at 50% 0, #687a5a12, transparent 70%), var(--room-panel); box-shadow: inset 0 1px 0 #dae5ca12, inset 0 -1px 0 #0008, 0 10px 20px #0007; }
+.seat-panel > .relative > div:not(.absolute), .self-identity > div:first-child { box-shadow: inset 0 1px 2px #fff3, inset 0 -2px 4px #0005, 0 3px 6px #0006; }
+.seat-panel > span, .self-name { text-shadow: 0 1px 2px #0006; }
+.seat-active .seat-panel, .self-seat.seat-active { box-shadow: inset 0 1px 0 #d1ec9c20, 0 0 0 1px #ade74a26, 0 0 22px var(--room-soft-glow), 0 10px 25px #0009; transition: border-color 220ms, box-shadow 220ms; }
+.seat-bet, .self-bet { backdrop-filter: blur(5px); box-shadow: inset 0 1px 0 #c0db8920, 0 3px 7px #0005; }
+.pot-display { filter: drop-shadow(0 2px 3px #0003); }
+.poker-action { box-shadow: inset 0 1px 0 #ffffff12, 0 3px 0 #0005, 0 8px 18px #0005; }
+.poker-action:not(:disabled):hover { filter: brightness(1.08); }
+.poker-action-positive { box-shadow: inset 0 1px 0 #e9ffc86b, 0 3px 0 #3c5425, 0 8px 20px var(--room-soft-glow); }
+.poker-action:active:not(:disabled) { filter: brightness(.97); }
+.room-primary:disabled { box-shadow: none; cursor: not-allowed; }
+.hero-table, .hero-hand, .hero-chips, .hero-dealer, .hero-deck { transition: translate 240ms ease-out; }
+@media (hover: hover) and (pointer: fine) and (min-width: 768px) and (prefers-reduced-motion: no-preference) {
+  .hero-table { translate: calc(var(--parallax-x, 0) * 3px) calc(var(--parallax-y, 0) * 2px); }
+  .hero-hand { translate: calc(var(--parallax-x, 0) * 7px) calc(var(--parallax-y, 0) * 5px); }
+  .hero-chips { translate: calc(var(--parallax-x, 0) * 10px) calc(var(--parallax-y, 0) * 6px); }
+  .hero-dealer { translate: calc(var(--parallax-x, 0) * 5px) calc(var(--parallax-y, 0) * 3px); }
+  .hero-deck { translate: calc(var(--parallax-x, 0) * -4px) calc(var(--parallax-y, 0) * -2px); }
+}
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
 }

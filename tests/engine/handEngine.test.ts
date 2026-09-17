@@ -3,6 +3,34 @@ import type { Card, Player, RoomState } from "@/lib/types";
 import { Deck } from "@/server/engine/deck";
 import { startHand, submitAction } from "@/server/engine/handEngine";
 
+describe("start-hand connectivity validation", () => {
+  it.each([
+    { label: "funded player", opts: {} },
+    { label: "sitting-out player", opts: { sittingOut: true } },
+    { label: "player awaiting buy-in", opts: { hasBoughtIn: false, chips: 0 } },
+  ])("blocks a disconnected seated $label even with two other eligible players", ({ opts }) => {
+    const room = makeRoom([makePlayer("host", 0, 1000), makePlayer("other", 1, 1000), makePlayer("offline", 2, 1000, { ...opts, connectionStatus: "disconnected" })]);
+    const before = structuredClone(room);
+    const deck = new Deck();
+    expect(() => startHand(room, deck)).toThrow("Waiting for all seated players to reconnect.");
+    expect(room).toEqual(before);
+    room.players[2].connectionStatus = "connected";
+    expect(() => startHand(room, deck)).not.toThrow();
+    expect(room.hand.phase).toBe("preflop");
+  });
+
+  it("does not block on a disconnected unseated player", () => {
+    const room = makeRoom([makePlayer("host", 0, 1000), makePlayer("guest", 1, 1000), makePlayer("spectator", 2, 0, { seat: null, connectionStatus: "disconnected", hasBoughtIn: false })]);
+    expect(() => startHand(room, new Deck())).not.toThrow();
+    expect(room.players[2].holeCards).toEqual([]);
+  });
+
+  it.each([{ chips: 0 }, { hasBoughtIn: false }, { sittingOut: true }, { seat: null }])("still requires two funded, seated participants after reconnection: %j", (opts) => {
+    const room = makeRoom([makePlayer("host", 0, 1000), makePlayer("guest", 1, 1000, opts)]);
+    expect(() => startHand(room, new Deck())).toThrow("At least 2 players with approved chips");
+  });
+});
+
 function card(spec: string): Card {
   const suitChar = spec.slice(-1);
   const rank = spec.slice(0, -1) as Card["rank"];
