@@ -8,7 +8,6 @@ import { copyInviteLink } from "@/lib/invite";
 import { HostRequestsPanel } from "./HostRequestsPanel";
 import { HostSettingsDialog } from "./HostSettingsDialog";
 import { LedgerPanel } from "./LedgerPanel";
-import { BuyInDialog } from "./BuyInDialog";
 import { PlayerAvatar } from "./PlayerAvatar";
 import { SoundControl } from "./SoundControl";
 
@@ -19,10 +18,12 @@ interface RoomControlsProps {
   onUpdateSettings: (settings: Partial<import("@/lib/types").RoomSettings>) => void;
   onRemovePlayer: (playerId: string) => void;
   onTransferOwnership: (playerId: string) => void;
-  onRequestBuyIn: (amount: number, type: "initial" | "topup") => Promise<{ ok: true } | { ok: false; error: string }>;
 }
 
-/** Thin, minimal top nav — logo left, room/blinds center, actions right. */
+/** Thin, minimal top nav — logo left, room/blinds center, actions right.
+ * Buy-in lives at the table/action dock instead (see ActionDock) — it's a
+ * core gameplay action, not a settings-tier one, so it doesn't belong here
+ * competing with invite/ledger/sound/settings for attention. */
 export function RoomControls({
   room,
   isHost,
@@ -30,11 +31,9 @@ export function RoomControls({
   onUpdateSettings,
   onRemovePlayer,
   onTransferOwnership,
-  onRequestBuyIn,
 }: RoomControlsProps) {
   const router = useRouter();
   const me = room.players.find((p) => p.id === room.you.playerId);
-  const pendingMine = room.buyInRequests.find((r) => r.playerId === me?.id && r.status === "pending");
 
   return (
     <header className="room-header relative flex items-center justify-between gap-2 px-3 py-2.5 sm:px-4">
@@ -61,26 +60,6 @@ export function RoomControls({
           <Link2 className="h-3.5 w-3.5" />
           <span className="hidden sm:inline">Invite Friends</span>
         </Button>
-
-        {me && (
-          <BuyInDialog
-            player={me}
-            settings={room.settings}
-            pendingRequest={pendingMine}
-            handInProgress={room.status === "in-hand"}
-            onRequest={onRequestBuyIn}
-          >
-            <Button
-              variant="ghost"
-              size="sm"
-              data-testid="buyin-trigger"
-              className="px-2 text-[var(--text-secondary)] hover:bg-white/8 hover:text-[var(--text-primary)] sm:px-3"
-            >
-              <span className="sm:hidden">{!me.hasBoughtIn ? "Buy In" : "+Chips"}</span>
-              <span className="hidden sm:inline">{!me.hasBoughtIn ? "Buy In" : "Add Chips"}</span>
-            </Button>
-          </BuyInDialog>
-        )}
 
         {me && <LedgerPanel entries={room.ledger.filter((e) => e.playerId === me.id)} currentChips={me.chips} />}
 

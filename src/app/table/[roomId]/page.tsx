@@ -171,7 +171,6 @@ export default function TablePage({ params }: { params: Promise<{ roomId: string
           onUpdateSettings={updateSettings}
           onRemovePlayer={removePlayer}
           onTransferOwnership={transferOwnership}
-          onRequestBuyIn={requestBuyIn}
         />
 
         <AppShell
@@ -189,7 +188,14 @@ export default function TablePage({ params }: { params: Promise<{ roomId: string
           </div>
 
           <div className="action-area">
-            <ActionDock room={room} isHost={isHost} onAction={submitAction} onStartHand={startHand} onSitOut={sitOut} />
+            <ActionDock
+              room={room}
+              isHost={isHost}
+              onAction={submitAction}
+              onStartHand={startHand}
+              onSitOut={sitOut}
+              onRequestBuyIn={requestBuyIn}
+            />
           </div>
         </AppShell>
       </div>

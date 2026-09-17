@@ -25,7 +25,6 @@ button:active:not(:disabled) { translate: 0 1px; }
 .room-header > div:last-child { flex: 0 0 auto; }
 .room-header button { border: 1px solid transparent; border-radius: 9px; }
 .room-header button:hover { border-color: #ffffff14; background: #ffffff07; }
-.room-header [data-testid="buyin-trigger"] { color: var(--accent-lime); background: #b2ed4b0b; border-color: #b2ed4b24; }
 .room-sidebar { background: linear-gradient(180deg, #0b100ee6, #070a09b3); backdrop-filter: blur(16px); }
 .room-sidebar h3 { font-size: 10px; letter-spacing: .17em; padding-bottom: 10px; margin-top: 6px; }
 .room-sidebar > div > div + div { border-top: 1px solid var(--room-border); padding-top: 20px; }
@@ -101,6 +100,12 @@ button:active:not(:disabled) { translate: 0 1px; }
 .host-label { position: absolute; bottom: -9px; left: 50%; transform: translateX(-50%); border: 1px solid #72855555; border-radius: 20px; background: #23301e; color: #c2d69c; padding: 1px 8px; font-size: 8px; text-transform: uppercase; letter-spacing: .12em; }
 .self-cards { position: absolute; left: 50%; bottom: calc(100% - 3px); transform: translateX(-50%); }
 .self-cards [role="img"] { width: clamp(48px, 8cqw, 78px); height: clamp(68px, 11.3cqw, 110px); border-radius: 9px; }
+/* Only the second (front) card overlaps the first — a fixed overlap this
+   size keeps both cards' corner rank+suit clear of the other card at every
+   size in the clamp() above, unlike the old margin-on-both-sides approach
+   which ate a fixed pixel amount that became most of a shrunken mobile
+   card's width and buried the back card's suit under the front card. */
+.self-cards [role="img"] + [role="img"] { margin-left: -14px; }
 .self-bet { position: absolute; left: calc(100% + 12px); top: 0; white-space: nowrap; }
 .spectator-hint { position: absolute; top: 102%; left: 50%; transform: translateX(-50%); white-space: nowrap; font-size: 11px; color: var(--text-secondary); }
 .action-area { flex-shrink: 0; position: relative; z-index: 10; padding: 16px 22px 22px; background: linear-gradient(0deg, #060a08, #0d1511d9); border-top: 1px solid #ffffff06; }
@@ -113,25 +118,28 @@ button:active:not(:disabled) { translate: 0 1px; }
 .winner-summary > div > p > span:first-child { color: var(--room-gold); }
 .card-face-reveal { animation: card-reveal 220ms ease-out; backface-visibility: hidden; }
 
-.landing-page { background: radial-gradient(ellipse at 50% 40%, #1c493333, transparent 65%), #070a08; }
-.landing-page header { width: 100%; max-width: 1600px; margin-inline: auto; padding-top: 28px; }
-.landing-page header > div > span { font-size: 25px; }
+.landing-page { background: radial-gradient(ellipse at 50% 40%, #1c493333, transparent 65%), #070a08; font-family: var(--font-geist-sans); }
+.landing-page h1, .landing-page h2 { font-family: var(--font-display); }
+.landing-page header { width: 100%; max-width: 1400px; margin-inline: auto; padding-top: 28px; }
+.landing-page header > div:first-child > span { font-size: 25px; }
 .landing-header-note { display: flex; align-items: center; gap: 8px; color: #91a395; font-size: 11px; }
-.landing-hero { padding-top: clamp(25px, 6vh, 70px); }
-.hero-eyebrow { font-size: 10px; letter-spacing: .23em; color: #a2b695; margin-bottom: 22px; }
-.hero-copy h1 { font-weight: 550; line-height: 1.1; letter-spacing: -.055em; text-wrap: balance; }
-.hero-copy > p:not(.hero-eyebrow) { font-size: 14px; line-height: 1.8; max-width: 385px; color: #9aa79e; }
-.hero-copy > div { max-width: 380px; }
-.hero-copy button { font-size: 12px; letter-spacing: .08em; height: 48px; border-radius: 9px; }
-.landing-steps { gap: 8px 22px; }
-.landing-steps li { flex-direction: row; gap: 6px; }
-.landing-steps li > span:first-child { border: 0; width: 18px; height: 18px; background: transparent; color: #92a986; }
-.landing-steps li svg { width: 13px; height: 13px; }
-.landing-steps li > span:last-child { font-size: 10px; color: #8a9c8e; }
-.hero-scene { position: relative; width: min(1100px, 96vw); height: clamp(240px, 34vh, 400px); margin-top: 25px; pointer-events: none; perspective: 1000px; }
+.landing-nav { display: none; }
+
+/* ---- Hero: text and table scene side by side on desktop, stacked on
+   mobile. Left-aligned rather than the centered-stack default so the
+   display serif has room to set at real size. ---- */
+.landing-hero { padding-top: clamp(20px, 5vh, 48px); padding-bottom: clamp(20px, 5vh, 48px); display: flex; flex-direction: column; gap: 36px; }
+.hero-copy { max-width: 640px; text-align: left; }
+.hero-copy h1 { font-weight: 600; font-size: clamp(38px, 5.4vw, 60px); line-height: 1.05; letter-spacing: -.02em; color: var(--text-primary); }
+.hero-copy > p:first-of-type { margin-top: 18px; font-size: 16px; line-height: 1.7; max-width: 440px; color: #a9b8ad; }
+.hero-actions { margin-top: 30px; display: flex; width: 100%; max-width: 420px; flex-direction: column; align-items: stretch; gap: 12px; }
+.hero-copy button { font-size: 13px; letter-spacing: .02em; height: 48px; border-radius: 9px; }
+.hero-fineprint { margin-top: 18px; font-size: 12px; color: #75876f; }
+.hero-visual { display: flex; justify-content: center; flex: 1; min-width: 0; }
+.hero-scene { position: relative; width: min(640px, 96vw); height: clamp(150px, 22vh, 235px); margin-top: 25px; pointer-events: none; perspective: 1000px; }
 .hero-table { position: absolute; inset: 5% 0 -55%; border-radius: 48%; transform: rotateX(35deg); }
 .hero-felt { position: absolute; inset: 22px; border-radius: inherit; }
-.hero-table-brand { position: absolute; top: 17%; left: 50%; transform: translateX(-50%); font-size: 28px; font-weight: 800; letter-spacing: .3em; color: #a3c39445; text-shadow: 0 1px 1px #0009; white-space: nowrap; }
+.hero-table-brand { position: absolute; top: 17%; left: 50%; transform: translateX(-50%); font-size: 22px; font-weight: 800; letter-spacing: .3em; color: #a3c39445; text-shadow: 0 1px 1px #0009; white-space: nowrap; }
 .hero-table-brand small { display: block; margin-top: 5px; font-size: 7px; letter-spacing: .3em; }
 .hero-hand { position: absolute; top: 43%; left: 43%; display: flex; transform: rotate(-8deg); }
 .hero-hand > div + div { margin-left: -25px; }
@@ -139,13 +147,55 @@ button:active:not(:disabled) { translate: 0 1px; }
 .hero-chip-column { position: relative; width: 42px; }
 .hero-dealer { position: absolute; left: 34%; top: 49%; width: 38px; height: 38px; font-size: 17px; }
 .hero-deck { position: absolute; top: 27%; left: 23%; transform: rotate(-15deg) scale(1.5); }
-.landing-footer { position: relative; z-index: 1; display: flex; justify-content: space-between; padding: 18px 40px; gap: 15px; background: #070a08; border-top: 1px solid #ffffff08; color: #7f9182; font-size: 9px; letter-spacing: .1em; }
+
+@media (min-width: 1024px) {
+  .landing-nav { display: flex; gap: 28px; font-size: 13px; color: #9aab9c; }
+  .landing-nav a:hover { color: var(--text-primary); }
+  .landing-hero { flex-direction: row; align-items: center; justify-content: space-between; gap: 40px; }
+  .hero-visual { justify-content: flex-end; }
+  .hero-scene { margin-top: 0; }
+}
+
+/* ---- How it works: a genuine sequence, so numbering earns its place —
+   plaques in the room's brass tone (not the lime CTA color) to keep the
+   accent hierarchy clear: lime is only ever an action. ---- */
+.how-section { position: relative; z-index: 1; padding: 56px 24px 8px; max-width: 1160px; width: 100%; margin-inline: auto; }
+.how-section h2 { font-size: clamp(24px, 3vw, 30px); font-weight: 600; color: var(--text-primary); margin-bottom: 28px; }
+.how-steps { list-style: none; display: grid; grid-template-columns: repeat(5, 1fr); gap: 0; position: relative; }
+.how-steps::before { content: ""; position: absolute; top: 17px; left: 6%; right: 6%; height: 1px; background: linear-gradient(90deg, transparent, #d0bb8945, transparent); }
+.how-step { position: relative; display: flex; flex-direction: column; gap: 9px; padding-right: 18px; }
+.how-step-n { position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 50%; background: #10150f; border: 1px solid #d0bb8955; color: var(--room-gold); font-family: var(--font-display); font-size: 15px; font-weight: 600; }
+.how-step-icon { display: none; }
+.how-step-title { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+.how-step-body { font-size: 12.5px; line-height: 1.55; color: #8a9c8e; max-width: 210px; }
+
+/* ---- Feature grid: styled like cards dealt face-up on felt (cream
+   panels, a thin gold rule) rather than the generic SaaS rounded-card kit. ---- */
+.features-section { position: relative; z-index: 1; padding: 40px 24px 64px; max-width: 1160px; width: 100%; margin-inline: auto; }
+.features-section h2 { font-size: clamp(24px, 3vw, 30px); font-weight: 600; color: var(--text-primary); margin-bottom: 28px; }
+.features-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+.feature-card { position: relative; padding: 22px 20px; border-radius: 14px; background: linear-gradient(165deg, #12241b, #0a1310 88%); border: 1px solid #d0bb891f; border-top: 2px solid #d0bb8950; }
+.feature-card-icon { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 9px; background: #d0bb8914; color: var(--room-gold); margin-bottom: 14px; }
+.feature-card h3 { font-size: 15px; font-weight: 600; color: var(--text-primary); margin-bottom: 8px; }
+.feature-card p { font-size: 12.5px; line-height: 1.6; color: #8a9c8e; }
+
+.cta-band { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 18px; padding: 48px 24px 64px; text-align: center; border-top: 1px solid #d0bb891a; }
+.cta-band p { font-family: var(--font-display); font-size: clamp(20px, 2.6vw, 26px); font-weight: 600; color: var(--text-primary); }
+
+.landing-footer { position: relative; z-index: 1; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px; padding: 22px 40px; background: #070a08; border-top: 1px solid #ffffff08; color: #7f9182; font-size: 12px; }
+.landing-footer-brand { display: flex; align-items: center; gap: 7px; font-weight: 600; color: #b7c6ba; }
+.landing-footer-disclaimer { color: #5f6f61; }
 
 @keyframes seat-arrive { from { transform: scale(.92); } to { transform: scale(1); } }
 @keyframes card-reveal { from { transform: perspective(600px) rotateY(65deg); } to { transform: perspective(600px) rotateY(0); } }
 @media (min-width: 1600px) { .room-header { padding-inline: 30px; } .table-lobby { gap: 10px; } .table-lobby h1 { font-size: 36px; } .table-stakes { font-size: 25px; } }
 @media (max-width: 1200px) { .room-header > div:first-child { flex-basis: 95px; } .room-header { padding-inline: 15px; } .room-header > div:last-child { gap: 2px; } .poker-table { width: min(calc(100cqw - 72px), calc((100cqh - 60px) * 1.65)); aspect-ratio: 1.65; } .empty-seat, .seat-panel { width: 88px; } .table-lobby { gap: 4px; } .table-lobby .room-eyebrow:first-child { display: none; } .room-title { position: static; transform: none; flex: 1; text-align: left; padding-left: 12px; } .poker-action { min-width: 84px; padding-inline: 12px; } }
 @media (min-width: 768px) and (max-width: 1050px) { .room-sidebar { display: none; } .game-client > div > .md\:hidden { display: flex; } .room-header > div:last-child > button span { display: none; } }
+@media (min-width: 640px) and (max-width: 1023px) {
+  .how-steps { grid-template-columns: repeat(3, 1fr); gap: 24px; }
+  .how-steps::before { display: none; }
+  .features-grid { grid-template-columns: repeat(2, 1fr); }
+}
 @media (max-width: 767px) {
   .game-page { padding: 0; }
   .game-client { height: 100dvh; min-height: 620px; border: 0; border-radius: 0; }
@@ -188,6 +238,7 @@ button:active:not(:disabled) { translate: 0 1px; }
   .self-seat { min-width: 150px; padding: 7px 9px; top: 90%; }
   .self-name { font-size: 11px; max-width: 115px; }
   .self-cards [role="img"] { width: 44px; height: 63px; font-size: 17px; }
+  .self-cards [role="img"] + [role="img"] { margin-left: -8px; }
   .self-bet { left: calc(100% + 5px); top: -22px; font-size: 9px; }
   .dealer-puck { width: 19px; height: 19px; font-size: 9px; }
   .blind-puck { font-size: 7px; }
@@ -202,12 +253,12 @@ button:active:not(:disabled) { translate: 0 1px; }
   .poker-action { min-width: 90px; height: 46px; font-size: 11px; padding: 8px 10px; }
   .landing-header-note { font-size: 9px; }
   .landing-page header { padding: 20px; }
-  .landing-hero { padding-top: 32px; }
-  .hero-copy h1 { max-width: 470px; font-size: clamp(35px, 8vw, 48px); }
-  .hero-eyebrow { font-size: 8px; letter-spacing: .18em; }
-  .hero-copy > p:not(.hero-eyebrow) { max-width: 310px; font-size: 13px; }
-  .landing-steps { max-width: 350px; gap: 10px 15px; }
-  .landing-steps li > span:last-child { font-size: 9px; }
+  .landing-hero { padding-top: 32px; text-align: center; }
+  .hero-copy { text-align: center; max-width: 100%; }
+  .hero-copy h1 { max-width: 100%; font-size: clamp(32px, 9vw, 44px); }
+  .hero-copy > p:first-of-type { max-width: 340px; margin-inline: auto; font-size: 14px; }
+  .hero-actions { margin-inline: auto; }
+  .hero-fineprint { text-align: center; }
   .hero-scene { width: 125vw; height: 230px; margin-top: 20px; }
   .hero-table { inset: 4% 0 -20%; }
   .hero-felt { inset: 14px; }
@@ -217,7 +268,16 @@ button:active:not(:disabled) { translate: 0 1px; }
   .hero-table-brand { font-size: 20px; }
   .hero-dealer { width: 26px; height: 26px; left: 30%; }
   .hero-deck { transform: rotate(-15deg); }
-  .landing-footer { padding: 16px 20px; font-size: 8px; flex-direction: column; gap: 6px; }
+  .how-section, .features-section { padding-inline: 20px; }
+  .how-steps { grid-template-columns: 1fr; gap: 18px; }
+  .how-steps::before { display: none; }
+  .how-step { display: grid; grid-template-columns: 34px 1fr; column-gap: 12px; row-gap: 3px; padding-right: 0; }
+  .how-step-n { grid-row: 1 / 3; }
+  .how-step-title { grid-column: 2; }
+  .how-step-body { grid-column: 2; max-width: none; }
+  .features-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
+  .cta-band { padding: 40px 20px 48px; }
+  .landing-footer { padding: 16px 20px; font-size: 10px; flex-direction: column; align-items: flex-start; gap: 8px; }
 }
 /* Material polish only: these layers leave all layout boxes and seat coordinates intact. */
 .dark {

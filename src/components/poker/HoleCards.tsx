@@ -17,14 +17,14 @@ export function HoleCards({ cards, folded }: { cards: Card[]; folded?: boolean }
         size="xl"
         rotationDeg={-9}
         dealDelayMs={0}
-        className="-mr-4 drop-shadow-[0_10px_24px_rgba(0,0,0,0.65)]"
+        className="drop-shadow-[0_10px_24px_rgba(0,0,0,0.65)]"
       />
       <PlayingCard
         card={cards[1]}
         size="xl"
         rotationDeg={9}
         dealDelayMs={110}
-        className="-ml-4 drop-shadow-[0_10px_24px_rgba(0,0,0,0.65)]"
+        className="drop-shadow-[0_10px_24px_rgba(0,0,0,0.65)]"
       />
     </div>
   );

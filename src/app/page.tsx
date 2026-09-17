@@ -15,7 +15,18 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Spade, Link2, Users, Coins, PlayCircle, ArrowRight, X } from "lucide-react";
+import {
+  Spade,
+  Link2,
+  Users,
+  Coins,
+  PlayCircle,
+  ArrowRight,
+  X,
+  Timer,
+  History,
+  MessageSquare,
+} from "lucide-react";
 import { useRoomStore } from "@/hooks/useRoomStore";
 import { getStoredDisplayName, storeDisplayName } from "@/lib/socketClient";
 import { HeroDecoration } from "@/components/poker/HeroDecoration";
@@ -83,23 +94,26 @@ export default function Home() {
           <Spade className="h-6 w-6 text-[var(--accent-lime)]" fill="currentColor" />
           <span className="text-lg font-bold tracking-tight">Felt</span>
         </div>
+        <nav className="landing-nav">
+          <a href="#how">How it works</a>
+          <a href="#features">What&rsquo;s included</a>
+        </nav>
         <span className="landing-header-note"><span /> Private tables. Real friends.</span>
       </header>
 
-      <section className="landing-hero relative flex flex-1 flex-col items-center px-4 text-center">
-
-        <div className="hero-copy relative z-10 flex flex-col items-center justify-center">
-          <p className="hero-eyebrow">THE BEST SEAT IS WITH YOUR FRIENDS</p>
-          <h1 className="max-w-3xl text-4xl font-bold leading-tight tracking-tight sm:text-6xl">
-            Play Texas Hold&rsquo;em with your friends,
-            <span className="text-[var(--accent-lime)]"> anywhere.</span>
+      <section className="landing-hero relative flex flex-1 items-center px-4 sm:px-10">
+        <div className="hero-copy relative z-10">
+          <h1>
+            Poker night, without
+            <br />
+            the kitchen table.
           </h1>
-          <p className="mt-4 max-w-md text-balance text-muted-foreground">
-            Create a private table, share one link, and deal in. Virtual chips, real friends, no
-            app to install.
+          <p>
+            Set the blinds, send one link, and deal real No-Limit Hold&rsquo;em with the people
+            you&rsquo;d actually invite over. Virtual chips, real bragging rights.
           </p>
 
-          <motion.div layout className="mt-8 flex w-full max-w-md flex-col items-stretch gap-3">
+          <motion.div layout className="hero-actions">
             <motion.div layout className="flex w-full gap-3">
               <Dialog open={createOpen} onOpenChange={setCreateOpen}>
                 <DialogTrigger asChild>
@@ -109,7 +123,7 @@ export default function Home() {
                     className="h-14 flex-1 bg-[var(--accent-lime)] text-[var(--accent-lime-foreground)] hover:bg-[var(--accent-lime)]/90 text-base font-bold tracking-wide shadow-[0_10px_30px_-8px_var(--accent-lime)]"
                     onClick={() => setJoinOpen(false)}
                   >
-                    CREATE TABLE
+                    Create table
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-sm">
@@ -171,7 +185,7 @@ export default function Home() {
                 className="h-14 flex-1 border-white/15 bg-white/[0.03] text-base font-bold tracking-wide text-[var(--text-primary)] hover:bg-white/[0.08]"
                 onClick={() => setJoinOpen((v) => !v)}
               >
-                {joinOpen ? "CANCEL" : "JOIN TABLE"}
+                {joinOpen ? "Cancel" : "Join table"}
               </Button>
             </motion.div>
 
@@ -220,28 +234,116 @@ export default function Home() {
             </AnimatePresence>
           </motion.div>
 
-          <ol className="landing-steps mt-8 flex w-full max-w-3xl list-none flex-wrap justify-center gap-4 text-left sm:text-center">
-            <Step icon={<PlayCircle className="h-5 w-5" />} label="Create a room" />
-            <Step icon={<Link2 className="h-5 w-5" />} label="Share the link" />
-            <Step icon={<Users className="h-5 w-5" />} label="Friends join" />
-            <Step icon={<Coins className="h-5 w-5" />} label="Host approves buy-in" />
-            <Step icon={<Spade className="h-5 w-5" />} label="Play poker" />
-          </ol>
+          <p className="hero-fineprint">No installs. No accounts. Nothing here is real money.</p>
         </div>
-        <HeroDecoration />
+
+        <div className="hero-visual">
+          <HeroDecoration />
+        </div>
       </section>
-      <footer className="landing-footer"><span>YOUR TABLE. YOUR PEOPLE. YOUR GAME.</span><span>Virtual chips · No real-money wagering</span></footer>
+
+      <section id="how" className="how-section">
+        <h2>How a table comes together</h2>
+        <ol className="how-steps">
+          <HowStep
+            n={1}
+            icon={<PlayCircle className="h-5 w-5" />}
+            title="Create a table"
+            body="Name the room, set the blinds, and it's ready."
+          />
+          <HowStep
+            n={2}
+            icon={<Link2 className="h-5 w-5" />}
+            title="Share the link"
+            body="One link, sent however you'd normally text your group."
+          />
+          <HowStep
+            n={3}
+            icon={<Users className="h-5 w-5" />}
+            title="Friends take a seat"
+            body="Up to eight players, each picking their own spot."
+          />
+          <HowStep
+            n={4}
+            icon={<Coins className="h-5 w-5" />}
+            title="You approve the buy-ins"
+            body="Nobody's chips hit the table without your say."
+          />
+          <HowStep
+            n={5}
+            icon={<Spade className="h-5 w-5" />}
+            title="Deal"
+            body="Real No-Limit Hold'em, live, for as many hands as you want."
+          />
+        </ol>
+      </section>
+
+      <section id="features" className="features-section">
+        <h2>What&rsquo;s at the table</h2>
+        <div className="features-grid">
+          <FeatureCard
+            icon={<Timer className="h-5 w-5" />}
+            title="Real hands, dealt live"
+            body="Turn timers and animated bets keep the pace of an actual table — everyone sees every action the moment it happens."
+          />
+          <FeatureCard
+            icon={<Coins className="h-5 w-5" />}
+            title="Buy-ins, your call"
+            body="Approve or reject every request, set a minimum and maximum, and keep a running ledger of who bought in for what."
+          />
+          <FeatureCard
+            icon={<History className="h-5 w-5" />}
+            title="Every hand on record"
+            body="Flip back through hand history to settle the inevitable argument about who really had the flush."
+          />
+          <FeatureCard
+            icon={<MessageSquare className="h-5 w-5" />}
+            title="Talk at the table"
+            body="Table chat and sound keep it feeling like everyone's actually sitting across from each other."
+          />
+        </div>
+      </section>
+
+      <section className="cta-band">
+        <p>Get a table running in under a minute.</p>
+        <Button
+          size="lg"
+          onClick={() => setCreateOpen(true)}
+          className="h-12 bg-[var(--accent-lime)] px-8 text-base font-bold tracking-wide text-[var(--accent-lime-foreground)] hover:bg-[var(--accent-lime)]/90"
+        >
+          Create table
+        </Button>
+      </section>
+
+      <footer className="landing-footer">
+        <div className="landing-footer-brand">
+          <Spade className="h-4 w-4 text-[var(--accent-lime)]" fill="currentColor" />
+          <span>Felt</span>
+        </div>
+        <p>A private table for you and your friends.</p>
+        <p className="landing-footer-disclaimer">Play-money only — nothing on Felt is for real-money wagering.</p>
+      </footer>
     </main>
   );
 }
 
-function Step({ icon, label }: { icon: React.ReactNode; label: string }) {
+function HowStep({ n, icon, title, body }: { n: number; icon: React.ReactNode; title: string; body: string }) {
   return (
-    <li className="flex items-center gap-3 sm:flex-col sm:items-center sm:gap-2">
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--accent-lime)]/30 bg-card text-[var(--accent-lime)]">
-        {icon}
-      </span>
-      <span className="text-sm text-muted-foreground">{label}</span>
+    <li className="how-step">
+      <span className="how-step-n">{n}</span>
+      <span className="how-step-icon">{icon}</span>
+      <span className="how-step-title">{title}</span>
+      <span className="how-step-body">{body}</span>
     </li>
+  );
+}
+
+function FeatureCard({ icon, title, body }: { icon: React.ReactNode; title: string; body: string }) {
+  return (
+    <div className="feature-card">
+      <span className="feature-card-icon">{icon}</span>
+      <h3>{title}</h3>
+      <p>{body}</p>
+    </div>
   );
 }

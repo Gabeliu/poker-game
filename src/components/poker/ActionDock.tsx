@@ -1,10 +1,12 @@
 "use client";
 
+import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatChips } from "@/lib/format";
 import type { ActionRequest, ClientRoomView } from "@/lib/types";
 import { PokerActions } from "./PokerActions";
 import { PlayingCard } from "./PlayingCard";
+import { BuyInDialog } from "./BuyInDialog";
 import { getStartHandError } from "@/server/engine/seats";
 import { cn } from "@/lib/utils";
 
@@ -14,21 +16,46 @@ interface ActionDockProps {
   onAction: (action: ActionRequest) => Promise<{ ok: true } | { ok: false; error: string }>;
   onStartHand: () => void;
   onSitOut: (sittingOut: boolean) => void;
+  onRequestBuyIn: (amount: number, type: "initial" | "topup") => Promise<{ ok: true } | { ok: false; error: string }>;
 }
 
-export function ActionDock({ room, isHost, onAction, onStartHand, onSitOut }: ActionDockProps) {
+export function ActionDock({ room, isHost, onAction, onStartHand, onSitOut, onRequestBuyIn }: ActionDockProps) {
   const me = room.players.find((p) => p.id === room.you.playerId);
   const isMyTurn = Boolean(me) && room.hand.activePlayerId === me!.id;
   const handOver = room.hand.phase === "waiting" || room.hand.phase === "hand-complete";
   const startError = getStartHandError(room.players);
   const iAmSittingOut = Boolean(me?.sittingOut && me.hasBoughtIn);
+  const pendingBuyIn = room.buyInRequests.find((r) => r.playerId === me?.id && r.status === "pending");
+  const buyInInProgress = room.status === "in-hand";
 
   return (
     <div className="action-dock flex w-full items-end justify-between gap-2 px-1 sm:gap-3">
       <div className="hidden w-24 shrink-0 sm:block sm:w-32" aria-hidden />
 
       <div className="flex flex-1 flex-col items-center gap-2">
-        {isMyTurn ? (
+        {me && !me.hasBoughtIn ? (
+          <div className="flex flex-col items-center gap-2">
+            <p className="text-sm text-[var(--text-secondary)]">
+              {pendingBuyIn ? "Your host still needs to approve it." : "Buy in to join the action."}
+            </p>
+            <BuyInDialog
+              player={me}
+              settings={room.settings}
+              pendingRequest={pendingBuyIn}
+              handInProgress={buyInInProgress}
+              onRequest={onRequestBuyIn}
+            >
+              <Button
+                size="lg"
+                disabled={Boolean(pendingBuyIn)}
+                data-testid="buyin-trigger"
+                className="bg-[var(--accent-lime)] text-[var(--accent-lime-foreground)] hover:bg-[var(--accent-lime)]/90 font-semibold px-8 shadow-[0_8px_24px_rgba(0,0,0,0.4)]"
+              >
+                {pendingBuyIn ? "Buy-In Requested" : "Buy In"}
+              </Button>
+            </BuyInDialog>
+          </div>
+        ) : isMyTurn ? (
           <PokerActions key={`${room.hand.activePlayerId}-${room.hand.phase}`} room={room} onAction={onAction} />
         ) : (
           <>
@@ -77,18 +104,38 @@ export function ActionDock({ room, isHost, onAction, onStartHand, onSitOut }: Ac
 
       <div className="flex w-20 shrink-0 flex-col items-end gap-1.5 sm:w-32">
         {me?.hasBoughtIn && (
-          <div
-            data-testid="your-stack"
-            data-your-chips={me.chips}
-            className="flex flex-col items-end rounded-xl border border-white/10 bg-black/40 px-2 py-1 backdrop-blur sm:px-3 sm:py-1.5"
-          >
-            <span className="text-[8px] font-medium uppercase tracking-wider text-[var(--text-secondary)] sm:text-[9px]">
-              Stack
-            </span>
-            <span className="text-sm font-bold tabular-nums text-[var(--text-primary)] sm:text-lg">
-              {formatChips(me.chips)}
-            </span>
-          </div>
+          <>
+            <div
+              data-testid="your-stack"
+              data-your-chips={me.chips}
+              className="flex flex-col items-end rounded-xl border border-white/10 bg-black/40 px-2 py-1 backdrop-blur sm:px-3 sm:py-1.5"
+            >
+              <span className="text-[8px] font-medium uppercase tracking-wider text-[var(--text-secondary)] sm:text-[9px]">
+                Stack
+              </span>
+              <span className="text-sm font-bold tabular-nums text-[var(--text-primary)] sm:text-lg">
+                {formatChips(me.chips)}
+              </span>
+            </div>
+            <BuyInDialog
+              player={me}
+              settings={room.settings}
+              pendingRequest={pendingBuyIn}
+              handInProgress={buyInInProgress}
+              onRequest={onRequestBuyIn}
+            >
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={Boolean(pendingBuyIn)}
+                data-testid="buyin-trigger"
+                className="h-auto gap-1 px-2 py-1 text-[10px] font-medium text-[var(--text-secondary)] hover:bg-white/8 hover:text-[var(--accent-lime)] sm:text-xs"
+              >
+                <Plus className="h-3 w-3 shrink-0" />
+                {pendingBuyIn ? "Request sent" : "Buy More Chips"}
+              </Button>
+            </BuyInDialog>
+          </>
         )}
       </div>
     </div>
