@@ -1,12 +1,19 @@
 # Felt — multiplayer Texas Hold'em
 
+### 🃏 [**Play now → felt-poker-qxjk.onrender.com**](https://felt-poker-qxjk.onrender.com)
+
+Just open the link, create a table, and share it with friends. No install, no account, no setup —
+everything below is only for people who want to run or deploy their own copy.
+
 A polished, real-time multiplayer Texas Hold'em poker web app. Create a private room, share a link,
 and play with friends using virtual chips. No accounts, no real money — just a shareable room code
 and a host who approves buy-ins.
 
 Repo: [github.com/Gabeliu/poker-game](https://github.com/Gabeliu/poker-game)
-Live: [felt-poker-qxjk.onrender.com](https://felt-poker-qxjk.onrender.com) (Render free tier — see
-[Deploying](#deploying) for what that means for uptime and room persistence)
+
+> The live link runs on Render's free tier: it spins down after 15 minutes of no traffic (a
+> ~30-60s cold start on the next visit), and since state is in-memory, rooms in progress are lost
+> if it spins down mid-session. See [Deploying](#deploying) for details.
 
 ## Stack
 
@@ -16,7 +23,7 @@ Live: [felt-poker-qxjk.onrender.com](https://felt-poker-qxjk.onrender.com) (Rend
 - **Vitest** for engine/service unit tests, **Playwright** for multi-browser end-to-end tests
 - No database — rooms are ephemeral, in-memory, single-process (see [Architecture](#architecture))
 
-## Getting started
+## Running it yourself (optional — most people should just play the live link above)
 
 ```bash
 npm install
@@ -118,4 +125,3 @@ turn and they don't come back in time.
   wrong with the link itself, the room it pointed to is just gone. Create a fresh room (and
   re-share that new link) after any restart or deploy.
 - No persistent accounts; identity is a per-room browser token, not a login.
-- No chat.
