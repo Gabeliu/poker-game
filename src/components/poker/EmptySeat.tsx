@@ -20,6 +20,11 @@ interface EmptySeatProps {
 export function EmptySeat({ position, canSit, onSit, canInvite, onInvite }: EmptySeatProps) {
   const interactive = canSit || canInvite;
   const label = canSit ? "Sit Here" : canInvite ? "Invite Player" : "Open seat";
+  // The top-center ring position sits almost exactly where the pot display
+  // renders, so that seat (empty or not) would otherwise paint over the pot
+  // total — fade it out so the real game info underneath stays legible,
+  // rather than reshuffling z-index globally and risking other overlaps.
+  const nearPot = Math.abs(position.xPct - 50) < 3 && position.yPct < 20;
 
   const content = (
     <>
@@ -43,7 +48,11 @@ export function EmptySeat({ position, canSit, onSit, canInvite, onInvite }: Empt
 
   if (!interactive) {
     return (
-      <div className="empty-seat pointer-events-none absolute flex flex-col items-center gap-1 opacity-70" style={style} data-testid="empty-seat">
+      <div
+        className={cn("empty-seat pointer-events-none absolute flex flex-col items-center gap-1 opacity-70", nearPot && "empty-seat-near-pot")}
+        style={style}
+        data-testid="empty-seat"
+      >
         {content}
       </div>
     );
@@ -52,7 +61,7 @@ export function EmptySeat({ position, canSit, onSit, canInvite, onInvite }: Empt
   return (
     <button
       onClick={canSit ? onSit : onInvite}
-      className="empty-seat group absolute flex flex-col items-center gap-1"
+      className={cn("empty-seat group absolute flex flex-col items-center gap-1", nearPot && "empty-seat-near-pot")}
       style={style}
       title={canSit ? "Take this seat" : "Invite a player to this seat"}
       data-testid="empty-seat"
