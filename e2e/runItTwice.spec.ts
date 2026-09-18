@@ -17,25 +17,35 @@ async function setupHeadsUp(browser: import("@playwright/test").Browser) {
   await expect(guest.getByTestId("your-stack")).toContainText("1,000", { timeout: 10_000 });
 
   await host.getByTestId("start-hand-button").click();
-  await expect(host.getByTestId("player-seat").first()).toBeVisible();
+  // player-seat renders for any seated player regardless of hand phase (it
+  // was already true before this click, since Guest was already seated) —
+  // wait for the lobby's start button to actually disappear instead, which
+  // only happens once the hand has genuinely started.
+  await expect(host.getByTestId("start-hand-button")).toHaveCount(0);
   return { hostCtx, guestCtx, host, guest };
 }
 
 /** Both players shove preflop — whichever page acts first raises to the
  * ALL-IN preset, the other calls it off, leaving 3 streets still to come. */
 async function bothAllInPreflop(host: import("@playwright/test").Page, guest: import("@playwright/test").Page) {
-  for (const page of [host, guest]) {
+  const pages = [host, guest];
+  let firstMover: import("@playwright/test").Page | null = null;
+  for (const page of pages) {
     if (await page.getByTestId("action-raise").isVisible().catch(() => false)) {
-      await goAllIn(page);
+      firstMover = page;
       break;
     }
   }
-  for (const page of [host, guest]) {
-    if (await page.getByTestId("action-call").isVisible().catch(() => false)) {
-      await goAllIn(page);
-      break;
-    }
-  }
+  if (!firstMover) throw new Error("Neither page had a visible raise button to shove with");
+  await goAllIn(firstMover);
+
+  // Wait for the other player's turn to actually arrive (their broadcast
+  // may not have landed yet the instant the shove resolves) before acting,
+  // rather than a single point-in-time visibility check that can race the
+  // update and silently call nothing.
+  const other = firstMover === host ? guest : host;
+  await expect(other.getByTestId("action-call")).toBeVisible({ timeout: 10_000 });
+  await goAllIn(other);
 }
 
 function boardCards(page: import("@playwright/test").Page, label: string) {
@@ -60,12 +70,23 @@ test.describe("run it once / run it twice", () => {
     await host.getByTestId("runit-twice").click();
     await guest.getByTestId("runit-twice").click();
 
-    // The dual board renders for both clients once both boards start dealing.
+    // Run 1 is dealt and revealed first, alone — no second board at all
+    // while it's still in progress.
+    await expect(host.locator('[data-boards="2"]')).not.toBeVisible();
+    await expect(host.getByTestId("hand-result-summary")).not.toBeVisible();
+
+    // Run 1 resolves with its own "Run 1 — winner" beat — and at that exact
+    // moment run 2 has no real cards yet, only empty placeholders (it
+    // hasn't started dealing), even once the dual-board frame appears.
+    await expect(host.getByTestId("run1-result-banner")).toBeVisible({ timeout: 10_000 });
+    await expect(boardCards(host, "Run 2")).toHaveCount(0);
+
+    // Run 2 then deals and resolves on its own.
     await expect(host.locator('[data-boards="2"]')).toBeVisible({ timeout: 10_000 });
     await expect(guest.locator('[data-boards="2"]')).toBeVisible({ timeout: 10_000 });
 
-    // The reveal is staged (server-paced) — the result shouldn't already be
-    // showing the instant it starts.
+    // The reveal is staged (server-paced) — the final combined result
+    // shouldn't already be showing the instant the dual board appears.
     await expect(host.getByTestId("hand-result-summary")).not.toBeVisible();
 
     // Eventually both boards finish and the result lands, on both clients.

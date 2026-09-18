@@ -29,8 +29,14 @@ interface PlayerSeatProps {
   turnTimeLimitSeconds: number;
   statusLabel: string | null;
   statusKey: string | number;
-  /** Shown under their revealed cards at showdown, e.g. "Two Pair, Kings and Fives". */
+  /** Shown under their revealed cards at showdown, e.g. "Two Pair, Kings and Fives".
+   * This is Run 1's description when the hand ran it twice — see
+   * `secondHandDescription` for Run 2, which is evaluated independently
+   * and can be an entirely different hand. */
   handDescription?: string | null;
+  /** Run 2's own independently-evaluated hand description, when the hand
+   * ran it twice — never the same value as `handDescription` reused. */
+  secondHandDescription?: string | null;
 }
 
 export function PlayerSeat({
@@ -47,6 +53,7 @@ export function PlayerSeat({
   statusLabel,
   statusKey,
   handDescription,
+  secondHandDescription,
 }: PlayerSeatProps) {
   const [confirmingRemove, setConfirmingRemove] = useState(false);
   const folded = player.handStatus === "folded";
@@ -95,8 +102,9 @@ export function PlayerSeat({
           </div>
         )}
         {showRevealedCards && handDescription && (
-          <span className="mb-1 hidden max-w-[96px] truncate text-[10px] font-medium text-[var(--accent-lime)] sm:block">
-            {handDescription}
+          <span className="mb-1 hidden max-w-[110px] flex-col text-center text-[10px] font-medium text-[var(--accent-lime)] sm:flex">
+            <span className="truncate">{secondHandDescription ? `Run 1: ${handDescription}` : handDescription}</span>
+            {secondHandDescription && <span className="truncate">Run 2: {secondHandDescription}</span>}
           </span>
         )}
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Card, Player, RoomState } from "@/lib/types";
 import { Deck } from "@/server/engine/deck";
+import { HAND_CATEGORY } from "@/server/engine/evaluator";
 import {
   chooseRunIt,
   continueRunout,
@@ -346,7 +347,7 @@ describe("startHand guard", () => {
  * what the server's reveal timer does in real time (see broadcast.ts). */
 function drainRunout(room: RoomState, deck: Deck): void {
   let guard = 0;
-  while (room.hand.runout && guard++ < 10) {
+  while (room.hand.runout && guard++ < 12) {
     continueRunout(room, deck);
   }
 }
@@ -457,6 +458,16 @@ describe("run it once / run it twice (heads-up all-in)", () => {
     expect(room.hand.communityCards).toHaveLength(0);
     expect(room.hand.runout).toBeNull();
     expect(room.status).toBe("in-hand");
+
+    // Hole cards stay hidden while the once/twice decision is pending —
+    // nobody should be able to see the other's cards before choosing.
+    expect(room.players.find((p) => p.id === "p1")!.holeCardsRevealed).toBe(false);
+    expect(room.players.find((p) => p.id === "p2")!.holeCardsRevealed).toBe(false);
+
+    chooseRunIt(room, "p1", "once");
+    // Resolved — now (and only now) both hands flip face-up.
+    expect(room.players.find((p) => p.id === "p1")!.holeCardsRevealed).toBe(true);
+    expect(room.players.find((p) => p.id === "p2")!.holeCardsRevealed).toBe(true);
   });
 
   it("resolves to a single run immediately when either player picks once, without waiting on the other", () => {
@@ -497,27 +508,83 @@ describe("run it once / run it twice (heads-up all-in)", () => {
     expect(room.hand.result).not.toBeNull();
   });
 
+  it("reveals runs strictly in sequence — run 2 has no cards or result while run 1 is still being dealt or is only just resolved", () => {
+    const p1 = makePlayer("p1", 0, 51);
+    const p2 = makePlayer("p2", 1, 51);
+    const room = makeRoom([p1, p2]);
+    const deck = Deck.fromOrderedDraws(
+      cards(
+        "2h", "3h", "9c", "9d", // holes
+        "Jc", "4h", "5h", "6h", // burn, run-1 flop
+        "Td", "7h", // burn, run-1 turn
+        "8d", "9h", // burn, run-1 river
+        "2c", "3d", "4d", "5d", // burn, run-2 flop
+        "Ts", "6d", // burn, run-2 turn
+        "8s", "7d" // burn, run-2 river
+      )
+    );
+
+    startHand(room, deck);
+    submitAction(room, deck, "p1", { action: "all-in" }, { paced: true });
+    submitAction(room, deck, "p2", { action: "call" }, { paced: true });
+    chooseRunIt(room, "p1", "twice");
+    chooseRunIt(room, "p2", "twice");
+    expect(room.hand.secondBoard).toEqual({ communityCards: [], result: null });
+
+    // Dealing run 1's flop, turn, river — run 2 stays completely untouched
+    // the whole time, not just "hidden", but literally not dealt yet.
+    continueRunout(room, deck); // run-1 flop
+    expect(room.hand.communityCards).toHaveLength(3);
+    expect(room.hand.secondBoard).toEqual({ communityCards: [], result: null });
+    expect(room.hand.result).toBeNull();
+
+    continueRunout(room, deck); // run-1 turn
+    continueRunout(room, deck); // run-1 river
+    expect(room.hand.communityCards).toHaveLength(5);
+    expect(room.hand.secondBoard).toEqual({ communityCards: [], result: null });
+    expect(room.hand.result).toBeNull(); // river dealt, not yet evaluated
+
+    // Run 1 resolves — its result appears, but run 2 is still nothing.
+    continueRunout(room, deck);
+    expect(room.hand.result).not.toBeNull();
+    expect(room.hand.secondBoard).toEqual({ communityCards: [], result: null });
+    expect(room.hand.runout).toEqual(expect.objectContaining({ runs: 2, activeRun: 2 }));
+    expect(room.hand.phase).not.toBe("hand-complete"); // still mid-reveal, run 2 hasn't happened
+
+    // Now run 2 deals and resolves on its own, independently.
+    continueRunout(room, deck); // run-2 flop
+    expect(room.hand.secondBoard!.communityCards).toHaveLength(3);
+    continueRunout(room, deck); // run-2 turn
+    continueRunout(room, deck); // run-2 river
+    expect(room.hand.secondBoard!.result).toBeNull();
+    continueRunout(room, deck); // evaluate run 2 + finalize
+    expect(room.hand.secondBoard!.result).not.toBeNull();
+    expect(room.hand.phase).toBe("hand-complete");
+    expect(room.hand.runout).toBeNull();
+  });
+
   it("runs it twice when both agree, sharing the pre-decision board and splitting each pot across runs with the odd chip to run 1", () => {
     const p1 = makePlayer("p1", 0, 51);
     const p2 = makePlayer("p2", 1, 51);
     const room = makeRoom([p1, p2]);
 
-    // Heads-up: p1 is dealer/SB. Deck order after the all-in/call resolves:
-    // burn, board1 flop(3), burn, board2 flop(3), burn, board1 turn(1),
-    // burn, board2 turn(1), burn, board1 river(1), burn, board2 river(1).
-    // Give p1 a flush on board A only, and let board B run out as a chop
-    // (both playing the board with unrelated hole cards) so each run's
-    // winner-set differs and the odd chip's placement is observable.
+    // Heads-up: p1 is dealer/SB. Runs are dealt strictly in sequence, never
+    // in lockstep: run 1 is fully dealt and evaluated first (flop/turn/
+    // river), then run 2 gets its own independent flop/turn/river from the
+    // same remaining deck. Give p1 a flush on board A only, and let board B
+    // run out as a chop (both playing the board with unrelated hole cards)
+    // so each run's winner-set differs and the odd chip's placement is
+    // observable.
     const deck = Deck.fromOrderedDraws(
       cards(
         "2h", "3h", // p1
         "9c", "9d", // p2
-        "Jc", "4h", "5h", "6h", // burn, boardA flop (p1 building a heart flush)
-        "2c", "3d", "4d", "5d", // burn, boardB flop (unrelated)
-        "Td", "7h", // burn, boardA turn (flush completes for p1)
-        "Ts", "6d", // burn, boardB turn
-        "8d", "9h", // burn, boardA river
-        "8s", "7d", // burn, boardB river
+        "Jc", "4h", "5h", "6h", // burn, run-1 flop (p1 building a heart flush)
+        "Td", "7h", // burn, run-1 turn (flush completes for p1)
+        "8d", "9h", // burn, run-1 river
+        "2c", "3d", "4d", "5d", // burn, run-2 flop (unrelated, chop board)
+        "Ts", "6d", // burn, run-2 turn
+        "8s", "7d", // burn, run-2 river
         "2d", "3c", "5c", "6c" // filler
       )
     );
@@ -555,6 +622,77 @@ describe("run it once / run it twice (heads-up all-in)", () => {
     expect(finalP1.handHistory).toHaveLength(1);
     expect(finalP2.handHistory).toHaveLength(1);
     expect(finalP1.handHistory[0].netChange + finalP2.handHistory[0].netChange).toBe(0);
+  });
+
+  it("evaluates each run completely independently, with its own winner, hand rank, and kicker comparison", () => {
+    // All-in ON THE FLOP (not preflop) so both runs share that flop and only
+    // diverge on turn/river — the exact shape that exposed the regression:
+    // Run 1 board: 6c 5d Ad 5h As -> both players make two pair, Aces and
+    //   5s; p1's King kicker beats p2's 6 kicker.
+    // Run 2 board: 6c 5d Ad 2c Kh -> p1 pairs both boarded pairs (Kings and
+    //   2s) while p2 only pairs the 2 (a plain pair) — a different category
+    //   entirely, and a different winner-deciding reason, from run 1.
+    // p1 (K♦2♦) wins BOTH runs outright; a description or winner bleeding
+    // from one run into the other must not change that.
+    const p1 = makePlayer("p1", 0, 1000);
+    const p2 = makePlayer("p2", 1, 1000);
+    const room = makeRoom([p1, p2]);
+    const deck = Deck.fromOrderedDraws(
+      cards(
+        "Kd", "2d", // p1 hole
+        "2h", "7s", // p2 hole (no wheel-straight risk: no 3/4 on either board)
+        "Ts", "6c", "5d", "Ad", // burn, flop (shared by both runs)
+        "Ts", "5h", // burn, run-1 turn
+        "Ts", "As", // burn, run-1 river (run 1 fully dealt+evaluated here)
+        "Ts", "2c", // burn, run-2 turn
+        "Ts", "Kh" // burn, run-2 river
+      )
+    );
+
+    startHand(room, deck);
+    submitAction(room, deck, room.hand.activePlayerId!, { action: "call" });
+    submitAction(room, deck, room.hand.activePlayerId!, { action: "check" });
+    expect(room.hand.communityCards).toHaveLength(3);
+
+    submitAction(room, deck, room.hand.activePlayerId!, { action: "all-in" }, { paced: true });
+    submitAction(room, deck, room.hand.activePlayerId!, { action: "call" }, { paced: true });
+    expect(room.hand.runItDecision).not.toBeNull();
+
+    chooseRunIt(room, "p1", "twice");
+    chooseRunIt(room, "p2", "twice");
+    drainRunout(room, deck);
+
+    expect(room.hand.phase).toBe("hand-complete");
+    expect(room.hand.communityCards).toEqual(cards("6c", "5d", "Ad", "5h", "As"));
+    expect(room.hand.secondBoard!.communityCards).toEqual(cards("6c", "5d", "Ad", "2c", "Kh"));
+
+    const run1 = room.hand.result!;
+    const run2 = room.hand.secondBoard!.result!;
+
+    // Run 1: both make two pair (Aces and 5s) — p1 wins on the King kicker.
+    expect(run1.revealedHands.p1.rank).toBe(HAND_CATEGORY.TWO_PAIR);
+    expect(run1.revealedHands.p2.rank).toBe(HAND_CATEGORY.TWO_PAIR);
+    expect(run1.winners.map((w) => w.playerId)).toEqual(["p1"]);
+
+    // Run 2: p1 makes two pair (Kings and 2s); p2 only makes a single pair
+    // of 2s — a genuinely different category, only possible if run 2 was
+    // evaluated against its own board instead of reusing run 1's.
+    expect(run2.revealedHands.p1.rank).toBe(HAND_CATEGORY.TWO_PAIR);
+    expect(run2.revealedHands.p2.rank).toBe(HAND_CATEGORY.PAIR);
+    expect(run2.winners.map((w) => w.playerId)).toEqual(["p1"]);
+
+    // The two runs' hand descriptions for the same player must differ (run
+    // 1 is "two pair, Aces and 5s"; run 2 is "two pair, Kings and 2s") —
+    // this is the exact bug report: the UI/engine reusing run 1's
+    // description for run 2.
+    expect(run1.revealedHands.p1.description).not.toBe(run2.revealedHands.p1.description);
+
+    // p1 scoops both runs outright — the whole pot, not a split.
+    const finalP1 = room.players.find((p) => p.id === "p1")!;
+    const finalP2 = room.players.find((p) => p.id === "p2")!;
+    expect(finalP1.chips).toBeGreaterThan(finalP2.chips);
+    expect(finalP2.chips).toBe(0);
+    expect(finalP1.chips + finalP2.chips).toBe(2000); // full pot conserved
   });
 });
 

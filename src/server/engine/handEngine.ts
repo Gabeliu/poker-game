@@ -250,7 +250,6 @@ function streetsRemainingFor(communityCardCount: number): number {
  */
 export function beginRunout(room: RoomState): void {
   const stillIn = getPlayersStillInHand(room.players);
-  for (const player of stillIn) player.holeCardsRevealed = true;
 
   room.hand.activePlayerId = null;
   room.hand.turnDeadline = null;
@@ -258,6 +257,9 @@ export function beginRunout(room: RoomState): void {
   const streetsRemaining = streetsRemainingFor(room.hand.communityCards.length);
 
   if (room.settings.runItTwiceEnabled && stillIn.length === 2 && streetsRemaining > 0) {
+    // Hole cards stay hidden while the decision is pending — reveal happens
+    // in startRunout once it resolves, so a player's once/twice choice is
+    // never influenced by having already seen the other's cards.
     room.hand.phase = "showdown";
     room.hand.runItDecision = {
       eligiblePlayerIds: stillIn.map((p) => p.id),
@@ -272,6 +274,7 @@ export function beginRunout(room: RoomState): void {
 
 function startRunout(room: RoomState, runs: 1 | 2): void {
   room.hand.runItDecision = null;
+  for (const player of getPlayersStillInHand(room.players)) player.holeCardsRevealed = true;
 
   if (runs === 2) {
     // Share whatever's already on the table — run-it-twice only re-runs the
@@ -286,32 +289,69 @@ function startRunout(room: RoomState, runs: 1 | 2): void {
     runs,
     streetsRemaining: streetsRemainingFor(count),
     nextRevealAt: Date.now() + REVEAL_STREET_DELAY_MS,
+    activeRun: 1,
   };
 }
 
-/** Deals the next street of a paced runout (both boards, if running twice),
- * or — once every street is dealt — runs showdown and finalizes the hand.
+/** Deals the next street of a paced runout, or — once every street for the
+ * currently active run is dealt — evaluates that run and either hands off
+ * to run 2 (after a beat showing run 1's result) or finalizes the hand.
+ *
+ * Run 1 and run 2 are dealt and revealed strictly in sequence, never in
+ * lockstep: run 2's cards are not dealt into `secondBoard`, and its result
+ * is not evaluated, until run 1 has fully resolved and been shown for a
+ * moment — so there is nothing for a client to see early even by
+ * inspecting the broadcast, because the server itself doesn't have it yet.
+ *
  * Called on a timer (see broadcast.ts's scheduleHandFlowTimer), one street
  * per call, so every client sees the reveal at the same real pace. */
 export function continueRunout(room: RoomState, deck: Deck): { done: boolean } {
   const runout = room.hand.runout;
   if (!runout) return { done: true };
 
+  if (runout.runs === 1) {
+    if (runout.streetsRemaining === 0) {
+      runShowdown(room);
+      room.hand.runout = null;
+      finalizeHand(room);
+      return { done: true };
+    }
+    dealNextStreetCards(room, deck);
+    runout.streetsRemaining -= 1;
+    runout.nextRevealAt = Date.now() + (runout.streetsRemaining === 0 ? REVEAL_RESOLVE_DELAY_MS : REVEAL_STREET_DELAY_MS);
+    return { done: false };
+  }
+
+  // runs === 2: sequential two-phase reveal.
+  const activeRun = runout.activeRun ?? 1;
+
+  if (activeRun === 1) {
+    if (runout.streetsRemaining === 0) {
+      evaluateAndCreditRunOne(room);
+      // Hand off to run 2, but pause on run 1's result first so it's had a
+      // real moment on screen before anything about run 2 exists.
+      runout.activeRun = 2;
+      runout.streetsRemaining = streetsRemainingFor(room.hand.secondBoard!.communityCards.length);
+      runout.nextRevealAt = Date.now() + REVEAL_RESOLVE_DELAY_MS;
+      return { done: false };
+    }
+    dealNextStreetCards(room, deck);
+    runout.streetsRemaining -= 1;
+    runout.nextRevealAt = Date.now() + REVEAL_STREET_DELAY_MS;
+    return { done: false };
+  }
+
+  // activeRun === 2
   if (runout.streetsRemaining === 0) {
-    runShowdown(room);
+    evaluateAndCreditRunTwo(room);
     room.hand.runout = null;
     finalizeHand(room);
     return { done: true };
   }
 
-  const countBefore = room.hand.communityCards.length;
-  const dealCount = countBefore === 0 ? 3 : 1;
-  dealNextStreetCards(room, deck); // board 1: burns, appends, advances phase
-
-  if (runout.runs === 2 && room.hand.secondBoard) {
-    dealStreetInto(deck, room.hand.secondBoard.communityCards, dealCount);
-  }
-
+  const secondBoard = room.hand.secondBoard!;
+  const dealCount = secondBoard.communityCards.length === 0 ? 3 : 1;
+  dealStreetInto(deck, secondBoard.communityCards, dealCount);
   runout.streetsRemaining -= 1;
   runout.nextRevealAt = Date.now() + (runout.streetsRemaining === 0 ? REVEAL_RESOLVE_DELAY_MS : REVEAL_STREET_DELAY_MS);
   return { done: false };
@@ -530,6 +570,16 @@ function sumWinnings(a: Map<string, number>, b: Map<string, number>): Map<string
   return combined;
 }
 
+function winningsByPlayerFromBoard(board: HandResult): Map<string, number> {
+  const winnings = new Map<string, number>();
+  for (const w of board.winners) winnings.set(w.playerId, (winnings.get(w.playerId) ?? 0) + w.amount);
+  return winnings;
+}
+
+/** Single-board showdown — used by every path that was never offered (or
+ * never took) a run-it-twice decision, so `secondBoard` is always null
+ * here. Applies the ledger immediately since there's only one result to
+ * combine. */
 function runShowdown(room: RoomState): void {
   const stillIn = getPlayersStillInHand(room.players);
   const contributions = buildContributions(room);
@@ -540,20 +590,36 @@ function runShowdown(room: RoomState): void {
   // every existing caller and test — keeps revealing cards exactly as before.
   for (const player of stillIn) player.holeCardsRevealed = true;
 
-  const runs = room.hand.secondBoard ? 2 : 1;
-  const boardA = evaluateBoard(room, room.hand.communityCards, pots, stillIn, 0, runs);
-  room.hand.result = boardA.result;
+  const board = evaluateBoard(room, room.hand.communityCards, pots, stillIn, 0, 1);
+  room.hand.result = board.result;
+  applyLedgerForHand(room, board.winningsByPlayer);
+}
 
-  let combinedWinnings = boardA.winningsByPlayer;
-  if (room.hand.secondBoard) {
-    const boardB = evaluateBoard(room, room.hand.secondBoard.communityCards, pots, stillIn, 1, runs);
-    room.hand.secondBoard.result = boardB.result;
-    combinedWinnings = sumWinnings(boardA.winningsByPlayer, boardB.winningsByPlayer);
-  }
+/** Run-it-twice, phase 1 of 2: evaluates and credits run 1 alone once its
+ * board is fully dealt. The ledger is NOT applied yet — that happens once
+ * with the combined total after run 2 resolves too, so hand history shows
+ * one net number for the hand, not two. */
+function evaluateAndCreditRunOne(room: RoomState): void {
+  const stillIn = getPlayersStillInHand(room.players);
+  const contributions = buildContributions(room);
+  const pots = calculateSidePots(contributions);
+  room.hand.pots = pots;
 
-  // Applied once with the combined total across both boards, so history and
-  // the room ledger reflect one net number for the hand, not two.
-  applyLedgerForHand(room, combinedWinnings);
+  const board = evaluateBoard(room, room.hand.communityCards, pots, stillIn, 0, 2);
+  room.hand.result = board.result;
+}
+
+/** Run-it-twice, phase 2 of 2: evaluates and credits run 2 once its board is
+ * fully dealt, then applies the one combined ledger entry for the hand
+ * (run 1's winnings are reconstructed from its already-stored result, not
+ * a value threaded across the two reveal ticks). */
+function evaluateAndCreditRunTwo(room: RoomState): void {
+  const stillIn = getPlayersStillInHand(room.players);
+  const board = evaluateBoard(room, room.hand.secondBoard!.communityCards, room.hand.pots, stillIn, 1, 2);
+  room.hand.secondBoard!.result = board.result;
+
+  const combined = sumWinnings(winningsByPlayerFromBoard(room.hand.result!), board.winningsByPlayer);
+  applyLedgerForHand(room, combined);
 }
 
 const MAX_HAND_HISTORY_PER_PLAYER = 25;

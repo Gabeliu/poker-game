@@ -62,6 +62,17 @@ button:active:not(:disabled) { translate: 0 1px; }
    so the pair fits the same vertical band a single board used to occupy. */
 .dual-board { display: flex; flex-direction: column; gap: 20px; align-items: center; }
 .dual-board .community-board { transform: scale(.82); }
+/* Dual-board content is much taller than a single board despite the scale
+   above — on a narrow/short window (split-screen, or a squeezed desktop
+   getting closer to phone proportions) it can grow enough to overlap the
+   self-seat's floating hole cards below. Reserve more bottom clearance and
+   shrink further specifically for this case, rather than relying on the
+   fixed inset a single board was tuned for. */
+.table-board-dual { inset: 6% 0 34%; gap: 8px; }
+.table-board-dual .dual-board { gap: 10px; }
+.table-board-dual .dual-board .community-board { transform: scale(.62); }
+.self-seat-dual-board { top: 92%; }
+.self-seat-dual-board .self-cards [role="img"] { width: clamp(38px, 6cqw, 58px); height: clamp(54px, 8.5cqw, 82px); }
 .card-winning { box-shadow: 0 0 0 2px var(--room-gold), 0 0 14px #d9c08255; border-radius: inherit; }
 .seat-loser .seat-panel, .self-seat.seat-loser { opacity: .55; filter: saturate(.65); transition: opacity 300ms, filter 300ms; }
 .card-placeholder { background: #061b140b; }
@@ -266,6 +277,11 @@ button:active:not(:disabled) { translate: 0 1px; }
   .dual-board { gap: 10px; }
   .dual-board .community-board { transform: scale(.72); }
   .board-run-label { font-size: 7px; top: -11px; }
+  .table-board-dual { inset: 12% 0 40%; gap: 5px; }
+  .table-board-dual .dual-board { gap: 6px; }
+  .table-board-dual .dual-board .community-board { transform: scale(.52); }
+  .self-seat-dual-board { top: 94%; min-width: 130px; padding: 5px 7px; }
+  .self-seat-dual-board .self-cards [role="img"] { width: 34px; height: 49px; font-size: 13px; }
   .pot-display > span:nth-child(2) { font-size: 23px; gap: 6px; }
   .pot-chips { transform: scale(.75); width: 35px; }
   .action-area { padding: 12px 10px max(16px, env(safe-area-inset-bottom)); }

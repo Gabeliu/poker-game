@@ -68,6 +68,13 @@ export function PokerTable({ room, isHost, onRemovePlayer, onSit, onStartHand }:
   const waiting = room.hand.phase === "waiting";
   const result = room.hand.result;
   const secondResult = room.hand.secondBoard?.result ?? null;
+  // Run 2 is dealt and revealed strictly after run 1 finishes — don't show
+  // the dual-board layout (or Run 2's board at all) until the server has
+  // actually moved on to it (activeRun flips to 2 the instant run 1
+  // resolves) or the hand is fully done. Until then this stays a single,
+  // fully-focused board on run 1, even though `secondBoard` already exists
+  // as an empty placeholder the moment both players agree to run it twice.
+  const showDualBoard = Boolean(room.hand.secondBoard) && (room.hand.runout?.activeRun === 2 || !room.hand.runout);
   const winners = result?.winners ?? [];
   const allWinnerIds = new Set([...winners, ...(secondResult?.winners ?? [])].map((w) => w.playerId));
   // Reached showdown (present in revealedHands) but didn't win a share of
@@ -190,10 +197,10 @@ export function PokerTable({ room, isHost, onRemovePlayer, onSit, onStartHand }:
       <div className="poker-table">
         <div className="table-dome-rim absolute inset-0 rounded-[46%] shadow-[0_24px_60px_rgba(0,0,0,0.6)]" />
         <div className="table-dome-surface absolute inset-[4.5%] rounded-[46%]">
-          <div className="table-board">
+          <div className={cn("table-board", showDualBoard && "table-board-dual")}>
             {!waiting && <>
             <Pot pots={room.hand.pots} liveTotal={room.players.reduce((s, p) => s + p.totalCommittedThisHand, 0)} />
-            {room.hand.secondBoard ? (
+            {showDualBoard && room.hand.secondBoard ? (
               <div className="dual-board" data-boards="2">
                 <CommunityCards
                   cards={room.hand.communityCards}
@@ -258,6 +265,7 @@ export function PokerTable({ room, isHost, onRemovePlayer, onSit, onStartHand }:
                 statusLabel={statusLabels[player.id]?.label ?? null}
                 statusKey={statusLabels[player.id]?.key ?? 0}
                 handDescription={room.hand.result?.revealedHands[player.id]?.description ?? null}
+                secondHandDescription={room.hand.secondBoard?.result?.revealedHands[player.id]?.description ?? null}
                 onRemove={() => onRemovePlayer(player.id)}
               />
             );
@@ -279,7 +287,7 @@ export function PokerTable({ room, isHost, onRemovePlayer, onSit, onStartHand }:
         ))}
       {me &&
         (mySeat !== null ? (
-          <div className={cn("self-seat", me.id === room.hand.activePlayerId && "seat-active", allWinnerIds.has(me.id) && "seat-winner", isLoser(me.id) && "seat-loser")}>
+          <div className={cn("self-seat", me.id === room.hand.activePlayerId && "seat-active", allWinnerIds.has(me.id) && "seat-winner", isLoser(me.id) && "seat-loser", showDualBoard && "self-seat-dual-board")}>
             <div className="self-cards"><HoleCards cards={me.holeCards} folded={me.handStatus === "folded"} /></div>
             {me.currentBet > 0 && <ChipStack amount={me.currentBet} variant="bet" className="self-bet" />}
             <div className="self-identity">
@@ -289,8 +297,14 @@ export function PokerTable({ room, isHost, onRemovePlayer, onSit, onStartHand }:
               {badgeFor(mySeat) && <span className={cn("dealer-puck", badgeFor(mySeat) !== "D" && "blind-puck")}>{badgeFor(mySeat)}</span>}
             </div>
             {room.hand.result?.revealedHands[me.id]?.description && (
-              <span className="text-xs font-medium text-[var(--accent-lime)]">
-                {room.hand.result.revealedHands[me.id].description}
+              <span className="flex flex-col text-xs font-medium text-[var(--accent-lime)]">
+                <span>
+                  {room.hand.secondBoard ? "Run 1: " : ""}
+                  {room.hand.result.revealedHands[me.id].description}
+                </span>
+                {room.hand.secondBoard?.result?.revealedHands[me.id]?.description && (
+                  <span>Run 2: {room.hand.secondBoard.result.revealedHands[me.id].description}</span>
+                )}
               </span>
             )}
           </div>

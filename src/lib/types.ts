@@ -218,10 +218,17 @@ export interface BoardRun {
 export interface RunoutState {
   runs: 1 | 2;
   /** Streets still to be dealt (3/2/1/0 depending on how far the hand had
-   * gotten when the last bet was called). */
+   * gotten when the last bet was called) for whichever run is currently
+   * active (see `activeRun`). */
   streetsRemaining: number;
   /** Epoch ms of the next scheduled reveal step — presentation only. */
   nextRevealAt: number | null;
+  /** Only meaningful when `runs === 2`: which run is currently being dealt
+   * and revealed. Run 2 is dealt into `secondBoard` and evaluated only
+   * after run 1 fully resolves and its result has had a beat to show —
+   * never in lockstep with run 1 — so its cards/result don't exist on the
+   * server, let alone reach a client, before its own reveal begins. */
+  activeRun?: 1 | 2;
 }
 
 export interface HandState {

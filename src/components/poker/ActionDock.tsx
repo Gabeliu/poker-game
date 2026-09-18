@@ -3,6 +3,7 @@
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatChips, formatSignedChips } from "@/lib/format";
+import { summarizeHandResult } from "@/lib/handResultSummary";
 import type { ActionRequest, ClientRoomView, RunItChoice } from "@/lib/types";
 import { PokerActions } from "./PokerActions";
 import { PlayingCard } from "./PlayingCard";
@@ -69,9 +70,15 @@ export function ActionDock({ room, isHost, onAction, onStartHand, onSitOut, onRe
             onChoose={onChooseRunIt}
           />
         ) : room.hand.runout ? (
-          <p className="text-sm text-[var(--text-secondary)]" data-testid="runout-indicator">
-            Running it {room.hand.runout.runs === 2 ? "twice" : "out"}&hellip;
-          </p>
+          room.hand.result && room.hand.secondBoard && !room.hand.secondBoard.result ? (
+            <RunOneResultBanner room={room} />
+          ) : (
+            <p className="text-sm text-[var(--text-secondary)]" data-testid="runout-indicator">
+              {room.hand.runout.runs === 2
+                ? `Running it twice — Run ${room.hand.runout.activeRun ?? 1}…`
+                : "Running it out…"}
+            </p>
+          )
         ) : isMyTurn ? (
           <PokerActions key={`${room.hand.activePlayerId}-${room.hand.phase}`} room={room} onAction={onAction} />
         ) : (
@@ -189,42 +196,52 @@ function WaitingIndicator({
   );
 }
 
+/** Shown during the pause after Run 1 resolves but before Run 2 has dealt
+ * or evaluated anything — a brief "Run 1 — X wins $Y" beat, distinct from
+ * the final combined summary, so the drama of each run lands on its own. */
+function RunOneResultBanner({ room }: { room: ClientRoomView }) {
+  const result = room.hand.result!;
+  const wonBy = new Map<string, number>();
+  for (const w of result.winners) wonBy.set(w.playerId, (wonBy.get(w.playerId) ?? 0) + w.amount);
+  const lines = [...wonBy.entries()].map(([playerId, amount]) => {
+    const name = room.players.find((p) => p.id === playerId)?.displayName ?? "Someone";
+    return `${name} wins ${formatChips(amount)}`;
+  });
+
+  return (
+    <div className="flex flex-col items-center gap-1 text-center" data-testid="run1-result-banner">
+      <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[var(--text-secondary)]">Run 1</span>
+      <span className="text-sm font-semibold text-[var(--accent-lime)]">{lines.join(" · ")}</span>
+    </div>
+  );
+}
+
 function ResultSummary({ room }: { room: ClientRoomView }) {
   const result = room.hand.result!;
-  const secondResult = room.hand.secondBoard?.result;
-
-  // Net result (what a player actually walks away up or down), not gross pot
-  // proceeds — a player who contributed 50 and got 50 back broke even, not
-  // "won 50". Combine both boards' winnings when the hand ran it twice, so
-  // a player who won one board and lost the other still nets correctly.
-  const winningsByPlayer = new Map<string, number>();
-  for (const w of result.winners) winningsByPlayer.set(w.playerId, (winningsByPlayer.get(w.playerId) ?? 0) + w.amount);
-  if (secondResult) {
-    for (const w of secondResult.winners) winningsByPlayer.set(w.playerId, (winningsByPlayer.get(w.playerId) ?? 0) + w.amount);
-  }
+  const secondResult = room.hand.secondBoard?.result ?? null;
 
   // Show everyone who put chips in this hand, winner or not, so a player
   // who lost can see their real loss instead of just disappearing.
   const contributors = room.players.filter((p) => p.totalCommittedThisHand > 0);
-
-  const boardAWinnerIds = new Set(result.winners.map((w) => w.playerId));
-  const boardBWinnerIds = secondResult ? new Set(secondResult.winners.map((w) => w.playerId)) : null;
+  const summaries = summarizeHandResult(contributors, result, secondResult);
+  const isRunItTwice = Boolean(secondResult);
 
   return (
     <div
       data-testid="hand-result-summary"
       className={cn(
         "winner-summary flex flex-wrap items-center justify-center gap-3 rounded-2xl border border-[var(--accent-lime)]/30 bg-black/55 px-5 py-3 text-center shadow-[0_12px_32px_rgba(0,0,0,0.5)] backdrop-blur-xl",
-        !boardBWinnerIds && winningsByPlayer.size === 1 && "animate-winner-pulse"
+        !isRunItTwice && summaries.filter((s) => s.netChange > 0).length === 1 && "animate-winner-pulse"
       )}
     >
-      {contributors.map((player) => {
-        const amountWon = winningsByPlayer.get(player.id) ?? 0;
-        const net = amountWon - player.totalCommittedThisHand;
-        const desc = result.revealedHands[player.id]?.description;
+      {summaries.map((summary) => {
+        const player = room.players.find((p) => p.id === summary.playerId)!;
         const netColorClass =
-          net > 0 ? "text-[var(--accent-lime)]" : net < 0 ? "text-[var(--danger)]" : "text-[var(--text-secondary)]";
-        const scooped = boardBWinnerIds && boardAWinnerIds.has(player.id) && boardBWinnerIds.has(player.id);
+          summary.netChange > 0
+            ? "text-[var(--accent-lime)]"
+            : summary.netChange < 0
+              ? "text-[var(--danger)]"
+              : "text-[var(--text-secondary)]";
         return (
           <div key={player.id} data-testid="result-row" data-player-name={player.displayName} className="flex items-center gap-3 text-sm">
             <div className="flex gap-1" aria-label="Revealed cards">
@@ -232,11 +249,28 @@ function ResultSummary({ room }: { room: ClientRoomView }) {
             </div>
             <p>
             <span className="font-semibold text-[var(--text-primary)]">{player.displayName}</span>{" "}
-            <span className={cn("font-semibold tabular-nums", netColorClass)} data-net-change={net}>
-              {formatSignedChips(net)}
+            <span className={cn("font-semibold tabular-nums", netColorClass)} data-net-change={summary.netChange}>
+              {formatSignedChips(summary.netChange)}
             </span>
-            {scooped && <span className="ml-1 rounded bg-[var(--room-gold)]/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[var(--room-gold)]">Scoop</span>}
-            {desc ? <span className="block text-xs text-[var(--text-secondary)]">{desc}</span> : null}
+            {summary.scooped && <span className="ml-1 rounded bg-[var(--room-gold)]/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[var(--room-gold)]">Scoop</span>}
+            {!isRunItTwice && summary.run1Description ? (
+              <span className="block text-xs text-[var(--text-secondary)]">{summary.run1Description}</span>
+            ) : null}
+            {isRunItTwice && (
+              <span className="block text-xs text-[var(--text-secondary)]" data-testid="per-run-result">
+                {summary.run1Description && (
+                  <span className={summary.wonRun1 ? "text-[var(--accent-lime)]" : undefined}>
+                    Run 1: {summary.run1Description}{summary.wonRun1 && !summary.scooped ? " (won)" : ""}
+                  </span>
+                )}
+                {summary.run1Description && summary.run2Description ? " · " : ""}
+                {summary.run2Description && (
+                  <span className={summary.wonRun2 ? "text-[var(--accent-lime)]" : undefined}>
+                    Run 2: {summary.run2Description}{summary.wonRun2 && !summary.scooped ? " (won)" : ""}
+                  </span>
+                )}
+              </span>
+            )}
             </p>
           </div>
         );

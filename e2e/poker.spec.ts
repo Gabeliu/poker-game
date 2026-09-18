@@ -59,7 +59,11 @@ test.describe("Felt poker table — full multiplayer flow", () => {
 
     // 13-17. Start a hand and play check/call/fold through to showdown or an uncontested win.
     await host.getByTestId("start-hand-button").click();
-    await expect(host.getByTestId("player-seat").first()).toBeVisible();
+    // player-seat renders for any seated player regardless of hand phase
+    // (it was already true before this click, since Bob/Carol were already
+    // seated) — wait for the lobby's start button to actually disappear
+    // instead, which only happens once the hand has genuinely started.
+    await expect(host.getByTestId("start-hand-button")).toHaveCount(0);
     await playHandToCompletion([host, bob, carol]);
 
     // Sanity: the UI reached a post-hand state without crashing.
@@ -110,6 +114,28 @@ test.describe("Felt poker table — full multiplayer flow", () => {
     await expect(guest.getByTestId("player-seat")).toHaveCount(1);
 
     await hostCtx.close();
+    await guestCtx.close();
+  });
+
+  test("other players are told when the host leaves (disconnects), and the room shows it's paused", async ({ browser }) => {
+    const hostCtx = await browser.newContext();
+    const guestCtx = await browser.newContext();
+    const host = await hostCtx.newPage();
+    const guest = await guestCtx.newPage();
+
+    const roomId = await createRoom(host, "Host");
+    await joinRoom(guest, roomId, "Guest");
+    await expect(guest.getByTestId("player-seat")).toHaveCount(1);
+
+    // "Leave table" is just a client-side navigation — from the server's
+    // perspective this looks exactly like any other disconnect (closing the
+    // tab, losing network), so closing the host's context here exercises
+    // the same real path a host clicking "Leave table" takes.
+    await hostCtx.close();
+
+    await expect(guest.getByText("Host disconnected.")).toBeVisible({ timeout: 10_000 });
+    await expect(guest.getByText(/lost connection.*paused until they reconnect/i)).toBeVisible({ timeout: 10_000 });
+
     await guestCtx.close();
   });
 
