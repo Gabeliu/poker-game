@@ -345,8 +345,10 @@
   .hero-hand-box { right: -30%; }
   .hero-hand-box-raster { right: -44%; top: 12%; height: 88%; }
   /* Not enough room beside the copy at this width. */
-  .hero-chips-raster, .hero-label-3 { display: none; }
+  .hero-chips-raster { display: none; }
   .hero-label-1 { left: auto; right: 12%; }
+  /* Below the copy, clear of the card. */
+  .hero-label-3 { left: -34%; top: auto; bottom: 16%; }
 }
 
 @media (max-width: 767px) {
@@ -379,13 +381,15 @@
   .hero-hand-box { right: -46%; top: -4%; height: 124%; }
   .hero-chips-a { left: 0; bottom: 8%; width: 30%; }
   .hero-chips-b { left: 30%; bottom: 2%; width: 20%; }
-  .hero-hand-box-raster { right: -34%; top: 32%; height: 96%; }
+  /* The art box is a fixed 566px square here (96% of the 590px art), so the
+     card sits at 0.72 of the viewport width whatever it is: right = 0.28vw - 249px. */
+  .hero-hand-box-raster { right: calc(28vw - 249px); top: 32%; height: 96%; }
   .hero-chips-raster { display: block; left: 14%; top: 46%; width: 32%; }
   .hero-chips-fg { display: none; }
   .hero-label { padding: 9px 14px 9px 11px; font-size: 12px; border-radius: 12px; }
   .hero-label-1 { left: 5%; right: auto; top: 35%; }
   .hero-label-2 { left: 5%; right: auto; top: 47%; bottom: auto; }
-  .hero-label-3 { display: none; }
+  .hero-label-3 { left: 5%; top: 59%; bottom: auto; }
 }
 
 @media (prefers-reduced-motion: reduce) {
