@@ -80,8 +80,17 @@ export function buildDigit(spec: DigitSpec): Digit {
     return { p, t, n: [-t[1], t[0]], w: widthAt(spec.widths, dist[i]) };
   });
 
-  const left = samples.map((s) => [s.p[0] + (s.n[0] * s.w) / 2, s.p[1] + (s.n[1] * s.w) / 2] as const);
-  const right = samples.map((s) => [s.p[0] - (s.n[0] * s.w) / 2, s.p[1] - (s.n[1] * s.w) / 2] as const);
+  // A perfectly smooth offset curve is what makes fingers look like tubes.
+  // A whisper of low-frequency variation, different on each side, gives the
+  // soft irregularity of real flesh; it eases in from zero at the tip.
+  const wobble = (d: number, side: number) =>
+    Math.min(1, d / 46) * (1.9 * Math.sin(d / 21 + side * 2.1) + 1.1 * Math.sin(d / 8.7 + side * 4.3));
+  const left = samples.map(
+    (s, i) => [s.p[0] + s.n[0] * (s.w / 2 + wobble(dist[i], 1)), s.p[1] + s.n[1] * (s.w / 2 + wobble(dist[i], 1))] as const
+  );
+  const right = samples.map(
+    (s, i) => [s.p[0] - s.n[0] * (s.w / 2 + wobble(dist[i], 2)), s.p[1] - s.n[1] * (s.w / 2 + wobble(dist[i], 2))] as const
+  );
   const r = samples[0].w / 2;
   const f = (n: number) => n.toFixed(1);
 
@@ -157,4 +166,12 @@ export function widthGradient(digit: Digit, distance: number) {
     x2: s.p[0] + s.n[0] * h,
     y2: s.p[1] + s.n[1] * h,
   };
+}
+
+/** Gradient endpoints running along the digit, between two distances from
+ * the tip — used to let it sink into shadow toward the hand. */
+export function axisGradient(digit: Digit, from: number, to: number) {
+  const a = digit.at(from);
+  const b = digit.at(to);
+  return { x1: a.p[0], y1: a.p[1], x2: b.p[0], y2: b.p[1] };
 }

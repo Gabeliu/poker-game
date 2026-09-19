@@ -173,6 +173,8 @@ export function HeroStage() {
           <ChipStackArt chips={["black", "emerald", "emerald", "black"]} className="hero-chip-svg hero-chip-blur" />
         </Layer>
 
+        <div className="hero-spill" />
+
         <Label className="hero-label-1" delay={0.9}>Private Tables</Label>
         <Label className="hero-label-2" delay={1.1}>Play With Friends</Label>
         <Label className="hero-label-3" delay={1.3}>No Download</Label>

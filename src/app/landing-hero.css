@@ -12,8 +12,8 @@
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(ellipse 55% 55% at 18% 60%, #0d4d3a66, transparent 70%),
-    radial-gradient(ellipse 90% 38% at 62% 104%, #2fe0a4aa, #0d6b4c66 40%, transparent 72%);
+    radial-gradient(ellipse 55% 55% at 18% 60%, #0d4d3a44, transparent 70%),
+    radial-gradient(ellipse 80% 30% at 64% 104%, #2fe0a466, #0d6b4c40 40%, transparent 72%);
 }
 
 .landing-hero {
@@ -67,8 +67,8 @@
   width: 78vw;
   height: 112%;
   background:
-    radial-gradient(closest-side at 46% 44%, #b4ffe6f2 0%, #46f0b4cc 14%, #14b783a6 34%, #0a6c4d66 56%, transparent 80%);
-  filter: blur(28px);
+    radial-gradient(closest-side at 44% 46%, #d4fff0 0%, #56f4bbe6 9%, #17b98599 24%, #0b6f4f55 44%, #0a4a3622 62%, transparent 82%);
+  filter: blur(24px);
   mix-blend-mode: screen;
 }
 .hero-glow-teal {
@@ -78,7 +78,7 @@
   bottom: -30%;
   width: 60vw;
   height: 80%;
-  background: radial-gradient(closest-side, #1bb6c655, #0d6d8033 50%, transparent 76%);
+  background: radial-gradient(closest-side, #1bb6c633, #0d6d801f 50%, transparent 76%);
 }
 
 .hero-grain {
@@ -95,7 +95,7 @@
   inset: 0;
   background:
     linear-gradient(90deg, #020605cc 0%, #02060580 30%, transparent 54%),
-    radial-gradient(ellipse 90% 85% at 62% 46%, transparent 46%, #020605c4 100%),
+    radial-gradient(ellipse 88% 82% at 60% 46%, transparent 38%, #020605d8 100%),
     linear-gradient(180deg, transparent 66%, #020605 99%);
 }
 
@@ -133,6 +133,19 @@
   aspect-ratio: 1 / 1;
 }
 
+/* The key light landing on what's in front of it: a soft emerald spill over
+   the hand and chips, so they read as lit by the glow behind the ace. */
+.hero-spill {
+  position: absolute;
+  inset: -10% -6% -6% -14%;
+  pointer-events: none;
+  mix-blend-mode: soft-light;
+  opacity: 0.5;
+  background:
+    radial-gradient(ellipse 20% 15% at 63% 63%, #5dffc2d0 0%, #1fd39a70 46%, transparent 78%),
+    radial-gradient(ellipse 22% 11% at 25% 90%, #4dffb8b0 0%, #1fd39a55 50%, transparent 78%);
+}
+
 /* A partial felt table under everything, lit from above. */
 .hero-felt-wrap {
   position: absolute;
@@ -165,7 +178,7 @@
 .hero-chips-a { position: absolute; left: 17%; top: 54%; width: 19%; }
 .hero-chips-b { position: absolute; left: 37%; top: 65%; width: 11.5%; }
 .hero-chips-fg { position: absolute; left: -9%; bottom: -12%; width: 24%; }
-.hero-chip-svg { display: block; width: 100%; height: auto; overflow: visible; filter: drop-shadow(0 18px 26px #000c) drop-shadow(0 0 30px #25d69a33); }
+.hero-chip-svg { display: block; width: 100%; height: auto; overflow: visible; filter: drop-shadow(0 10px 14px #000a) drop-shadow(0 0 26px #25d69a26); }
 .hero-chip-blur { filter: blur(6px) brightness(0.6) drop-shadow(0 0 24px #25d69a44); }
 
 /* ---------- Floating feature labels ---------- */
@@ -197,7 +210,7 @@
   box-shadow: 0 0 0 3px #b9f56a2b, 0 0 14px #b9f56aaa;
 }
 .hero-label-1 { left: 56%; top: 9%; }
-.hero-label-2 { left: 66%; bottom: 20%; }
+.hero-label-2 { left: 62%; bottom: 13%; }
 .hero-label-3 { left: 71%; top: 33%; }
 
 /* ---------- Copy ---------- */
