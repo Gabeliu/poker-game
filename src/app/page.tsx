@@ -30,6 +30,8 @@ import {
 import { useRoomStore } from "@/hooks/useRoomStore";
 import { getStoredDisplayName, storeDisplayName } from "@/lib/socketClient";
 import { HeroStage } from "@/components/poker/hero/HeroStage";
+import { BlindFields } from "@/components/poker/BlindFields";
+import { hasBlindErrors, parseBlindText, validateBlindText } from "@/lib/blinds";
 import "./landing-hero.css";
 import { LoadingExperience } from "@/components/poker/LoadingExperience";
 
@@ -60,17 +62,17 @@ export default function Home() {
   const [joinCode, setJoinCode] = useState("");
   const [loadingText, setLoadingText] = useState<string | null>(null);
 
+  const blindErrors = validateBlindText(smallBlind, bigBlind);
+
   const handleCreate = async () => {
-    if (!name.trim()) return;
+    if (!name.trim() || hasBlindErrors(blindErrors)) return;
     setCreating(true);
     setLoadingText("Creating your table…");
     storeDisplayName(name.trim());
-    const parsedSmallBlind = Number(smallBlind);
-    const parsedBigBlind = Number(bigBlind);
     const res = await createRoom(name.trim(), {
       roomName: roomName.trim() || "Poker Night",
-      smallBlind: Number.isFinite(parsedSmallBlind) && parsedSmallBlind > 0 ? parsedSmallBlind : 25,
-      bigBlind: Number.isFinite(parsedBigBlind) && parsedBigBlind > 0 ? parsedBigBlind : 50,
+      smallBlind: parseBlindText(smallBlind),
+      bigBlind: parseBlindText(bigBlind),
     });
     setCreating(false);
     if (res.ok && res.roomId) {
@@ -157,16 +159,14 @@ export default function Home() {
                         placeholder="Poker Night"
                       />
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="grid gap-1.5">
-                        <Label htmlFor="sb">Small blind</Label>
-                        <Input id="sb" type="number" min={1} value={smallBlind} onChange={(e) => setSmallBlind(e.target.value)} />
-                      </div>
-                      <div className="grid gap-1.5">
-                        <Label htmlFor="bb">Big blind</Label>
-                        <Input id="bb" type="number" min={1} value={bigBlind} onChange={(e) => setBigBlind(e.target.value)} />
-                      </div>
-                    </div>
+                    <BlindFields
+                      smallBlind={smallBlind}
+                      bigBlind={bigBlind}
+                      onChange={(next) => {
+                        setSmallBlind(next.smallBlind);
+                        setBigBlind(next.bigBlind);
+                      }}
+                    />
                     <p className="text-xs text-muted-foreground">
                       You can fine-tune buy-in limits and more from the table once it&rsquo;s created.
                     </p>
@@ -174,7 +174,7 @@ export default function Home() {
                   <DialogFooter>
                     <Button
                       className="w-full bg-[var(--accent-lime)] text-[var(--accent-lime-foreground)] hover:bg-[var(--accent-lime)]/90 font-semibold"
-                      disabled={!name.trim() || creating}
+                      disabled={!name.trim() || creating || hasBlindErrors(blindErrors)}
                       data-testid="create-table-submit"
                       onClick={handleCreate}
                     >

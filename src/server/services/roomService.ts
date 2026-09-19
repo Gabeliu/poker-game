@@ -1,5 +1,6 @@
 import type { ClientRoomView, Player, PublicPlayer, RoomSettings, RoomState, SeatNumber } from "@/lib/types";
 import { MAX_SEATS } from "@/lib/types";
+import { MAX_BIG_BLIND, MAX_SMALL_BLIND, validateBlinds } from "@/lib/blinds";
 import { roomStore } from "./roomStore";
 import { generatePlayerId, generatePlayerToken, generateRoomId } from "@/server/utils/ids";
 
@@ -19,10 +20,21 @@ const DEFAULT_SETTINGS: RoomSettings = {
 
 function sanitizeSettings(partial: Partial<RoomSettings>): RoomSettings {
   const merged = { ...DEFAULT_SETTINGS, ...partial };
+  // Blinds are rejected, not quietly "fixed": a negative, blank, fractional or
+  // inverted value is a mistake the host should hear about, and silently
+  // turning it into something else would change the game without telling them.
+  const blindErrors = validateBlinds(Number(merged.smallBlind), Number(merged.bigBlind));
+  const blindProblem = blindErrors.smallBlind
+    ? `Small blind: ${blindErrors.smallBlind}`
+    : blindErrors.bigBlind
+      ? `Big blind: ${blindErrors.bigBlind}`
+      : null;
+  if (blindProblem) throw new RoomServiceError(blindProblem);
+
   return {
     roomName: (merged.roomName || "Poker Night").slice(0, 60),
-    smallBlind: clampPositiveInt(merged.smallBlind, 1, 1_000_000),
-    bigBlind: clampPositiveInt(merged.bigBlind, 1, 2_000_000),
+    smallBlind: clampPositiveInt(merged.smallBlind, 1, MAX_SMALL_BLIND),
+    bigBlind: clampPositiveInt(merged.bigBlind, 1, MAX_BIG_BLIND),
     minBuyIn: merged.minBuyIn == null ? null : clampPositiveInt(merged.minBuyIn, 1, 100_000_000),
     maxBuyIn: merged.maxBuyIn == null ? null : clampPositiveInt(merged.maxBuyIn, 1, 100_000_000),
     allowAdditionalBuyIns: Boolean(merged.allowAdditionalBuyIns),
@@ -215,7 +227,16 @@ export function buildClientView(room: RoomState, viewerPlayerId: string | null):
 }
 
 export function updateSettings(room: RoomState, partial: Partial<RoomSettings>): void {
-  room.settings = sanitizeSettings({ ...room.settings, ...partial });
+  const next = sanitizeSettings({ ...room.settings, ...partial });
+  // Changing the blinds under a hand that's already posted them would change
+  // its minimum raise and street resets mid-hand; wait for the next one.
+  if (
+    room.status === "in-hand" &&
+    (next.smallBlind !== room.settings.smallBlind || next.bigBlind !== room.settings.bigBlind)
+  ) {
+    throw new RoomServiceError("Blinds can only be changed between hands.");
+  }
+  room.settings = next;
 }
 
 export function transferOwnership(room: RoomState, toPlayerId: string): void {

@@ -15,7 +15,7 @@ interface RoomControlsProps {
   room: ClientRoomView;
   isHost: boolean;
   onResolveBuyIn: (requestId: string, approve: boolean) => void;
-  onUpdateSettings: (settings: Partial<import("@/lib/types").RoomSettings>) => void;
+  onUpdateSettings: (settings: Partial<import("@/lib/types").RoomSettings>) => Promise<{ ok: true } | { ok: false; error: string }>;
   onRemovePlayer: (playerId: string) => void;
   onTransferOwnership: (playerId: string) => void;
 }

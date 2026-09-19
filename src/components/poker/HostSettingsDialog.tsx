@@ -15,14 +15,16 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatChips } from "@/lib/format";
+import { hasBlindErrors, parseBlindText, validateBlindText } from "@/lib/blinds";
 import type { PublicPlayer, RoomSettings } from "@/lib/types";
 import { ConfirmRemoveDialog } from "./ConfirmRemoveDialog";
+import { BlindFields } from "./BlindFields";
 
 interface HostSettingsDialogProps {
   settings: RoomSettings;
   players: PublicPlayer[];
   hostPlayerId: string;
-  onUpdateSettings: (settings: Partial<RoomSettings>) => void;
+  onUpdateSettings: (settings: Partial<RoomSettings>) => Promise<{ ok: true } | { ok: false; error: string }>;
   onRemovePlayer: (playerId: string) => void;
   onTransferOwnership: (playerId: string) => void;
   children: React.ReactNode;
@@ -39,12 +41,25 @@ export function HostSettingsDialog({
 }: HostSettingsDialogProps) {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(settings);
+  // Blinds are edited as text so a field can be cleared and retyped; they're
+  // only turned into numbers (after validation) when saving.
+  const [blinds, setBlinds] = useState({ smallBlind: String(settings.smallBlind), bigBlind: String(settings.bigBlind) });
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const blindErrors = validateBlindText(blinds.smallBlind, blinds.bigBlind);
   const [pendingRemoveId, setPendingRemoveId] = useState<string | null>(null);
   const pendingRemovePlayer = players.find((p) => p.id === pendingRemoveId);
 
-  const save = () => {
-    onUpdateSettings(form);
-    setOpen(false);
+  const save = async () => {
+    if (hasBlindErrors(blindErrors)) return;
+    setSaveError(null);
+    const res = await onUpdateSettings({
+      ...form,
+      smallBlind: parseBlindText(blinds.smallBlind),
+      bigBlind: parseBlindText(blinds.bigBlind),
+    });
+    // The server has the final say (e.g. blinds can't change mid-hand).
+    if (res.ok) setOpen(false);
+    else setSaveError(res.error);
   };
 
   return (
@@ -52,7 +67,11 @@ export function HostSettingsDialog({
       open={open}
       onOpenChange={(v) => {
         setOpen(v);
-        if (v) setForm(settings);
+        if (v) {
+          setForm(settings);
+          setBlinds({ smallBlind: String(settings.smallBlind), bigBlind: String(settings.bigBlind) });
+          setSaveError(null);
+        }
       }}
     >
       <DialogTrigger asChild>{children}</DialogTrigger>
@@ -75,26 +94,7 @@ export function HostSettingsDialog({
               <Label>Room name</Label>
               <Input value={form.roomName} onChange={(e) => setForm({ ...form, roomName: e.target.value })} />
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="grid gap-1.5">
-                <Label>Small blind</Label>
-                <Input
-                  type="number"
-                  min={1}
-                  value={form.smallBlind}
-                  onChange={(e) => setForm({ ...form, smallBlind: Math.max(1, Number(e.target.value) || 1) })}
-                />
-              </div>
-              <div className="grid gap-1.5">
-                <Label>Big blind</Label>
-                <Input
-                  type="number"
-                  min={1}
-                  value={form.bigBlind}
-                  onChange={(e) => setForm({ ...form, bigBlind: Math.max(1, Number(e.target.value) || 1) })}
-                />
-              </div>
-            </div>
+            <BlindFields idPrefix="settings-" smallBlind={blinds.smallBlind} bigBlind={blinds.bigBlind} onChange={setBlinds} />
             <div className="grid grid-cols-2 gap-3">
               <div className="grid gap-1.5">
                 <Label>Min buy-in</Label>
@@ -154,7 +154,17 @@ export function HostSettingsDialog({
               />
             </div>
             <DialogFooter className="pt-2">
-              <Button onClick={save} className="w-full bg-[var(--accent-lime)] text-[var(--accent-lime-foreground)] hover:bg-[var(--accent-lime)]/90">
+              {saveError && (
+                <p role="alert" className="mb-2 text-xs text-destructive" data-testid="settings-save-error">
+                  {saveError}
+                </p>
+              )}
+              <Button
+                onClick={save}
+                disabled={hasBlindErrors(blindErrors)}
+                data-testid="settings-save"
+                className="w-full bg-[var(--accent-lime)] text-[var(--accent-lime-foreground)] hover:bg-[var(--accent-lime)]/90"
+              >
                 Save settings
               </Button>
             </DialogFooter>
