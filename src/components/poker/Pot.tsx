@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { formatChips } from "@/lib/format";
+import { useAnimatedNumber } from "@/hooks/useAnimatedNumber";
 import type { SidePot } from "@/lib/types";
 import { PokerChip } from "./PokerChip";
 
@@ -26,6 +27,8 @@ export function Pot({ pots, liveTotal, uncalled }: PotProps) {
     setBump((b) => b + 1);
   }
 
+  const shown = useAnimatedNumber(total);
+
   if (total <= 0) return null;
 
   return (
@@ -36,7 +39,7 @@ export function Pot({ pots, liveTotal, uncalled }: PotProps) {
         className="animate-pot-bump flex items-center gap-3 text-3xl font-bold tabular-nums text-[var(--text-primary)] drop-shadow-[0_2px_12px_rgba(0,0,0,0.6)] sm:text-4xl"
       >
         <span className="pot-chips" aria-hidden><PokerChip size={25} denomination={25} /><PokerChip size={25} denomination={100} /><PokerChip size={25} denomination={1000} /></span>
-        {formatChips(total)}
+        {formatChips(shown)}
       </span>
       {uncalled && uncalled.amount > 0 && (
         <span className="mt-1 text-[10px] font-medium text-[var(--accent-lime)]" data-testid="uncalled-bet">

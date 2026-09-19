@@ -182,6 +182,8 @@ test.describe("Felt poker table — full multiplayer flow", () => {
     await host.getByTestId("start-hand-button").click();
     await foldWhoeversTurn([host, guest]);
     await expect(host.getByTestId("hand-result-summary")).toBeVisible({ timeout: 10_000 });
+    // The payout also lands as a "+amount" popup over the winner.
+    await expect(host.getByTestId("win-float")).toBeVisible();
 
     const hostRow = host.locator('[data-testid="result-row"][data-player-name="Host"]');
     const guestRow = host.locator('[data-testid="result-row"][data-player-name="Guest"]');
@@ -278,6 +280,50 @@ test.describe("Felt poker table — full multiplayer flow", () => {
     await hostCtx.close();
     await guestCtx.close();
     await carolCtx.close();
+  });
+
+  test("cards already on the table aren't re-dealt or re-flipped after a reload", async ({ browser }) => {
+    const hostCtx = await browser.newContext();
+    const guestCtx = await browser.newContext();
+    const host = await hostCtx.newPage();
+    const guest = await guestCtx.newPage();
+
+    const roomId = await createRoom(host, "Host");
+    await requestBuyIn(host, 1000);
+    await approveLatestRequest(host, "Host");
+    await joinRoom(guest, roomId, "Guest");
+    await requestBuyIn(guest, 1000);
+    await approveLatestRequest(host, "Guest");
+    await host.getByTestId("start-hand-button").click();
+    await expect(host.getByTestId("start-hand-button")).toHaveCount(0);
+
+    // Preflop: SB calls, BB checks -> the flop is dealt.
+    for (const page of [host, guest]) {
+      for (let i = 0; i < 20; i++) {
+        const call = page.getByTestId("action-call");
+        const check = page.getByTestId("action-check");
+        if (await call.isVisible().catch(() => false)) { await call.click(); break; }
+        if (await check.isVisible().catch(() => false)) { await check.click(); break; }
+        await page.waitForTimeout(150);
+      }
+    }
+    const board = host.locator('[aria-label="Community cards"] [role="img"]');
+    await expect(board).toHaveCount(3);
+
+    // Freshly dealt cards do animate (travel + flip)...
+    const dealAnimations = () =>
+      host.evaluate(
+        () => document.getAnimations().filter((a) => ["deal-in", "card-flip"].includes((a as CSSAnimation).animationName)).length
+      );
+    expect(await dealAnimations()).toBeGreaterThan(0);
+
+    // ...but after a reload the same cards are simply there — nothing replays.
+    await host.reload();
+    await expect(board).toHaveCount(3);
+    expect(await dealAnimations()).toBe(0);
+
+    await hostCtx.close();
+    await guestCtx.close();
   });
 
   test("table layout stays usable with a larger player count", async ({ browser }) => {

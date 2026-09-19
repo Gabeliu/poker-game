@@ -9,6 +9,14 @@ import { cn } from "@/lib/utils";
 // while staying deterministic (no layout shift on re-render).
 const NATURAL_TILT = [-3, 2, -1, 3, -2];
 
+/** Each board slot's offset from where the deck sits (upper right of the
+ * table), in container-query units so the flight scales with the table. The
+ * slots are ~12cqw apart, centred on the board; the deck is ~17cqw right of
+ * and ~18cqh above the board's centre. */
+function dealFromDeck(slot: number): { x: string; y: string } {
+  return { x: `${(17 - (slot - 2) * 12).toFixed(1)}cqw`, y: "-18cqh" };
+}
+
 function cardKey(card: Card): string {
   return `${card.rank}${card.suit}`;
 }
@@ -45,11 +53,19 @@ interface CommunityCardsProps {
  * double-render, e.g. React Strict Mode, would read back already-updated).
  */
 export function CommunityCards({ cards, label, dimmed, highlightCards }: CommunityCardsProps) {
-  const [prevLength, setPrevLength] = useState(0);
-  const alreadyShown = prevLength;
-  if (cards.length !== prevLength) {
-    setPrevLength(cards.length);
+  // `prev` is how many cards were on the board before the current street
+  // arrived, and it's seeded from what's already there at mount — so cards
+  // dealt before this board rendered (a reconnect, or the board swapping
+  // into the two-run layout) appear in place instead of re-dealing, and only
+  // the street that just arrived gets the staggered deal. (Updating state
+  // during render re-renders immediately, so it has to carry the *previous*
+  // length forward explicitly; reading it back afterwards would only ever
+  // see the new one.)
+  const [lengths, setLengths] = useState({ prev: cards.length, cur: cards.length });
+  if (cards.length !== lengths.cur) {
+    setLengths({ prev: lengths.cur, cur: cards.length });
   }
+  const alreadyShown = lengths.prev;
 
   const highlightKeys = highlightCards ? new Set(highlightCards.map(cardKey)) : null;
 
@@ -65,15 +81,19 @@ export function CommunityCards({ cards, label, dimmed, highlightCards }: Communi
       )}
       {Array.from({ length: 5 }).map((_, i) => {
         const card = cards[i];
-        if (!card) return <PlayingCard key={i} empty size="lg" />;
+        // Distinct keys: the card that fills a slot must mount fresh (with its own
+        // deal settings), not reuse the empty placeholder's instance.
+        if (!card) return <PlayingCard key={`empty-${i}`} empty size="lg" />;
         const isHighlighted = highlightKeys?.has(cardKey(card)) ?? false;
         return (
           <PlayingCard
-            key={i}
+            key={`card-${i}`}
             card={card}
             size="lg"
             rotationDeg={NATURAL_TILT[i]}
-            dealDelayMs={i < alreadyShown ? 0 : (i - alreadyShown) * 110}
+            instant={i < alreadyShown}
+            dealDelayMs={i < alreadyShown ? 0 : (i - alreadyShown) * 140}
+            dealFrom={dealFromDeck(i)}
             className={cn(isHighlighted && "card-winning")}
           />
         );

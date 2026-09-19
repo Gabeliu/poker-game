@@ -297,7 +297,14 @@ export function PokerTable({ room, isHost, onRemovePlayer, onSit, onStartHand }:
         })}
 
         {flights.map((f) => (
-          <ChipFlight key={f.id} from={f.from} to={f.to} amount={f.amount} onDone={() => removeFlight(f.id)} />
+          <ChipFlight
+            key={f.id}
+            from={f.from}
+            to={f.to}
+            amount={f.amount}
+            kind={f.id.startsWith("bet-") ? "bet" : "win"}
+            onDone={() => removeFlight(f.id)}
+          />
         ))}
       {me &&
         (mySeat !== null ? (

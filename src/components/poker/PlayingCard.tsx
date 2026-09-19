@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 import type { Card } from "@/lib/types";
 
@@ -47,6 +48,22 @@ interface PlayingCardProps {
   className?: string;
   /** Renders a dashed empty placeholder instead of a card. */
   empty?: boolean;
+  /** Already on the table (a reconnect, a board layout swap) — appears in
+   * place with no travel or flip, so nothing replays that already happened. */
+  instant?: boolean;
+  /** Where the card is dealt from, relative to its resting spot (any CSS
+   * length, e.g. container-query units so it scales with the table). */
+  dealFrom?: { x: string; y: string };
+}
+
+function CardBack() {
+  return (
+    <div className="card-back h-full w-full rounded-[inherit]">
+      <div className="flex h-full w-full items-center justify-center rounded-[inherit] border-2 border-white/8">
+        <div className="card-back-brand"><span>♠</span><small>FELT</small></div>
+      </div>
+    </div>
+  );
 }
 
 export function PlayingCard({
@@ -57,7 +74,19 @@ export function PlayingCard({
   rotationDeg = 0,
   className,
   empty,
+  instant,
+  dealFrom,
 }: PlayingCardProps) {
+  // Whether this card was dealt already face-up (it travels in, then flips
+  // over) or was already on the table face-down and is only now being
+  // turned over (a showdown reveal — flip straight away, no travel delay).
+  const showBack = Boolean(faceDown) || !card;
+  const [dealtFaceUp] = useState(!showBack);
+  // Animation settings are read once, at mount. A parent re-rendering with
+  // different values later (e.g. the next street arriving) must never
+  // retarget a card that's already mid-flight or mid-flip.
+  const [mounted] = useState({ instant: Boolean(instant), delayMs: dealDelayMs, dealFrom });
+
   if (empty) {
     return (
       <div
@@ -66,7 +95,7 @@ export function PlayingCard({
     );
   }
 
-  const showBack = faceDown || !card;
+  const flipDelayMs = dealtFaceUp ? mounted.delayMs + 260 : 0;
 
   return (
     <div
@@ -74,41 +103,54 @@ export function PlayingCard({
       aria-label={showBack ? "Face-down card" : `${card.rank} of ${card.suit}`}
       className={cn(
         SIZE_CLASSES[size],
-        "animate-deal-in relative shrink-0 select-none shadow-[0_6px_16px_rgba(0,0,0,0.55)]",
+        "card-3d relative shrink-0 select-none shadow-[0_6px_16px_rgba(0,0,0,0.55)]",
+        !mounted.instant && "animate-deal-in",
         className
       )}
-      style={{
-        animationDelay: `${dealDelayMs}ms`,
-        // Preserve any rotation set via the deal-in animation's end state.
-        transform: rotationDeg ? `rotate(${rotationDeg}deg)` : undefined,
-      }}
+      style={
+        {
+          animationDelay: `${mounted.delayMs}ms`,
+          // The tilt lives in a variable the deal animation also lands on —
+          // a plain inline `transform` would be overridden while animating
+          // and then visibly snap into place when the animation ended.
+          "--card-rot": `${rotationDeg}deg`,
+          "--deal-from-x": mounted.dealFrom?.x,
+          "--deal-from-y": mounted.dealFrom?.y,
+          transform: "rotate(var(--card-rot))",
+        } as React.CSSProperties
+      }
     >
       {showBack ? (
-        <div
-          className="card-back h-full w-full rounded-[inherit]"
-        >
-          <div className="flex h-full w-full items-center justify-center rounded-[inherit] border-2 border-white/8">
-            <div className="card-back-brand"><span>♠</span><small>FELT</small></div>
-          </div>
-        </div>
+        <CardBack />
       ) : (
-        <div key={`${card.rank}-${card.suit}`} className="card-face-reveal relative h-full w-full rounded-[inherit] border border-black/10 bg-[var(--card-face)] p-[9%] leading-none">
-          <span className={cn("absolute top-[8%] left-[10%] font-bold", SUIT_COLOR[card.suit])}>
-            {card.rank}
-          </span>
-          <span
-            className={cn(
-              "absolute inset-0 flex items-center justify-center text-[2em] opacity-90",
-              SUIT_COLOR[card.suit]
-            )}
-          >
-            {SUIT_SYMBOL[card.suit]}
-          </span>
-          <span
-            className={cn("absolute bottom-[8%] right-[10%] rotate-180 font-bold", SUIT_COLOR[card.suit])}
-          >
-            {card.rank}
-          </span>
+        <div
+          key={`${card.rank}-${card.suit}`}
+          // Static only if it was already face-up when it mounted; a card that
+          // was on the table face-down still flips when it's turned over.
+          className={cn("card-flipper", mounted.instant && dealtFaceUp && "card-flipper-static")}
+          style={{ animationDelay: `${flipDelayMs}ms` }}
+        >
+          <div className="card-face-front card-face-reveal relative h-full w-full rounded-[inherit] border border-black/10 bg-[var(--card-face)] p-[9%] leading-none">
+            <span className={cn("absolute top-[8%] left-[10%] font-bold", SUIT_COLOR[card.suit])}>
+              {card.rank}
+            </span>
+            <span
+              className={cn(
+                "absolute inset-0 flex items-center justify-center text-[2em] opacity-90",
+                SUIT_COLOR[card.suit]
+              )}
+            >
+              {SUIT_SYMBOL[card.suit]}
+            </span>
+            <span
+              className={cn("absolute bottom-[8%] right-[10%] rotate-180 font-bold", SUIT_COLOR[card.suit])}
+            >
+              {card.rank}
+            </span>
+          </div>
+          <div className="card-face-back-side rounded-[inherit]">
+            <CardBack />
+          </div>
         </div>
       )}
     </div>

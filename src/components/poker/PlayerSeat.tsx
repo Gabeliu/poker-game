@@ -56,6 +56,11 @@ export function PlayerSeat({
   secondHandDescription,
 }: PlayerSeatProps) {
   const [confirmingRemove, setConfirmingRemove] = useState(false);
+  // Cards already in this player's hand when the seat first renders (a
+  // reload mid-hand) appear in place; only cards dealt while watching
+  // animate. Re-arms once the hand empties.
+  const [heldAtMount, setHeldAtMount] = useState(player.hasHoleCards);
+  if (!player.hasHoleCards && heldAtMount) setHeldAtMount(false);
   const folded = player.handStatus === "folded";
   const allIn = player.handStatus === "all-in";
   const sittingOut = player.sittingOut || player.handStatus === "sitting-out" || !player.hasBoughtIn;
@@ -89,6 +94,7 @@ export function PlayerSeat({
               card={showRevealedCards ? player.holeCards[0] : undefined}
               faceDown={!showRevealedCards}
               size="sm"
+              instant={heldAtMount}
               rotationDeg={-8}
               className="-mr-2"
             />
@@ -96,6 +102,7 @@ export function PlayerSeat({
               card={showRevealedCards ? player.holeCards[1] : undefined}
               faceDown={!showRevealedCards}
               size="sm"
+              instant={heldAtMount}
               rotationDeg={8}
               className="-ml-2"
             />

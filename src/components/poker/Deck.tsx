@@ -16,13 +16,13 @@ export function Deck({ handNumber, className }: DeckProps) {
   return (
     <div key={handNumber} className={cn("pointer-events-none relative h-[2.25rem] w-[1.5rem]", className)} aria-hidden>
       <div className="absolute inset-0 rotate-3 translate-x-0.5 opacity-50">
-        <PlayingCard faceDown size="xs" />
+        <PlayingCard faceDown size="xs" instant />
       </div>
       <div className="absolute inset-0 rotate-1 translate-x-px opacity-75">
-        <PlayingCard faceDown size="xs" />
+        <PlayingCard faceDown size="xs" instant />
       </div>
       <div className="animate-deck-deal absolute inset-0">
-        <PlayingCard faceDown size="xs" />
+        <PlayingCard faceDown size="xs" instant />
       </div>
     </div>
   );
