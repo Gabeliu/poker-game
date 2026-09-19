@@ -87,6 +87,15 @@ export const roomStore = {
   getSocketLocation(socketId: string) {
     return socketLocations.get(socketId);
   },
+  /** The connections currently acting as a given player (a player can have
+   * more than one open: a second tab, or a reconnect that hasn't timed out). */
+  socketsForPlayer(roomId: string, playerId: string): string[] {
+    const found: string[] = [];
+    for (const [socketId, loc] of socketLocations) {
+      if (loc.roomId === roomId && loc.playerId === playerId) found.push(socketId);
+    }
+    return found;
+  },
   /** Unlinks every socket currently mapped to a given player in a room —
    * used when the host removes someone, so their (still-open) connection
    * stops being treated as that now-nonexistent player for every future

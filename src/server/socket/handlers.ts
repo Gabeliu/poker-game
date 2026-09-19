@@ -98,6 +98,16 @@ export function registerRoomHandlers(io: AppServer, socket: AppSocket): void {
             : `${request.playerDisplayName}'s ${request.amount.toLocaleString()} chip buy-in was rejected`
         );
       }
+      // The chat line is easy to miss, so the player who was turned down also
+      // gets a message on screen, on top of whatever they're looking at.
+      if (request && !payload.approve) {
+        for (const socketId of roomStore.socketsForPlayer(room.id, request.playerId)) {
+          io.to(socketId).emit("toast", {
+            message: `The host declined your ${request.amount.toLocaleString()} chip buy-in.`,
+            variant: "error",
+          });
+        }
+      }
       ack({ ok: true });
       void broadcastRoomState(io, room.id);
     } catch (err) {
