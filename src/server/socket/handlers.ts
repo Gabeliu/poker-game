@@ -36,6 +36,7 @@ export function registerRoomHandlers(io: AppServer, socket: AppSocket): void {
       socket.data.playerId = playerId;
       socket.data.playerToken = playerToken;
       roomStore.linkSocket(socket.id, room.id, playerId);
+      roomStore.markActive(room.id);
       socket.emit("room:state", buildClientView(room, playerId));
       ack({ ok: true, roomId: room.id, playerId, playerToken });
     } catch (err) {
@@ -55,6 +56,7 @@ export function registerRoomHandlers(io: AppServer, socket: AppSocket): void {
       socket.data.playerId = playerId;
       socket.data.playerToken = playerToken;
       roomStore.linkSocket(socket.id, room.id, playerId);
+      roomStore.markActive(room.id);
       ack({ ok: true, playerId, playerToken });
       const displayName = room.players.find((p) => p.id === playerId)?.displayName ?? "A player";
       if (reconnected) {
@@ -121,6 +123,13 @@ export function registerRoomHandlers(io: AppServer, socket: AppSocket): void {
       const room = getRoomOrThrow(payload.roomId);
       const playerId = requirePlayerId(socket);
       assertHost(room, playerId);
+      // Must be checked before touching the timer or deck: a duplicate/stray
+      // start request mid-reveal would otherwise cancel the pending reveal
+      // timer and swap the deck out from under the runout, then throw —
+      // leaving the hand stuck forever with nothing left to advance it.
+      if (room.status === "in-hand") {
+        throw new RoomServiceError("A hand is already in progress.");
+      }
       roomStore.clearRevealTimer(room.id);
       const deck = roomStore.replaceDeck(room.id);
       startHand(room, deck);
@@ -284,6 +293,7 @@ export function registerRoomHandlers(io: AppServer, socket: AppSocket): void {
       socket.data.playerId = player.id;
       socket.data.playerToken = payload.playerToken;
       roomStore.linkSocket(socket.id, room.id, player.id);
+      roomStore.markActive(room.id);
 
       const wasDisconnected = player.connectionStatus === "disconnected";
       player.connectionStatus = "connected";
@@ -327,6 +337,9 @@ export function registerRoomHandlers(io: AppServer, socket: AppSocket): void {
     );
     if (!stillConnected) {
       player.connectionStatus = "disconnected";
+      if (room.players.every((p) => p.connectionStatus === "disconnected")) {
+        roomStore.markEmpty(loc.roomId);
+      }
       void broadcastRoomState(io, loc.roomId);
       io.to(loc.roomId).emit("toast", { message: `${player.displayName} disconnected.`, variant: "default" });
     }

@@ -3,6 +3,12 @@ import next from "next";
 import { Server } from "socket.io";
 import type { ClientToServerEvents, InterServerEvents, ServerToClientEvents, SocketData } from "./src/lib/events";
 import { registerRoomHandlers } from "./src/server/socket/handlers";
+import { roomStore } from "./src/server/services/roomStore";
+
+// Rooms live only in memory; drop ones nobody has been connected to for a
+// long while so abandoned tables don't accumulate until the next restart.
+const IDLE_ROOM_TTL_MS = 6 * 60 * 60 * 1000;
+const REAP_INTERVAL_MS = 10 * 60 * 1000;
 
 const dev = process.env.NODE_ENV !== "production";
 const port = Number(process.env.PORT) || 3000;
@@ -32,6 +38,8 @@ app.prepare().then(() => {
   io.on("connection", (socket) => {
     registerRoomHandlers(io, socket);
   });
+
+  setInterval(() => roomStore.reapIdleRooms(IDLE_ROOM_TTL_MS), REAP_INTERVAL_MS).unref();
 
   httpServer.listen(port, hostname, () => {
     console.log(`> Poker table ready on http://${hostname}:${port}`);

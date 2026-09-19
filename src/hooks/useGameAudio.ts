@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import type { ClientRoomView, HandPhase, HandResult } from "@/lib/types";
+import type { ClientRoomView, HandPhase } from "@/lib/types";
 import { audioManager } from "@/audio/AudioManager";
 import { panForPlayer } from "@/lib/seatLayout";
+import { boardResultKey } from "@/lib/resultKey";
 
 interface PlayerSnapshot {
   handStatus: string;
@@ -33,7 +34,8 @@ export function useGameAudio(room: ClientRoomView | null): void {
   const prevPlayersRef = useRef<Map<string, PlayerSnapshot>>(new Map());
   const prevPhaseRef = useRef<HandPhase | null>(null);
   const prevActivePlayerRef = useRef<string | null>(null);
-  const prevResultRef = useRef<HandResult | null>(null);
+  const prevResultKeyRef = useRef("");
+  const prevSecondResultKeyRef = useRef("");
   const prevBuyInRef = useRef<Map<string, string>>(new Map());
   const prevChatCountRef = useRef(0);
 
@@ -50,7 +52,8 @@ export function useGameAudio(room: ClientRoomView | null): void {
       prevPlayersRef.current = snapshotPlayers(room);
       prevPhaseRef.current = room.hand.phase;
       prevActivePlayerRef.current = room.hand.activePlayerId;
-      prevResultRef.current = room.hand.result;
+      prevResultKeyRef.current = boardResultKey(room.hand.handNumber, room.hand.result);
+      prevSecondResultKeyRef.current = boardResultKey(room.hand.handNumber, room.hand.secondBoard?.result);
       prevBuyInRef.current = new Map(room.buyInRequests.map((r) => [r.id, r.status]));
       prevChatCountRef.current = room.chatMessages.length;
       return;
@@ -92,7 +95,11 @@ export function useGameAudio(room: ClientRoomView | null): void {
       if (id !== meId && !nextPlayers.has(id)) audioManager.play("player-leave");
     }
 
-    if (room.hand.phase !== prevPhaseRef.current) {
+    // "showdown" is also the phase while a run-it decision is pending; when
+    // that resolves the phase just falls back to whatever street the board
+    // is already on (possibly "preflop") — that's not a new deal, so it
+    // mustn't replay the hand-start/street sounds.
+    if (room.hand.phase !== prevPhaseRef.current && prevPhaseRef.current !== "showdown") {
       if (room.hand.phase === "preflop") audioManager.play("hand-start");
       else if (DEALT_PHASES.has(room.hand.phase)) audioManager.play(room.hand.phase as "flop" | "turn" | "river" | "showdown");
     }
@@ -101,10 +108,20 @@ export function useGameAudio(room: ClientRoomView | null): void {
       audioManager.play("your-turn");
     }
 
-    if (room.hand.result && room.hand.result !== prevResultRef.current) {
+    // Keyed on a stable per-run result key, not object identity: every
+    // broadcast is a fresh deserialized copy, so identity would replay the
+    // payout sounds on any later broadcast (a chat message, a join…). Each
+    // run of a run-it-twice hand pays out — and sounds — on its own.
+    const resultKey = boardResultKey(room.hand.handNumber, room.hand.result);
+    const secondResultKey = boardResultKey(room.hand.handNumber, room.hand.secondBoard?.result);
+    for (const [result, key, prevKey] of [
+      [room.hand.result, resultKey, prevResultKeyRef.current],
+      [room.hand.secondBoard?.result ?? null, secondResultKey, prevSecondResultKeyRef.current],
+    ] as const) {
+      if (!result || key === prevKey) continue;
       audioManager.play("pot-collect");
       audioManager.play("winner", { delaySeconds: 0.25 });
-      for (const w of room.hand.result.winners) {
+      for (const w of result.winners) {
         audioManager.play("pot-win", { pan: panForPlayer(room.players, meId, w.playerId), delaySeconds: 0.15 });
       }
     }
@@ -128,7 +145,8 @@ export function useGameAudio(room: ClientRoomView | null): void {
     prevPlayersRef.current = nextPlayers;
     prevPhaseRef.current = room.hand.phase;
     prevActivePlayerRef.current = room.hand.activePlayerId;
-    prevResultRef.current = room.hand.result;
+    prevResultKeyRef.current = resultKey;
+    prevSecondResultKeyRef.current = secondResultKey;
     prevBuyInRef.current = new Map(room.buyInRequests.map((r) => [r.id, r.status]));
     prevChatCountRef.current = room.chatMessages.length;
   }, [room]);

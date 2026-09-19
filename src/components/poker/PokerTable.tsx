@@ -17,6 +17,7 @@ import { Spade } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getEligiblePlayers, getStartHandError } from "@/server/engine/seats";
 import { formatChips } from "@/lib/format";
+import { boardResultKey } from "@/lib/resultKey";
 import { PlayerAvatar } from "./PlayerAvatar";
 import { ChipStack } from "./ChipStack";
 import { cn } from "@/lib/utils";
@@ -95,8 +96,10 @@ export function PokerTable({ room, isHost, onRemovePlayer, onSit, onStartHand }:
   const [flights, setFlights] = useState<Flight[]>([]);
   const prevBetsRef = useRef<Record<string, number>>({});
   const prevHandNumberRef = useRef(room.hand.handNumber);
-  const prevResultRef = useRef(room.hand.result);
-  const prevSecondResultRef = useRef(secondResult);
+  const resultKey = boardResultKey(room.hand.handNumber, room.hand.result);
+  const secondResultKey = boardResultKey(room.hand.handNumber, secondResult);
+  const prevResultKeyRef = useRef(resultKey);
+  const prevSecondResultKeyRef = useRef(secondResultKey);
   const flightIdRef = useRef(0);
 
   const betSignature = room.players.map((p) => `${p.id}:${p.currentBet}`).join("|");
@@ -128,7 +131,7 @@ export function PokerTable({ room, isHost, onRemovePlayer, onSit, onStartHand }:
 
   useEffect(() => {
     const current = room.hand.result;
-    if (current && current !== prevResultRef.current) {
+    if (current && resultKey !== prevResultKeyRef.current) {
       const from = room.hand.secondBoard ? POT_POINT_RUN_1 : POT_POINT;
       const spawned: Flight[] = current.winners
         .map((w) => {
@@ -142,16 +145,16 @@ export function PokerTable({ room, isHost, onRemovePlayer, onSit, onStartHand }:
         setTimeout(() => setFlights((f) => [...f, ...spawned]), 0);
       }
     }
-    prevResultRef.current = current;
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally only reacts to the result object changing identity
-  }, [room.hand.result]);
+    prevResultKeyRef.current = resultKey;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the stable result key; the result object itself is a fresh copy every broadcast
+  }, [resultKey]);
 
   // Second board's payout, when the hand ran it twice — same mechanics as
   // above, its own ref/effect so the two never clobber each other, distinct
   // flight ids, and a different visual origin point.
   useEffect(() => {
     const current = room.hand.secondBoard?.result ?? null;
-    if (current && current !== prevSecondResultRef.current) {
+    if (current && secondResultKey !== prevSecondResultKeyRef.current) {
       const spawned: Flight[] = current.winners
         .map((w) => {
           const to = seatPointFor(w.playerId);
@@ -164,9 +167,9 @@ export function PokerTable({ room, isHost, onRemovePlayer, onSit, onStartHand }:
         setTimeout(() => setFlights((f) => [...f, ...spawned]), 0);
       }
     }
-    prevSecondResultRef.current = current;
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally only reacts to the secondBoard result object changing identity
-  }, [room.hand.secondBoard?.result]);
+    prevSecondResultKeyRef.current = secondResultKey;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the stable result key; the result object itself is a fresh copy every broadcast
+  }, [secondResultKey]);
 
   const removeFlight = (id: string) => setFlights((f) => f.filter((fl) => fl.id !== id));
 

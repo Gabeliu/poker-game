@@ -26,6 +26,9 @@ const revealTimers = new Map<string, ReturnType<typeof setTimeout>>();
 /** roomId -> monotonic broadcast counter, so a client can tell a stale snapshot
  * (e.g. a slow resync ack landing after a newer push) from the current one. */
 const stateVersions = new Map<string, number>();
+/** roomId -> when every player in it went offline; cleared as soon as anyone
+ * comes back. Lets idle rooms be reaped instead of living in memory forever. */
+const emptySince = new Map<string, number>();
 
 export const roomStore = {
   get(roomId: string): RoomState | undefined {
@@ -39,6 +42,7 @@ export const roomStore = {
     decks.delete(roomId);
     playerTokensByRoom.delete(roomId);
     stateVersions.delete(roomId);
+    emptySince.delete(roomId);
     clearTurnTimer(roomId);
     clearRevealTimer(roomId);
   },
@@ -110,6 +114,27 @@ export const roomStore = {
   },
   clearRevealTimer(roomId: string): void {
     clearRevealTimer(roomId);
+  },
+
+  /** Call when the last connected player in a room drops. */
+  markEmpty(roomId: string, now: number = Date.now()): void {
+    if (!emptySince.has(roomId)) emptySince.set(roomId, now);
+  },
+  /** Call whenever any player (re)connects to a room. */
+  markActive(roomId: string): void {
+    emptySince.delete(roomId);
+  },
+  /** Deletes every room that has had nobody connected for longer than
+   * `maxIdleMs`, returning the ids removed. */
+  reapIdleRooms(maxIdleMs: number, now: number = Date.now()): string[] {
+    const reaped: string[] = [];
+    for (const [roomId, since] of [...emptySince]) {
+      if (now - since >= maxIdleMs) {
+        roomStore.delete(roomId);
+        reaped.push(roomId);
+      }
+    }
+    return reaped;
   },
 
   /** Bumps and returns a room's broadcast version — call once per outgoing

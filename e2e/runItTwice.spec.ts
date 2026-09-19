@@ -1,4 +1,6 @@
 import { test, expect } from "@playwright/test";
+import { io, type Socket } from "socket.io-client";
+import type { ClientToServerEvents, ServerToClientEvents } from "../src/lib/events";
 import { approveLatestRequest, createRoom, goAllIn, joinRoom, requestBuyIn } from "./helpers";
 
 /** Sets up two heads-up players with equal stacks, ready to start a hand. */
@@ -123,6 +125,38 @@ test.describe("run it once / run it twice", () => {
     await expect(host.getByTestId("hand-result-summary")).toBeVisible({ timeout: 15_000 });
     await expect(guest.getByTestId("hand-result-summary")).toBeVisible({ timeout: 15_000 });
     await expect(guest.locator('[data-boards="2"]')).not.toBeVisible();
+
+    await hostCtx.close();
+    await guestCtx.close();
+  });
+
+  test("a stray start-hand request mid-decision is rejected and doesn't stall the hand", async ({ browser }) => {
+    const { hostCtx, guestCtx, host, guest } = await setupHeadsUp(browser);
+    const roomId = host.url().split("/table/")[1];
+    await bothAllInPreflop(host, guest);
+    await expect(host.getByTestId("runit-decision-prompt")).toBeVisible({ timeout: 10_000 });
+
+    // Straight to the socket, bypassing the UI (which hides the Start button
+    // mid-hand) — the server itself must refuse, without side effects.
+    const token = await host.evaluate((id) => localStorage.getItem(`poker:token:${id}`), roomId);
+    const client: Socket<ServerToClientEvents, ClientToServerEvents> = io("http://localhost:3000", { autoConnect: false });
+    try {
+      client.connect();
+      const joined = await client
+        .timeout(5000)
+        .emitWithAck("room:join", { roomId, displayName: "Host", playerToken: token ?? undefined });
+      expect(joined.ok).toBe(true);
+      const rejected = await client.timeout(5000).emitWithAck("host:startHand", { roomId });
+      expect(rejected).toEqual({ ok: false, error: "A hand is already in progress." });
+    } finally {
+      client.disconnect();
+    }
+
+    // The decision is still live, and its own timeout still fires (nobody
+    // clicks anything here — a manual choice would re-arm the timer and hide
+    // exactly the stall this guards against) and the hand runs to completion.
+    await expect(host.getByTestId("runit-decision-prompt")).toBeVisible();
+    await expect(host.getByTestId("hand-result-summary")).toBeVisible({ timeout: 30_000 });
 
     await hostCtx.close();
     await guestCtx.close();

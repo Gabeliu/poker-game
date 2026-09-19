@@ -166,4 +166,50 @@ test.describe("Sound system", () => {
     const finalHostLog = countBy(await readAudioLog(page));
     expect(finalHostLog["pot-win"] ?? 0).toBeLessThanOrEqual(1);
   });
+
+  test("payout sounds don't replay on later, unrelated broadcasts (e.g. a chat message)", async ({ page, browser }) => {
+    const roomId = await createRoom(page, "Host");
+    await requestBuyIn(page, 1000);
+    await approveLatestRequest(page, "Host");
+
+    const guestCtx = await browser.newContext();
+    const guest = await guestCtx.newPage();
+    await joinRoom(guest, roomId, "Guest");
+    await requestBuyIn(guest, 1000);
+    await approveLatestRequest(page, "Guest");
+    await page.waitForTimeout(300);
+
+    await page.mouse.click(50, 50);
+    await page.getByTestId("start-hand-button").click();
+    await expect(page.getByTestId("start-hand-button")).toHaveCount(0);
+
+    // Whoever's turn it is folds, ending the hand with a payout.
+    let folder = page;
+    for (let i = 0; i < 40; i++) {
+      if (await page.getByTestId("action-fold").isVisible().catch(() => false)) break;
+      if (await guest.getByTestId("action-fold").isVisible().catch(() => false)) {
+        folder = guest;
+        break;
+      }
+      await page.waitForTimeout(150);
+    }
+    await folder.getByTestId("action-fold").click();
+    await expect(page.getByTestId("hand-result-summary")).toBeVisible({ timeout: 10_000 });
+    await page.waitForTimeout(500);
+    expect(countBy(await readAudioLog(page))["pot-collect"]).toBe(1);
+
+    // Every broadcast is a freshly deserialized copy of the room; a later,
+    // unrelated one (a chat message) must not look like a new result.
+    await clearAudioLog(page);
+    await guest.getByRole("textbox", { name: "Chat message" }).fill("gg");
+    await guest.getByRole("button", { name: "Send message" }).click();
+    await expect(page.getByText("gg", { exact: true })).toBeVisible();
+    await page.waitForTimeout(500);
+
+    const afterChat = countBy(await readAudioLog(page));
+    expect(afterChat["pot-collect"] ?? 0).toBe(0);
+    expect(afterChat["winner"] ?? 0).toBe(0);
+    expect(afterChat["pot-win"] ?? 0).toBe(0);
+    await guestCtx.close();
+  });
 });
