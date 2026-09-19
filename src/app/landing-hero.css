@@ -1,0 +1,366 @@
+/* Landing hero — cinematic, emerald-lit, layered. Composition + light + scale,
+   not extra UI: everything here is background, artwork and the existing copy. */
+
+.landing-page {
+  background:
+    radial-gradient(ellipse 60% 50% at 72% 34%, #0b3a2c88, transparent 70%),
+    radial-gradient(ellipse 50% 40% at 4% 92%, #08303a66, transparent 70%),
+    #020605;
+}
+.hero-stage::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 55% 55% at 18% 60%, #0d4d3a66, transparent 70%),
+    radial-gradient(ellipse 90% 38% at 62% 104%, #2fe0a4aa, #0d6b4c66 40%, transparent 72%);
+}
+
+.landing-hero {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: center;
+  min-height: max(720px, calc(100svh - 84px));
+  padding: 24px 40px 48px max(40px, calc((100vw - 1400px) / 2 + 40px));
+  overflow: hidden;
+}
+
+/* ---------- Stage (everything behind and around the copy) ---------- */
+
+.hero-stage {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+/* Oversized background lettering, cropped by the top edge like a poster. */
+.hero-bigtype {
+  position: absolute;
+  left: 1.5vw;
+  top: -3.4vw;
+  display: flex;
+  flex-direction: column;
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  font-weight: 800;
+  font-size: clamp(120px, 20.5vw, 400px);
+  line-height: 0.8;
+  letter-spacing: -0.06em;
+  color: transparent;
+  background: linear-gradient(180deg, #52f0b982 0%, #1fae8340 42%, #0a3d2e0c 88%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-stroke: 1.5px #78ffc83a;
+  -webkit-mask-image: linear-gradient(180deg, #000 30%, transparent 92%);
+  mask-image: linear-gradient(180deg, #000 30%, transparent 92%);
+  user-select: none;
+  white-space: nowrap;
+}
+
+/* The key light: a huge emerald bloom behind the ace that trails the cursor. */
+.hero-glow {
+  position: absolute;
+  right: -10vw;
+  top: -4%;
+  width: 78vw;
+  height: 112%;
+  background:
+    radial-gradient(closest-side at 46% 44%, #b4ffe6f2 0%, #46f0b4cc 14%, #14b783a6 34%, #0a6c4d66 56%, transparent 80%);
+  filter: blur(28px);
+  mix-blend-mode: screen;
+}
+.hero-glow-teal {
+  right: auto;
+  left: -18vw;
+  top: auto;
+  bottom: -30%;
+  width: 60vw;
+  height: 80%;
+  background: radial-gradient(closest-side, #1bb6c655, #0d6d8033 50%, transparent 76%);
+}
+
+.hero-grain {
+  position: absolute;
+  inset: 0;
+  opacity: 0.09;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Darkness pooling at the edges, and behind the copy for legibility. */
+.hero-vignette {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, #020605cc 0%, #02060580 30%, transparent 54%),
+    radial-gradient(ellipse 90% 85% at 62% 46%, transparent 46%, #020605c4 100%),
+    linear-gradient(180deg, transparent 66%, #020605 99%);
+}
+
+/* ---------- Artwork ---------- */
+
+.hero-art {
+  position: absolute;
+  right: -3vw;
+  top: 0;
+  bottom: 0;
+  width: min(68vw, 1300px);
+}
+
+.hero-layer-fill {
+  width: 100%;
+  height: 100%;
+}
+.hero-layer-abs {
+  position: absolute;
+  inset: 0;
+}
+.hero-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+/* One box holds the three hand/card layers so they stay perfectly aligned. */
+.hero-hand-box {
+  position: absolute;
+  right: -8%;
+  top: -14%;
+  height: 152%;
+  aspect-ratio: 1 / 1;
+}
+
+/* A partial felt table under everything, lit from above. */
+.hero-felt-wrap {
+  position: absolute;
+  left: -4%;
+  right: -10%;
+  bottom: -30%;
+  height: 66%;
+}
+.hero-felt {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background:
+    radial-gradient(ellipse at 50% 22%, #48e0a6 0%, #1a8b62 28%, #0a3d2a 58%, #020a07 100%);
+  box-shadow:
+    inset 0 3px 0 #b6ffe044,
+    inset 0 40px 90px #52e8ac33,
+    0 -40px 180px #25d69a77;
+  transform: perspective(900px) rotateX(58deg);
+  overflow: hidden;
+}
+.hero-swirl {
+  position: absolute;
+  inset: 8% 0 auto;
+  width: 100%;
+  opacity: 0.85;
+}
+
+.hero-chips-a { position: absolute; left: 17%; top: 54%; width: 19%; }
+.hero-chips-b { position: absolute; left: 37%; top: 65%; width: 11.5%; }
+.hero-chips-fg { position: absolute; left: -9%; bottom: -12%; width: 24%; }
+.hero-chip-svg { display: block; width: 100%; height: auto; overflow: visible; filter: drop-shadow(0 18px 26px #000c) drop-shadow(0 0 30px #25d69a33); }
+.hero-chip-blur { filter: blur(6px) brightness(0.6) drop-shadow(0 0 24px #25d69a44); }
+
+/* ---------- Floating feature labels ---------- */
+
+.hero-label {
+  position: absolute;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 20px 12px 15px;
+  border-radius: 15px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: #ecf6ee;
+  white-space: nowrap;
+  background: linear-gradient(135deg, #0f2c25c7, #050f0cb5);
+  border: 1px solid #8cffcd2b;
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  box-shadow: 0 18px 44px #000a, inset 0 1px 0 #ffffff14, 0 0 32px #25d69a1f;
+}
+.hero-label-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #b9f56a;
+  box-shadow: 0 0 0 3px #b9f56a2b, 0 0 14px #b9f56aaa;
+}
+.hero-label-1 { left: 56%; top: 9%; }
+.hero-label-2 { left: 66%; bottom: 20%; }
+.hero-label-3 { left: 71%; top: 33%; }
+
+/* ---------- Copy ---------- */
+
+.hero-copy {
+  position: relative;
+  z-index: 10;
+  width: min(48%, 780px);
+  text-align: left;
+}
+
+.hero-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+  color: #8ff0c4;
+}
+.hero-eyebrow::before {
+  content: "";
+  width: 42px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #8ff0c4);
+}
+
+.landing-page .hero-copy h1 {
+  margin-top: 22px;
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  font-weight: 800;
+  font-size: clamp(44px, 5.7vw, 100px);
+  line-height: 0.93;
+  letter-spacing: -0.048em;
+  color: #f5f1e3;
+  text-shadow: 0 6px 40px #000a;
+}
+.hero-copy h1 .hl { display: block; white-space: nowrap; }
+.hero-copy h1 .hl-2 {
+  padding-left: 0.55em;
+  background: linear-gradient(100deg, #f5f1e3 0%, #9df3cf 45%, #39d9a0 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: none;
+  filter: drop-shadow(0 0 26px #25d69a55);
+}
+
+.hero-copy > p:first-of-type {
+  margin-top: 26px;
+  max-width: 25em;
+  font-size: clamp(15px, 1.2vw, 18px);
+  line-height: 1.65;
+  color: #a8c3b5;
+}
+
+.hero-actions {
+  margin-top: 34px;
+  display: flex;
+  width: 100%;
+  max-width: 460px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+}
+
+.hero-cta,
+.hero-cta-secondary {
+  height: 58px;
+  border-radius: 14px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.hero-cta {
+  position: relative;
+  flex: 1.35;
+  gap: 10px;
+  color: #04241a;
+  background: linear-gradient(135deg, #d4f77a 0%, #a2e552 34%, #46d597 100%);
+  box-shadow:
+    inset 0 1px 0 #ffffff8c,
+    inset 0 -2px 0 #0a6b4433,
+    0 14px 38px -8px #5de89e99,
+    0 0 0 1px #d9ff9a55;
+  transition: transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 220ms;
+}
+.hero-cta:hover {
+  transform: translateY(-3px);
+  box-shadow:
+    inset 0 1px 0 #ffffffaa,
+    inset 0 -2px 0 #0a6b4433,
+    0 20px 48px -6px #5de89ecc,
+    0 0 0 1px #e6ffb0aa;
+}
+.hero-cta:active { transform: translateY(0) scale(0.975); }
+.hero-cta-arrow { transition: transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+.hero-cta:hover .hero-cta-arrow { transform: translateX(5px); }
+
+.hero-cta-secondary {
+  flex: 1;
+  color: #e6f1ea;
+  background: #ffffff0a;
+  border: 1px solid #ffffff24;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+.hero-cta-secondary:hover { background: #ffffff16; border-color: #8cffcd55; }
+.hero-cta-secondary:active { transform: scale(0.975); }
+
+.hero-fineprint {
+  margin-top: 20px;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  color: #6f8d7c;
+}
+
+/* ---------- Tablet / mobile ---------- */
+
+@media (max-width: 1023px) {
+  .hero-copy { width: min(56%, 620px); }
+  .hero-hand-box { right: -30%; }
+}
+
+@media (max-width: 767px) {
+  .landing-hero {
+    display: block;
+    min-height: 0;
+    padding: 18px 24px 410px;
+    text-align: center;
+  }
+  .hero-copy { width: 100%; text-align: center; }
+  .hero-eyebrow { font-size: 10.5px; letter-spacing: 0.28em; }
+  .hero-eyebrow::before { display: none; }
+  .landing-page .hero-copy h1 { margin-top: 16px; font-size: clamp(36px, 10.6vw, 56px); }
+  .hero-copy h1 .hl-2 { padding-left: 0; }
+  .hero-copy > p:first-of-type { margin-inline: auto; max-width: 22em; font-size: 14.5px; }
+  .hero-actions { margin-inline: auto; margin-top: 26px; }
+  .hero-copy > p:first-of-type { margin-top: 18px; }
+  .hero-fineprint { text-align: center; margin-top: 14px; }
+  .hero-cta, .hero-cta-secondary { height: 54px; }
+
+  .hero-bigtype { font-size: 30vw; left: -2vw; top: 2vw; }
+  .hero-vignette {
+    background:
+      linear-gradient(180deg, #020605e6 0%, #020605a0 46%, transparent 66%),
+      radial-gradient(ellipse 100% 60% at 60% 84%, transparent 40%, #020605cc 100%);
+  }
+  .hero-glow { right: -30vw; top: 38%; width: 130vw; height: 62%; }
+  .hero-art { left: 0; right: 0; top: auto; bottom: 0; width: 100%; height: 590px; }
+  .hero-fan { display: none; }
+  .hero-hand-box { right: -46%; top: -4%; height: 124%; }
+  .hero-chips-a { left: 0; bottom: 8%; width: 30%; }
+  .hero-chips-b { left: 30%; bottom: 2%; width: 20%; }
+  .hero-chips-fg { display: none; }
+  .hero-label { padding: 9px 14px 9px 11px; font-size: 12px; border-radius: 12px; }
+  .hero-label-1 { left: 5%; top: 35%; }
+  .hero-label-2 { left: 5%; top: 47%; bottom: auto; }
+  .hero-label-3 { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-cta, .hero-cta-arrow { transition: none; }
+}

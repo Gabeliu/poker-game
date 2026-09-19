@@ -29,7 +29,8 @@ import {
 } from "lucide-react";
 import { useRoomStore } from "@/hooks/useRoomStore";
 import { getStoredDisplayName, storeDisplayName } from "@/lib/socketClient";
-import { HeroDecoration } from "@/components/poker/HeroDecoration";
+import { HeroStage } from "@/components/poker/hero/HeroStage";
+import "./landing-hero.css";
 import { LoadingExperience } from "@/components/poker/LoadingExperience";
 
 export default function Home() {
@@ -103,12 +104,14 @@ export default function Home() {
         <span className="landing-header-note"><span /> Private tables. Real friends.</span>
       </header>
 
-      <section className="landing-hero relative flex flex-1 items-center px-4 sm:px-10">
-        <div className="hero-copy relative z-10">
+      <section className="landing-hero">
+        <HeroStage />
+        <div className="hero-copy">
+          <span className="hero-eyebrow">Poker anywhere.</span>
           <h1>
-            Poker night, without
-            <br />
-            the kitchen table.
+            <span className="hl hl-1">Poker night,</span>
+            <span className="hl hl-2">without the</span>
+            <span className="hl hl-3">kitchen table.</span>
           </h1>
           <p>
             Set the blinds, send one link, and deal real No-Limit Hold&rsquo;em with the people
@@ -122,10 +125,11 @@ export default function Home() {
                   <Button
                     size="lg"
                     data-testid="create-table-trigger"
-                    className="h-14 flex-1 bg-[var(--accent-lime)] text-[var(--accent-lime-foreground)] hover:bg-[var(--accent-lime)]/90 text-base font-bold tracking-wide shadow-[0_10px_30px_-8px_var(--accent-lime)]"
+                    className="hero-cta"
                     onClick={() => setJoinOpen(false)}
                   >
                     Create table
+                    <ArrowRight className="hero-cta-arrow h-5 w-5" />
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-sm">
@@ -184,7 +188,7 @@ export default function Home() {
                 size="lg"
                 variant="outline"
                 data-testid="join-table-trigger"
-                className="h-14 flex-1 border-white/15 bg-white/[0.03] text-base font-bold tracking-wide text-[var(--text-primary)] hover:bg-white/[0.08]"
+                className="hero-cta-secondary"
                 onClick={() => setJoinOpen((v) => !v)}
               >
                 {joinOpen ? "Cancel" : "Join table"}
@@ -239,9 +243,6 @@ export default function Home() {
           <p className="hero-fineprint">No installs. No accounts. Nothing here is real money.</p>
         </div>
 
-        <div className="hero-visual">
-          <HeroDecoration />
-        </div>
       </section>
 
       <section id="how" className="how-section">

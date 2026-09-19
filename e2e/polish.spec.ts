@@ -47,22 +47,52 @@ test("disconnected seats block both start buttons and a direct socket request un
   await Promise.all(contexts.map((ctx) => ctx.close()));
 });
 
-test("hero parallax preserves layout and respects reduced motion and mobile", async ({ page }) => {
-  await page.setViewportSize({ width: 1920, height: 1080 });
+const heroAceTransform = (page: import("@playwright/test").Page) =>
+  page.getByTestId("hero-ace").evaluate((el) => getComputedStyle(el).transform);
+
+test("hero: cursor parallax moves the ace without shifting the layout, and is off for reduced motion and touch-size screens", async ({ browser }) => {
+  // Desktop: the ace drifts and tilts with the cursor; the copy and buttons don't move.
+  const desktop = await browser.newContext({ viewport: { width: 1920, height: 1080 } });
+  const page = await desktop.newPage();
   await page.goto("/");
   const cta = page.getByTestId("create-table-trigger");
   await expect(cta).toBeVisible();
-  const before = await cta.boundingBox();
+  await expect(page.getByTestId("join-table-trigger")).toBeVisible();
+  await expect(page.getByTestId("hero-stage")).toBeVisible();
+  await page.waitForTimeout(1600); // entrance animation settles
+  const ctaBefore = await cta.boundingBox();
+  const aceBefore = await heroAceTransform(page);
   await page.mouse.move(1750, 750);
-  await expect.poll(() => page.locator('.hero-scene').evaluate((el) => Number((el as HTMLElement).style.getPropertyValue('--parallax-x')))).toBeGreaterThan(0.5);
-  expect(await cta.boundingBox()).toEqual(before);
+  await expect.poll(() => heroAceTransform(page), { timeout: 5000 }).not.toBe(aceBefore);
+  expect(await cta.boundingBox()).toEqual(ctaBefore);
   await page.screenshot({ path: "e2e/screenshots/polish-landing-1920.png" });
-  await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.mouse.move(300, 300);
-  await expect.poll(() => page.locator('.hero-hand').evaluate((el) => getComputedStyle(el).translate)).toBe('none');
-  await page.emulateMedia({ reducedMotion: "no-preference" });
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.mouse.move(300, 400);
-  await expect.poll(() => page.locator('.hero-hand').evaluate((el) => getComputedStyle(el).translate)).toBe('none');
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await desktop.close();
+
+  // Reduced motion: no cursor tracking at all.
+  const reduced = await browser.newContext({ viewport: { width: 1920, height: 1080 }, reducedMotion: "reduce" });
+  const still = await reduced.newPage();
+  await still.goto("/");
+  await expect(still.getByTestId("hero-ace")).toBeAttached();
+  await still.waitForTimeout(800);
+  const stillBefore = await heroAceTransform(still);
+  await still.mouse.move(300, 300);
+  await still.waitForTimeout(700);
+  expect(await heroAceTransform(still)).toBe(stillBefore);
+  await reduced.close();
+
+  // Phone: cursor tracking is off, nothing overflows, and the artwork is on screen.
+  const phone = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const mobile = await phone.newPage();
+  await mobile.goto("/");
+  await expect(mobile.getByTestId("create-table-trigger")).toBeVisible();
+  await mobile.waitForTimeout(1600);
+  const phoneBefore = await heroAceTransform(mobile);
+  await mobile.mouse.move(300, 400);
+  await mobile.waitForTimeout(700);
+  expect(await heroAceTransform(mobile)).toBe(phoneBefore);
+  expect(await mobile.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  const ace = await mobile.getByTestId("hero-ace").boundingBox();
+  expect(ace).not.toBeNull();
+  expect(ace!.y).toBeLessThan(844); // the hero art starts within the first screen
+  await phone.close();
 });
