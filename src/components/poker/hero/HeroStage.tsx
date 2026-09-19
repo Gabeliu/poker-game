@@ -4,6 +4,7 @@ import { useEffect, type ReactNode } from "react";
 import { motion, useMotionValue, useReducedMotion, useSpring, useTransform, type MotionValue } from "framer-motion";
 import { AceCard, AceHandBack, AceHandFront } from "./AceHandArt";
 import { ChipStackArt } from "./ChipStackArt";
+import { HERO_ASSETS, useAssetStatus } from "./heroAssets";
 
 const EASE_OUT = [0.16, 1, 0.3, 1] as const;
 
@@ -88,6 +89,8 @@ function Label({ children, className, delay }: { children: ReactNode; className:
  */
 export function HeroStage() {
   const reduced = useReducedMotion();
+  const handAsset = useAssetStatus(HERO_ASSETS.hand);
+  const chipsAsset = useAssetStatus(HERO_ASSETS.chips);
   const mx = useMotionValue(0);
   const my = useMotionValue(0);
   const spring = { stiffness: 70, damping: 18, mass: 0.7 };
@@ -150,30 +153,50 @@ export function HeroStage() {
         </Layer>
 
         <div className="hero-hand-box">
-          <Layer sx={sx} sy={sy} depth={10} delay={0.2} float={6} className="hero-layer-abs">
-            <AceHandBack />
-          </Layer>
-          <Layer sx={sx} sy={sy} depth={22} delay={0.3} float={9} tilt={4} testId="hero-ace" className="hero-layer-abs">
-            <AceCard />
-          </Layer>
-          <Layer sx={sx} sy={sy} depth={15} delay={0.38} float={7} className="hero-layer-abs">
-            <AceHandFront />
-          </Layer>
+          {handAsset === "ready" && (
+            <Layer sx={sx} sy={sy} depth={22} delay={0.3} float={8} tilt={4} testId="hero-ace" className="hero-layer-abs">
+              {/* eslint-disable-next-line @next/next/no-img-element -- decorative art with its own fixed sizing */}
+              <img src={HERO_ASSETS.hand} alt="" className="hero-raster" draggable={false} decoding="async" />
+            </Layer>
+          )}
+          {handAsset === "missing" && (
+            <>
+              <Layer sx={sx} sy={sy} depth={10} delay={0.2} float={6} className="hero-layer-abs">
+                <AceHandBack />
+              </Layer>
+              <Layer sx={sx} sy={sy} depth={22} delay={0.3} float={9} tilt={4} testId="hero-ace" className="hero-layer-abs">
+                <AceCard />
+              </Layer>
+              <Layer sx={sx} sy={sy} depth={15} delay={0.38} float={7} className="hero-layer-abs">
+                <AceHandFront />
+              </Layer>
+            </>
+          )}
           {/* The stacks sit on the table in front of the card, anchored to
               the hand group so they stay tied to it at every viewport size. */}
-          <Layer sx={sx} sy={sy} depth={-26} delay={0.45} float={4} className="hero-chips-a">
-            <ChipStackArt chips={["black", "black", "emerald", "emerald", "emerald", "emerald", "ivory"]} className="hero-chip-svg" />
-          </Layer>
-          <Layer sx={sx} sy={sy} depth={-16} delay={0.55} float={3} className="hero-chips-b">
-            <ChipStackArt chips={["emerald", "emerald", "red", "black", "emerald"]} className="hero-chip-svg" />
-          </Layer>
+          {chipsAsset === "ready" && (
+            <Layer sx={sx} sy={sy} depth={-26} delay={0.45} float={4} className="hero-chips-raster">
+              {/* eslint-disable-next-line @next/next/no-img-element -- decorative art with its own fixed sizing */}
+              <img src={HERO_ASSETS.chips} alt="" className="hero-raster" draggable={false} decoding="async" />
+            </Layer>
+          )}
+          {chipsAsset === "missing" && (
+            <>
+              <Layer sx={sx} sy={sy} depth={-26} delay={0.45} float={4} className="hero-chips-a">
+                <ChipStackArt chips={["black", "black", "emerald", "emerald", "emerald", "emerald", "ivory"]} className="hero-chip-svg" />
+              </Layer>
+              <Layer sx={sx} sy={sy} depth={-16} delay={0.55} float={3} className="hero-chips-b">
+                <ChipStackArt chips={["emerald", "emerald", "red", "black", "emerald"]} className="hero-chip-svg" />
+              </Layer>
+            </>
+          )}
         </div>
 
         <Layer sx={sx} sy={sy} depth={-34} delay={0.5} float={3} className="hero-chips-fg">
           <ChipStackArt chips={["black", "emerald", "emerald", "black"]} className="hero-chip-svg hero-chip-blur" />
         </Layer>
 
-        <div className="hero-spill" />
+        {handAsset === "missing" && <div className="hero-spill" />}
 
         <Label className="hero-label-1" delay={0.9}>Private Tables</Label>
         <Label className="hero-label-2" delay={1.1}>Play With Friends</Label>
