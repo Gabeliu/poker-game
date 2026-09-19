@@ -92,10 +92,14 @@ button:active:not(:disabled) { translate: 0 1px; }
 .empty-seat, .seat-panel { width: clamp(90px, 14cqw, 126px); border-radius: 15px; border: 1px solid #66796b40; background: var(--room-panel); box-shadow: var(--room-shadow); }
 .empty-seat { min-height: 72px; padding: 10px 6px; color: #a8b6ac; z-index: 3; }
 .empty-seat:hover { border-color: #b5e87b66; background: linear-gradient(160deg, #27392c, #101a13); box-shadow: 0 8px 24px #0008, 0 0 18px #a7dc4210; }
-/* The top-center seat sits almost exactly where the pot total renders —
-   fade it down so the real pot amount underneath stays readable, and
-   restore it on hover/focus so the seat is still clearly usable. */
-.empty-seat-near-pot { opacity: .18 !important; transition: opacity 150ms; }
+/* Open seats are deliberately ghosted (uniformly) so real players and game
+   info are what draw the eye; hover/focus restores full presence so a seat
+   is still obviously usable. The top-center seat sits almost exactly where
+   the pot total renders, so it fades a bit further to keep the pot legible. */
+.empty-seat-recessive, .empty-seat-near-pot { transition: opacity 150ms; }
+.empty-seat-recessive { opacity: .32 !important; }
+.empty-seat-near-pot { opacity: .2 !important; }
+.empty-seat-recessive:hover, .empty-seat-recessive:focus-visible,
 .empty-seat-near-pot:hover, .empty-seat-near-pot:focus-visible { opacity: 1 !important; }
 .empty-avatar { width: 26px; height: 26px; border: 1px solid #71867555; color: #92ab97; background: #19271e; }
 .empty-label { color: #a8b6ac; }

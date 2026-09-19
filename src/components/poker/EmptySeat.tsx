@@ -20,11 +20,15 @@ interface EmptySeatProps {
 export function EmptySeat({ position, canSit, onSit, canInvite, onInvite }: EmptySeatProps) {
   const interactive = canSit || canInvite;
   const label = canSit ? "Sit Here" : canInvite ? "Invite Player" : "Open seat";
+  // Every open seat shares the same recessive, ghosted look so the table
+  // reads as one unified surface — the exception is a viewer who hasn't sat
+  // down yet, whose "Sit Here" seats are the primary call to action.
+  const recessive = !canSit;
   // The top-center ring position sits almost exactly where the pot display
-  // renders, so that seat (empty or not) would otherwise paint over the pot
-  // total — fade it out so the real game info underneath stays legible,
-  // rather than reshuffling z-index globally and risking other overlaps.
-  const nearPot = Math.abs(position.xPct - 50) < 3 && position.yPct < 20;
+  // renders, so that one ghosted seat fades a little further to keep the pot
+  // total legible underneath it. ("Sit Here" seats stay uniformly solid.)
+  const nearPot = recessive && Math.abs(position.xPct - 50) < 3 && position.yPct < 20;
+  const fadeClass = cn(recessive && "empty-seat-recessive", nearPot && "empty-seat-near-pot");
 
   const content = (
     <>
@@ -49,7 +53,7 @@ export function EmptySeat({ position, canSit, onSit, canInvite, onInvite }: Empt
   if (!interactive) {
     return (
       <div
-        className={cn("empty-seat pointer-events-none absolute flex flex-col items-center gap-1 opacity-70", nearPot && "empty-seat-near-pot")}
+        className={cn("empty-seat pointer-events-none absolute flex flex-col items-center gap-1", fadeClass)}
         style={style}
         data-testid="empty-seat"
       >
@@ -61,7 +65,7 @@ export function EmptySeat({ position, canSit, onSit, canInvite, onInvite }: Empt
   return (
     <button
       onClick={canSit ? onSit : onInvite}
-      className={cn("empty-seat group absolute flex flex-col items-center gap-1", nearPot && "empty-seat-near-pot")}
+      className={cn("empty-seat group absolute flex flex-col items-center gap-1", fadeClass)}
       style={style}
       title={canSit ? "Take this seat" : "Invite a player to this seat"}
       data-testid="empty-seat"
