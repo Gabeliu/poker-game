@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-import type { ArcPosition } from "@/lib/seatLayout";
+import { isTopCenterPosition, type ArcPosition } from "@/lib/seatLayout";
 import type { PublicPlayer } from "@/lib/types";
 import { PlayingCard } from "./PlayingCard";
 import { PlayerAvatar } from "./PlayerAvatar";
@@ -74,7 +74,7 @@ export function PlayerSeat({
       data-player-name={player.displayName}
       data-player-chips={player.chips}
       data-player-status={player.handStatus}
-      data-bet-edge={position.yPct > 65 ? "bottom" : position.yPct < 35 ? "top" : position.xPct < 50 ? "left" : "right"}
+      data-bet-edge={position.yPct > 65 ? "bottom" : isTopCenterPosition(position) ? "top-center" : position.yPct < 35 ? "top" : position.xPct < 50 ? "left" : "right"}
       data-bet-side={position.xPct < 50 ? "left" : "right"}
       style={{
         left: `${position.xPct}%`,

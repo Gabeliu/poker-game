@@ -45,7 +45,7 @@ button:active:not(:disabled) { translate: 0 1px; }
 .table-dome-rim::after { content: ""; position: absolute; inset: 9px; border: 1px dashed #ffffff12; border-radius: inherit; pointer-events: none; }
 .table-dome-surface { background: radial-gradient(ellipse at 46% 30%, #20745545, transparent 65%), repeating-linear-gradient(25deg, #ffffff03 0 1px, transparent 1px 3px), repeating-linear-gradient(115deg, #00000009 0 1px, transparent 1px 3px), radial-gradient(ellipse, var(--table-surface-a), var(--table-surface-b)); box-shadow: inset 0 0 0 1px #739d7345, inset 0 0 0 5px #00000016, inset 0 6px 22px #0009, inset 0 0 70px #0006; }
 .table-dome-surface::after { content: ""; pointer-events: none; position: absolute; inset: 15px; border: 1px solid #aecb9830; border-radius: inherit; }
-.table-board { position: absolute; inset: 10% 0 24%; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 14px; z-index: 2; }
+.table-board { position: absolute; inset: 10% 0 0; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 14px; z-index: 2; }
 .table-watermark { pointer-events: none; position: absolute; left: 50%; top: 15%; transform: translateX(-50%); display: flex; align-items: center; gap: 7px; opacity: .4; filter: drop-shadow(0 1px 0 #0008); }
 .table-watermark span { font-size: 18px; letter-spacing: .32em; }
 .table-watermark svg { width: 18px; height: 18px; }
@@ -71,7 +71,12 @@ button:active:not(:disabled) { translate: 0 1px; }
    self-seat's floating hole cards below. Reserve more bottom clearance and
    shrink further specifically for this case, rather than relying on the
    fixed inset a single board was tuned for. */
-.table-board-dual { inset: 6% 0 34%; gap: 8px; }
+.table-board-dual { gap: 8px; }
+/* useBoardFit measures the free band between the seat straight across and the
+   viewer's own cards, reserving it here and scaling the pot + boards to fit;
+   `safe` keeps the top clear if they still have to overflow downward. */
+.table-board { padding: var(--board-pad-top, 0px) 0 var(--board-pad-bottom, 0px); justify-content: safe center; }
+.table-board-content { display: flex; flex-direction: column; align-items: center; gap: inherit; zoom: var(--board-fit, 1); }
 .table-board-dual .dual-board { gap: 10px; }
 .table-board-dual .dual-board .community-board { transform: scale(.62); }
 .self-seat-dual-board { top: 92%; }
@@ -127,6 +132,8 @@ button:active:not(:disabled) { translate: 0 1px; }
 .player-seat[data-bet-edge="bottom"][data-bet-side="right"] .seat-bet { right: calc(100% + 12px); }
 .player-seat[data-bet-edge="left"] .seat-bet { top: 40%; left: calc(100% + 12px); }
 .player-seat[data-bet-edge="right"] .seat-bet { top: 40%; right: calc(100% + 12px); }
+/* The seat straight across sits over the pot; its bet goes beside it. */
+.player-seat[data-bet-edge="top-center"] .seat-bet { top: 45%; right: calc(100% + 10px); }
 .self-seat { position: absolute; z-index: 6; left: 50%; top: 87%; transform: translate(-50%, -15%); min-width: 180px; padding: 10px 13px; border: 1px solid #71846c66; border-radius: 14px; background: var(--room-panel); box-shadow: var(--room-shadow); }
 .self-identity { display: flex; align-items: center; gap: 9px; }
 .self-identity > div:nth-child(2) { display: flex; flex-direction: column; }
@@ -229,7 +236,7 @@ button:active:not(:disabled) { translate: 0 1px; }
   .poker-table { width: min(calc(100cqw - 58px), calc((100cqh - 80px) * .78)); aspect-ratio: .78; }
   .poker-table > .table-dome-rim { inset: 3% 0; border-radius: 44%; }
   .poker-table > .table-dome-surface { inset: 6% 4%; border-radius: 44%; }
-  .table-board { inset: 20% 0; gap: 10px; }
+  .table-board { inset: 20% 0 0; gap: 10px; }
   .table-watermark { top: 19%; }
   .table-watermark span { font-size: 12px; }
   .table-watermark svg { width: 12px; }
@@ -256,6 +263,7 @@ button:active:not(:disabled) { translate: 0 1px; }
   .seat-bet { padding: 1px 4px; top: calc(100% + 4px); font-size: 9px; }
   .player-seat[data-bet-edge="left"] .seat-bet { top: 5%; left: calc(100% + 3px); }
   .player-seat[data-bet-edge="right"] .seat-bet { top: 5%; right: calc(100% + 3px); }
+  .player-seat[data-bet-edge="top-center"] .seat-bet { top: 40%; right: calc(100% + 3px); }
   .player-seat[data-bet-edge="bottom"][data-bet-side="left"] .seat-bet { left: calc(100% + 3px); }
   .player-seat[data-bet-edge="bottom"][data-bet-side="right"] .seat-bet { right: calc(100% + 3px); }
   .self-seat { min-width: 150px; padding: 7px 9px; top: 90%; }
@@ -270,9 +278,12 @@ button:active:not(:disabled) { translate: 0 1px; }
   .dual-board { gap: 10px; }
   .dual-board .community-board { transform: scale(.72); }
   .board-run-label { font-size: 7px; top: -11px; }
-  .table-board-dual { inset: 12% 0 40%; gap: 5px; }
+  .table-board-dual { gap: 5px; }
   .table-board-dual .dual-board { gap: 6px; }
   .table-board-dual .dual-board .community-board { transform: scale(.52); }
+  /* With two boards the cards are dealt the same size as one board's, then
+     nudged up: a phone has the room, and shrunken cards were unreadable. */
+  .dual-board .community-board > div { width: 36px; height: 52px; font-size: 14px; }
   .self-seat-dual-board { top: 94%; min-width: 130px; padding: 5px 7px; }
   .self-seat-dual-board .self-cards [role="img"] { width: 34px; height: 49px; font-size: 13px; }
   .pot-display > span:nth-child(2) { font-size: 23px; gap: 6px; }
@@ -326,4 +337,17 @@ button:active:not(:disabled) { translate: 0 1px; }
 .room-primary:disabled { box-shadow: none; cursor: not-allowed; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}
+
+/* Two boards: `zoom` scales the layout box as well as the pixels, unlike the
+   transform: scale() fallbacks above, which keep a full-size box and leave dead
+   space that pushed the pot up under the top seat. On phones there's room for
+   full-size cards, so they aren't shrunk at all. */
+@supports (zoom: 1) {
+  .dual-board .community-board { transform: none; zoom: .82; }
+  .table-board-dual .dual-board .community-board { transform: none; zoom: .62; }
+  @media (max-width: 767px) {
+    .dual-board .community-board,
+    .table-board-dual .dual-board .community-board { zoom: 1; }
+  }
 }

@@ -2,9 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Card, ClientRoomView, HandResult, SeatNumber } from "@/lib/types";
-import { playerAtSeat, ringPositionForSeat, ringSeatPositions, type ArcPosition } from "@/lib/seatLayout";
+import { isTopCenterPosition, playerAtSeat, ringPositionForSeat, ringSeatPositions, type ArcPosition } from "@/lib/seatLayout";
 import { copyInviteLink } from "@/lib/invite";
 import { usePlayerStatusLabels } from "@/hooks/usePlayerStatusLabels";
+import { useBoardFit } from "@/hooks/useBoardFit";
 import { useRoomStore } from "@/hooks/useRoomStore";
 import { PlayerSeat } from "./PlayerSeat";
 import { EmptySeat } from "./EmptySeat";
@@ -64,9 +65,14 @@ export function PokerTable({ room, isHost, onRemovePlayer, onSit, onStartHand }:
     `${room.hand.handNumber}:${resyncNonce}`
   );
   const ringSeats = ringSeatPositions(mySeat);
+  const topSeatPlayer = ringSeats
+    .map(({ seat, position }) => (isTopCenterPosition(position) ? playerAtSeat(room.players, seat) : null))
+    .find(Boolean) ?? null;
+  const tableRef = useRef<HTMLDivElement>(null);
   const eligibleCount = getEligiblePlayers(room.players).length;
   const startError = getStartHandError(room.players);
   const waiting = room.hand.phase === "waiting";
+  useBoardFit(tableRef, topSeatPlayer?.id ?? null, waiting);
   const result = room.hand.result;
   const secondResult = room.hand.secondBoard?.result ?? null;
   // Run 2 is dealt and revealed strictly after run 1 finishes — don't show
@@ -197,11 +203,11 @@ export function PokerTable({ room, isHost, onRemovePlayer, onSit, onStartHand }:
 
   return (
     <div className="poker-table-wrap">
-      <div className="poker-table">
+      <div className="poker-table" ref={tableRef}>
         <div className="table-dome-rim absolute inset-0 rounded-[46%] shadow-[0_24px_60px_rgba(0,0,0,0.6)]" />
         <div className="table-dome-surface absolute inset-[4.5%] rounded-[46%]">
-          <div className={cn("table-board", showDualBoard && "table-board-dual")}>
-            {!waiting && <>
+          <div className={cn("table-board", showDualBoard && "table-board-dual")} data-top-seat={topSeatPlayer ? "" : undefined}>
+            {!waiting && <div className="table-board-content">
             <Pot
               pots={room.hand.pots}
               liveTotal={room.players.reduce((s, p) => s + p.totalCommittedThisHand, 0)}
@@ -230,7 +236,7 @@ export function PokerTable({ room, isHost, onRemovePlayer, onSit, onStartHand }:
             ) : (
               <CommunityCards cards={room.hand.communityCards} highlightCards={highlightForBoard(result)} />
             )}
-            </>}
+            </div>}
             {waiting && (
               <div className="table-lobby">
                 <span className="room-eyebrow">Your private table</span>

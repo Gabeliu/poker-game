@@ -59,6 +59,12 @@ export function ringSeatPositions(mySeat: SeatNumber | null): { seat: SeatNumber
   return ALL_SEATS.filter((s) => s !== mySeat).map((seat) => ({ seat, position: ringPositionForSeat(seat, mySeat) }));
 }
 
+/** The seat straight across from the viewer sits right where the pot and the
+ * top of the board are drawn, so the table lays those out around it. */
+export function isTopCenterPosition(position: ArcPosition): boolean {
+  return Math.abs(position.xPct - 50) < 8 && position.yPct < 35;
+}
+
 /** Looks up the occupying player for a seat, if any. */
 export function playerAtSeat(players: PublicPlayer[], seat: SeatNumber): PublicPlayer | null {
   return players.find((p) => p.seat === seat) ?? null;

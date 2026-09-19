@@ -183,11 +183,18 @@ test.describe("run it once / run it twice", () => {
     await expect(rows).toHaveCount(2);
     const texts = await rows.allTextContents();
     for (const run of ["Run 1", "Run 2"]) {
-      const winners = texts.filter((t) => new RegExp(`${run}:[^·]*\(won\)`).test(t)).length;
+      const won = (t: string) => new RegExp(`${run}:[^·]*\(won\)`).test(t);
+      const winners = texts.filter(won).length;
       const scooped = await host.getByText("Scoop").count();
       // one "(won)" per run, or that run's winner scooped both (no marker)
       expect(winners + scooped).toBeGreaterThanOrEqual(1);
-      expect(winners).toBeLessThanOrEqual(1);
+      if (winners === 2) {
+        // Both players marked as winning a run is only right when it's a
+        // genuine chop — the board plays for both, so their hands read the same
+        // (a random deal makes this happen now and then).
+        const hand = (t: string) => t.match(new RegExp(`${run}: ([^·(]*)`))?.[1].trim();
+        expect(hand(texts[0])).toBe(hand(texts[1]));
+      }
     }
 
     await hostCtx.close();
