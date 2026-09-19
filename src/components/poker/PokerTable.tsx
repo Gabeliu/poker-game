@@ -202,7 +202,18 @@ export function PokerTable({ room, isHost, onRemovePlayer, onSit, onStartHand }:
         <div className="table-dome-surface absolute inset-[4.5%] rounded-[46%]">
           <div className={cn("table-board", showDualBoard && "table-board-dual")}>
             {!waiting && <>
-            <Pot pots={room.hand.pots} liveTotal={room.players.reduce((s, p) => s + p.totalCommittedThisHand, 0)} />
+            <Pot
+              pots={room.hand.pots}
+              liveTotal={room.players.reduce((s, p) => s + p.totalCommittedThisHand, 0)}
+              uncalled={
+                room.hand.uncalledBet
+                  ? {
+                      amount: room.hand.uncalledBet.amount,
+                      playerName: room.players.find((p) => p.id === room.hand.uncalledBet!.playerId)?.displayName ?? "a player",
+                    }
+                  : null
+              }
+            />
             {showDualBoard && room.hand.secondBoard ? (
               <div className="dual-board" data-boards="2">
                 <CommunityCards

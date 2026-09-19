@@ -248,6 +248,10 @@ export interface HandState {
   runItDecision?: RunItDecision | null;
   runout?: RunoutState | null;
   secondBoard?: BoardRun | null;
+  /** Chips a player bet beyond what anyone could match, handed straight back
+   * once action closed — never part of any pot, so never contested, split
+   * across runs, or counted as a win. */
+  uncalledBet?: { playerId: string; amount: number } | null;
 }
 
 // ---------- Room ----------

@@ -111,6 +111,7 @@ export function startHand(room: RoomState, deck: Deck): void {
     runItDecision: null,
     runout: null,
     secondBoard: null,
+    uncalledBet: null,
   };
 
   const sbPlayer = room.players.find((p) => p.seat === smallBlindSeat)!;
@@ -212,6 +213,11 @@ export function advanceGameFlow(room: RoomState, deck: Deck, fromSeat: number, o
     return;
   }
 
+  // Action is closed for this street: anything one player bet beyond what
+  // the next-deepest contributor could match was never at risk, so it goes
+  // straight back rather than sitting in a one-player "side pot".
+  returnUncalledBet(room);
+
   if (room.hand.phase === "river") {
     runShowdown(room);
     finalizeHand(room);
@@ -229,6 +235,31 @@ export function advanceGameFlow(room: RoomState, deck: Deck, fromSeat: number, o
 
   dealNextStreetCards(room, deck);
   advanceGameFlow(room, deck, room.hand.dealerSeat, opts);
+}
+
+/** Returns the unmatched part of the largest contribution — the excess over
+ * the second-largest contributor (folded players' chips still count as
+ * matched money) — to that player. Idempotent: once returned there's no
+ * excess left to find. */
+function returnUncalledBet(room: RoomState): void {
+  const contributors = room.players
+    .filter((p) => p.totalCommittedThisHand > 0)
+    .sort((a, b) => b.totalCommittedThisHand - a.totalCommittedThisHand);
+  if (contributors.length < 2) return;
+
+  const [top, next] = contributors;
+  const excess = top.totalCommittedThisHand - next.totalCommittedThisHand;
+  if (excess <= 0 || top.handStatus === "folded") return;
+
+  top.chips += excess;
+  top.totalCommittedThisHand -= excess;
+  top.currentBet = Math.max(0, top.currentBet - excess);
+
+  const existing = room.hand.uncalledBet;
+  room.hand.uncalledBet = {
+    playerId: top.id,
+    amount: existing && existing.playerId === top.id ? existing.amount + excess : excess,
+  };
 }
 
 const RUN_IT_DECISION_SECONDS = 10;

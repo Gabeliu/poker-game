@@ -3,8 +3,9 @@ import { io, type Socket } from "socket.io-client";
 import type { ClientToServerEvents, ServerToClientEvents } from "../src/lib/events";
 import { approveLatestRequest, createRoom, goAllIn, joinRoom, requestBuyIn } from "./helpers";
 
-/** Sets up two heads-up players with equal stacks, ready to start a hand. */
-async function setupHeadsUp(browser: import("@playwright/test").Browser) {
+/** Sets up two heads-up players, ready to start a hand (equal 1,000 stacks
+ * unless the guest's buy-in is overridden). */
+async function setupHeadsUp(browser: import("@playwright/test").Browser, guestBuyIn = 1000) {
   const hostCtx = await browser.newContext();
   const guestCtx = await browser.newContext();
   const host = await hostCtx.newPage();
@@ -14,9 +15,9 @@ async function setupHeadsUp(browser: import("@playwright/test").Browser) {
   await requestBuyIn(host, 1000);
   await approveLatestRequest(host, "Host");
   await joinRoom(guest, roomId, "Guest");
-  await requestBuyIn(guest, 1000);
+  await requestBuyIn(guest, guestBuyIn);
   await approveLatestRequest(host, "Guest");
-  await expect(guest.getByTestId("your-stack")).toContainText("1,000", { timeout: 10_000 });
+  await expect(guest.getByTestId("your-stack")).toContainText(guestBuyIn.toLocaleString("en-US"), { timeout: 10_000 });
 
   await host.getByTestId("start-hand-button").click();
   // player-seat renders for any seated player regardless of hand phase (it
@@ -157,6 +158,37 @@ test.describe("run it once / run it twice", () => {
     // exactly the stall this guards against) and the hand runs to completion.
     await expect(host.getByTestId("runit-decision-prompt")).toBeVisible();
     await expect(host.getByTestId("hand-result-summary")).toBeVisible({ timeout: 30_000 });
+
+    await hostCtx.close();
+    await guestCtx.close();
+  });
+
+  test("an unmatched excess is shown as an uncalled bet (not a side pot), and each run has one winner", async ({ browser }) => {
+    // Host 1,000 vs guest 200: both shove, so 800 of the host's chips can
+    // never be matched.
+    const { hostCtx, guestCtx, host, guest } = await setupHeadsUp(browser, 200);
+    await bothAllInPreflop(host, guest);
+    await expect(host.getByTestId("runit-decision-prompt")).toBeVisible({ timeout: 10_000 });
+    await host.getByTestId("runit-twice").click();
+    await guest.getByTestId("runit-twice").click();
+    await expect(host.getByTestId("hand-result-summary")).toBeVisible({ timeout: 30_000 });
+
+    // The refund is called out as such, and there's no one-player side pot.
+    await expect(host.getByTestId("uncalled-bet")).toContainText("Uncalled 800 returned to");
+    await expect(host.getByText(/Side \d/)).toHaveCount(0);
+
+    // Heads-up, no side pot: each run is won by exactly one player (or is a
+    // chop) — never marked "(won)" for both players just because of the refund.
+    const rows = host.locator('[data-testid="per-run-result"]');
+    await expect(rows).toHaveCount(2);
+    const texts = await rows.allTextContents();
+    for (const run of ["Run 1", "Run 2"]) {
+      const winners = texts.filter((t) => new RegExp(`${run}:[^·]*\(won\)`).test(t)).length;
+      const scooped = await host.getByText("Scoop").count();
+      // one "(won)" per run, or that run's winner scooped both (no marker)
+      expect(winners + scooped).toBeGreaterThanOrEqual(1);
+      expect(winners).toBeLessThanOrEqual(1);
+    }
 
     await hostCtx.close();
     await guestCtx.close();

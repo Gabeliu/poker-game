@@ -696,6 +696,74 @@ describe("run it once / run it twice (heads-up all-in)", () => {
   });
 });
 
+describe("uncalled bets", () => {
+  it("returns the unmatched excess to the deeper stack as a refund, so it is never a pot, a run-split, or a win", () => {
+    // p1 is short (200) and p2 deep (1000). Flop: p2 bets 500, p1 can only
+    // call all-in for 190 more -> 310 of p2's bet was never matched.
+    // Run 1 (board Qc 4c 2d 9h 8c): p1's 99 makes trips, p2 has queen high.
+    // Run 2 (board Qc 4c 2d 10s 10h): p2's T6 makes trips tens, p1 only two pair.
+    const p1 = makePlayer("p1", 0, 200);
+    const p2 = makePlayer("p2", 1, 1000);
+    const room = makeRoom([p1, p2]);
+    const deck = Deck.fromOrderedDraws(
+      cards(
+        "9d", "9s", // p1
+        "10d", "6d", // p2
+        "3h", "Qc", "4c", "2d", // burn, flop
+        "3s", "9h", // burn, run-1 turn
+        "3c", "8c", // burn, run-1 river
+        "5h", "10s", // burn, run-2 turn
+        "5s", "10h" // burn, run-2 river
+      )
+    );
+
+    startHand(room, deck);
+    submitAction(room, deck, room.hand.activePlayerId!, { action: "call" }); // p1 completes the blind
+    submitAction(room, deck, room.hand.activePlayerId!, { action: "check" });
+    expect(room.hand.communityCards).toHaveLength(3);
+
+    expect(submitAction(room, deck, "p2", { action: "bet", amount: 500 }, { paced: true }).ok).toBe(true);
+    expect(submitAction(room, deck, "p1", { action: "call" }, { paced: true }).ok).toBe(true);
+
+    // The 310 nobody could match went straight back and is reported as such.
+    expect(room.hand.uncalledBet).toEqual({ playerId: "p2", amount: 310 });
+    expect(room.players.find((p) => p.id === "p2")!.totalCommittedThisHand).toBe(200);
+    expect(room.players.find((p) => p.id === "p2")!.chips).toBe(800);
+
+    chooseRunIt(room, "p1", "twice");
+    chooseRunIt(room, "p2", "twice");
+    drainRunout(room, deck);
+
+    // Only the contested 400 is a pot — no one-player "side pot".
+    expect(room.hand.pots).toHaveLength(1);
+    expect(room.hand.pots[0].amount).toBe(400);
+
+    // Each run independently has exactly one winner; the refund is not a win.
+    const run1 = room.hand.result!;
+    const run2 = room.hand.secondBoard!.result!;
+    expect(run1.winners).toEqual([expect.objectContaining({ playerId: "p1", amount: 200 })]);
+    expect(run2.winners).toEqual([expect.objectContaining({ playerId: "p2", amount: 200 })]);
+    expect(run1.revealedHands.p1.rank).toBe(HAND_CATEGORY.THREE_OF_A_KIND);
+    expect(run2.revealedHands.p2.rank).toBe(HAND_CATEGORY.THREE_OF_A_KIND);
+
+    // Chips: p1 wins run 1's half; p2 wins run 2's half and keeps the refund.
+    expect(room.players.find((p) => p.id === "p1")!.chips).toBe(200);
+    expect(room.players.find((p) => p.id === "p2")!.chips).toBe(1000);
+    // A split run breaks exactly even for both players.
+    expect(room.players.find((p) => p.id === "p1")!.handHistory[0].netChange).toBe(0);
+    expect(room.players.find((p) => p.id === "p2")!.handHistory[0].netChange).toBe(0);
+  });
+
+  it("returns nothing when every contributor matched", () => {
+    const room = makeRoom([makePlayer("p1", 0, 100), makePlayer("p2", 1, 100)]);
+    const deck = new Deck();
+    startHand(room, deck);
+    submitAction(room, deck, room.hand.activePlayerId!, { action: "call" });
+    submitAction(room, deck, room.hand.activePlayerId!, { action: "check" });
+    expect(room.hand.uncalledBet).toBeNull();
+  });
+});
+
 describe("player busting", () => {
   it("marks a player with zero chips as sitting-out after losing an all-in hand", () => {
     const p1 = makePlayer("short", 0, 20);

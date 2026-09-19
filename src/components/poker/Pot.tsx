@@ -5,7 +5,15 @@ import { formatChips } from "@/lib/format";
 import type { SidePot } from "@/lib/types";
 import { PokerChip } from "./PokerChip";
 
-export function Pot({ pots, liveTotal }: { pots: SidePot[]; liveTotal: number }) {
+interface PotProps {
+  pots: SidePot[];
+  liveTotal: number;
+  /** Chips returned because no one could match them — shown apart from the
+   * pot, never as a side pot. */
+  uncalled?: { playerName: string; amount: number } | null;
+}
+
+export function Pot({ pots, liveTotal, uncalled }: PotProps) {
   const total = pots.length > 0 ? pots.reduce((s, p) => s + p.amount, 0) : liveTotal;
 
   // "Adjust state during render" pattern (React's own recommended escape
@@ -30,6 +38,11 @@ export function Pot({ pots, liveTotal }: { pots: SidePot[]; liveTotal: number })
         <span className="pot-chips" aria-hidden><PokerChip size={25} denomination={25} /><PokerChip size={25} denomination={100} /><PokerChip size={25} denomination={1000} /></span>
         {formatChips(total)}
       </span>
+      {uncalled && uncalled.amount > 0 && (
+        <span className="mt-1 text-[10px] font-medium text-[var(--accent-lime)]" data-testid="uncalled-bet">
+          Uncalled {formatChips(uncalled.amount)} returned to {uncalled.playerName}
+        </span>
+      )}
       {pots.length > 1 && (
         <div className="mt-1 flex gap-2 text-[10px] text-[var(--text-secondary)]">
           {pots.map((p, i) => (
