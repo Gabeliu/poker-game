@@ -96,3 +96,14 @@ test("hero: cursor parallax moves the ace without shifting the layout, and is of
   expect(ace!.y).toBeLessThan(844); // the hero art starts within the first screen
   await phone.close();
 });
+
+test("hero: the generated hand and chip artwork load and are drawn as image layers", async ({ page }) => {
+  await page.goto("/");
+  const hand = page.getByTestId("hero-ace").locator("img.hero-raster");
+  const chips = page.locator(".hero-chips-raster img.hero-raster");
+  await expect(hand).toBeVisible();
+  await expect(chips).toBeVisible();
+  for (const img of [hand, chips]) {
+    expect(await img.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0)).toBe(true);
+  }
+});

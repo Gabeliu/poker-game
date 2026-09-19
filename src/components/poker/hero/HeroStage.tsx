@@ -152,11 +152,11 @@ export function HeroStage() {
           </div>
         </Layer>
 
-        <div className="hero-hand-box">
+        <div className={`hero-hand-box${handAsset === "ready" ? " hero-hand-box-raster" : ""}`}>
           {handAsset === "ready" && (
             <Layer sx={sx} sy={sy} depth={22} delay={0.3} float={8} tilt={4} testId="hero-ace" className="hero-layer-abs">
               {/* eslint-disable-next-line @next/next/no-img-element -- decorative art with its own fixed sizing */}
-              <img src={HERO_ASSETS.hand} alt="" className="hero-raster" draggable={false} decoding="async" />
+              <img src={HERO_ASSETS.hand} alt="" className="hero-raster" draggable={false} />
             </Layer>
           )}
           {handAsset === "missing" && (
@@ -177,7 +177,7 @@ export function HeroStage() {
           {chipsAsset === "ready" && (
             <Layer sx={sx} sy={sy} depth={-26} delay={0.45} float={4} className="hero-chips-raster">
               {/* eslint-disable-next-line @next/next/no-img-element -- decorative art with its own fixed sizing */}
-              <img src={HERO_ASSETS.chips} alt="" className="hero-raster" draggable={false} decoding="async" />
+              <img src={HERO_ASSETS.chips} alt="" className="hero-raster" draggable={false} />
             </Layer>
           )}
           {chipsAsset === "missing" && (

@@ -146,6 +146,11 @@
     radial-gradient(ellipse 22% 11% at 25% 90%, #4dffb8b0 0%, #1fd39a55 50%, transparent 78%);
 }
 
+/* The photographic hand sits in the same box, but its card is higher and the
+   hand rises from below, so the frame is placed to crop the sleeve out. */
+.hero-hand-box-raster { right: 6%; top: 6%; height: 124%; }
+.hero-hand-box-raster .hero-raster { filter: drop-shadow(0 0 34px #2fe0a466) drop-shadow(0 30px 40px #000a); }
+
 /* A partial felt table under everything, lit from above. */
 .hero-felt-wrap {
   position: absolute;
@@ -179,7 +184,7 @@
 .hero-chips-b { position: absolute; left: 37%; top: 65%; width: 11.5%; }
 /* Raster layers: generated artwork, contained in the same boxes as the vector art. */
 .hero-raster { display: block; width: 100%; height: 100%; object-fit: contain; user-select: none; pointer-events: none; }
-.hero-chips-raster { position: absolute; left: 8%; top: 46%; width: 50%; aspect-ratio: 4 / 3; }
+.hero-chips-raster { position: absolute; left: 8%; top: 44%; width: 40%; aspect-ratio: 4 / 3; }
 .hero-chips-fg { position: absolute; left: -9%; bottom: -12%; width: 24%; }
 .hero-chip-svg { display: block; width: 100%; height: auto; overflow: visible; filter: drop-shadow(0 10px 14px #000a) drop-shadow(0 0 26px #25d69a26); }
 .hero-chip-blur { filter: blur(6px) brightness(0.6) drop-shadow(0 0 24px #25d69a44); }
@@ -212,8 +217,8 @@
   background: #b9f56a;
   box-shadow: 0 0 0 3px #b9f56a2b, 0 0 14px #b9f56aaa;
 }
-.hero-label-1 { left: 56%; top: 9%; }
-.hero-label-2 { left: 62%; bottom: 13%; }
+.hero-label-1 { left: 74%; top: 9%; }
+.hero-label-2 { right: 6%; bottom: 8%; }
 .hero-label-3 { left: 71%; top: 33%; }
 
 /* ---------- Copy ---------- */
@@ -338,6 +343,10 @@
 @media (max-width: 1023px) {
   .hero-copy { width: min(56%, 620px); }
   .hero-hand-box { right: -30%; }
+  .hero-hand-box-raster { right: -44%; top: 12%; height: 88%; }
+  /* Not enough room beside the copy at this width. */
+  .hero-chips-raster, .hero-label-3 { display: none; }
+  .hero-label-1 { left: auto; right: 12%; }
 }
 
 @media (max-width: 767px) {
@@ -370,11 +379,12 @@
   .hero-hand-box { right: -46%; top: -4%; height: 124%; }
   .hero-chips-a { left: 0; bottom: 8%; width: 30%; }
   .hero-chips-b { left: 30%; bottom: 2%; width: 20%; }
-  .hero-chips-raster { left: -6%; top: auto; bottom: 0; width: 62%; }
+  .hero-hand-box-raster { right: -34%; top: 32%; height: 96%; }
+  .hero-chips-raster { display: block; left: 14%; top: 46%; width: 32%; }
   .hero-chips-fg { display: none; }
   .hero-label { padding: 9px 14px 9px 11px; font-size: 12px; border-radius: 12px; }
-  .hero-label-1 { left: 5%; top: 35%; }
-  .hero-label-2 { left: 5%; top: 47%; bottom: auto; }
+  .hero-label-1 { left: 5%; right: auto; top: 35%; }
+  .hero-label-2 { left: 5%; right: auto; top: 47%; bottom: auto; }
   .hero-label-3 { display: none; }
 }
 
