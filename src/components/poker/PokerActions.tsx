@@ -107,6 +107,7 @@ export function PokerActions({ room, onAction }: PokerActionsProps) {
           currentBetAmount={room.hand.currentBetAmount}
           playerChips={myPlayer.chips}
           playerCurrentBet={myPlayer.currentBet}
+          step={room.settings.bigBlind}
           onCancel={() => setRaising(false)}
           onConfirm={(amount) => run({ action: raiseVerb === "Bet" ? "bet" : "raise", amount })}
         />

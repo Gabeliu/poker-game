@@ -19,6 +19,7 @@ interface BuyInRequestProps {
 export function BuyInRequest({ playerName, amount, type, deferred, onApprove, onReject, className }: BuyInRequestProps) {
   return (
     <div
+      data-buyin-request
       className={cn(
         "animate-in slide-in-from-top-2 fade-in w-72 rounded-2xl border border-white/10 bg-black/70 p-3.5 shadow-[0_16px_40px_rgba(0,0,0,0.55)] backdrop-blur-xl duration-200",
         className

@@ -23,8 +23,11 @@ button:active:not(:disabled) { translate: 0 1px; }
 .room-title > p:first-child { font-size: 16px; font-weight: 600; }
 .room-title > p:last-child { margin-top: 4px; letter-spacing: .08em; }
 .room-header > div:last-child { flex: 0 0 auto; }
-.room-header button { border: 1px solid transparent; border-radius: 9px; }
-.room-header button:hover { border-color: #ffffff14; background: #ffffff07; }
+/* The floating buy-in card renders inside the header but has its own button
+   styling: without the :not(), this hover rule replaced Approve's lime fill
+   with a near-transparent one, leaving its dark label invisible. */
+.room-header button:not([data-buyin-request] button) { border: 1px solid transparent; border-radius: 9px; }
+.room-header button:not([data-buyin-request] button):hover { border-color: #ffffff14; background: #ffffff07; }
 .room-sidebar { background: linear-gradient(180deg, #0b100ee6, #070a09b3); backdrop-filter: blur(16px); }
 .room-sidebar h3 { font-size: 10px; letter-spacing: .17em; padding-bottom: 10px; margin-top: 6px; }
 .room-sidebar > div > div + div { border-top: 1px solid var(--room-border); padding-top: 20px; }
@@ -72,7 +75,7 @@ button:active:not(:disabled) { translate: 0 1px; }
 .table-board-dual .dual-board { gap: 10px; }
 .table-board-dual .dual-board .community-board { transform: scale(.62); }
 .self-seat-dual-board { top: 92%; }
-.self-seat-dual-board .self-cards [role="img"] { width: clamp(38px, 6cqw, 58px); height: clamp(54px, 8.5cqw, 82px); }
+.self-seat-dual-board .self-cards [role="img"] { width: clamp(38px, 6cqw, 58px); height: clamp(54px, 8.5cqw, 82px); font-size: clamp(11px, 1.75cqw, 17px); }
 .card-winning { box-shadow: 0 0 0 2px var(--room-gold), 0 0 14px #d9c08255; border-radius: inherit; }
 .seat-loser .seat-panel, .self-seat.seat-loser { opacity: .55; filter: saturate(.65); transition: opacity 300ms, filter 300ms; }
 .card-placeholder { background: #061b140b; }
@@ -131,7 +134,10 @@ button:active:not(:disabled) { translate: 0 1px; }
 .self-name small { color: #a7b5a8; font-weight: 400; }
 .host-label { position: absolute; bottom: -9px; left: 50%; transform: translateX(-50%); border: 1px solid #72855555; border-radius: 20px; background: #23301e; color: #c2d69c; padding: 1px 8px; font-size: 8px; text-transform: uppercase; letter-spacing: .12em; }
 .self-cards { position: absolute; left: 50%; bottom: calc(100% - 3px); transform: translateX(-50%); }
-.self-cards [role="img"] { width: clamp(48px, 8cqw, 78px); height: clamp(68px, 11.3cqw, 110px); border-radius: 9px; }
+/* The rank and the centre suit (2em) are sized off font-size, so it has to
+   scale with the card — otherwise a card shrunk by the clamp() below keeps
+   its full-size suit, which swallows the rank. */
+.self-cards [role="img"] { width: clamp(48px, 8cqw, 78px); height: clamp(68px, 11.3cqw, 110px); font-size: clamp(14px, 2.4cqw, 23px); border-radius: 9px; }
 /* Only the second (front) card overlaps the first — a fixed overlap this
    size keeps both cards' corner rank+suit clear of the other card at every
    size in the clamp() above, unlike the old margin-on-both-sides approach
@@ -219,7 +225,7 @@ button:active:not(:disabled) { translate: 0 1px; }
   .room-title > p:first-child { font-size: 12px; }
   .room-title > p:last-child { font-size: 9px; margin: 0; }
   .room-header > div:last-child { flex: 1; }
-  .room-header button { height: 30px; min-width: 28px; padding-inline: 7px; }
+  .room-header button:not([data-buyin-request] button) { height: 30px; min-width: 28px; padding-inline: 7px; }
   .poker-table { width: min(calc(100cqw - 58px), calc((100cqh - 80px) * .78)); aspect-ratio: .78; }
   .poker-table > .table-dome-rim { inset: 3% 0; border-radius: 44%; }
   .poker-table > .table-dome-surface { inset: 6% 4%; border-radius: 44%; }
