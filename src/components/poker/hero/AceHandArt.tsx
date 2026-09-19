@@ -1,47 +1,97 @@
+import { angleAt, buildDigit, crease, offsetLine, widthGradient } from "./digitGeometry";
+
 /**
- * The hero object: a hand entering from the right, pinching a large Ace of
- * Spades between thumb (in front) and fingers (behind). Drawn as three
- * stacked, identically-sized SVG layers — fingers/hand behind, the card,
+ * The hero object: a hand pinching a large Ace of Spades between the thumb
+ * (pressing on the front) and the middle finger (supporting from behind).
+ * Drawn as three identically-sized SVG layers — the finger behind, the card,
  * then the thumb in front — so each can drift at its own depth under the
- * cursor and the card visibly slides between thumb and fingers.
+ * cursor and the card visibly slides between them.
  *
- * Everything is authored in the card's own frame (origin = card centre,
- * card 380x532) and placed with one shared transform. The hand is
- * deliberately low-key — near-black skin, lit only by a hard emerald rim
- * from the left/top plus a warm bounce off the card — which is what keeps
- * it looking cinematic instead of like clip-art.
+ * Only the two digits are shown, in normal human proportions (the card is
+ * ~6 units per millimetre, so the thumb is ~20mm wide and the middle finger
+ * ~15mm), and they run off toward the hand, which stays out of frame. Each
+ * digit is a rounded, lit form — shaded by a lighting filter from a blurred
+ * height map, then edged by the same emerald key light as the card — with
+ * joint creases and a nail, rather than a flat silhouette.
  */
 
 const VIEW = "0 0 1200 1200";
 const PLACE = "translate(470 470) rotate(-12)";
-/** The hand swings clockwise about the pinch point, so it reaches up-left
- * from the bottom-right corner instead of poking in flat from the side. */
-const HAND = "rotate(27 150 110)";
 
-const THUMB =
-  "M 120 98 C 160 100, 250 150, 345 196 C 400 222, 470 262, 540 300 L 575 520 " +
-  "C 470 470, 380 386, 300 322 C 230 268, 170 212, 128 172 C 96 142, 92 108, 120 98 Z";
-const MASS =
-  "M 405 34 C 470 -8, 640 -32, 820 -12 L 1400 10 L 1400 1000 L 470 1000 " +
-  "C 445 780, 530 600, 476 470 C 436 372, 366 250, 405 34 Z";
-const INDEX = "M 470 18 C 400 24, 290 38, 160 70";
-const MIDDLE = "M 480 122 C 400 126, 290 122, 150 122";
+/** Thumb: tip presses the card face near its right edge; runs off lower-right. */
+const THUMB = buildDigit({
+  points: [
+    [112, 128],
+    [190, 150],
+    [268, 173],
+    [350, 198],
+    [432, 224],
+    [520, 252],
+    [612, 282],
+    [740, 326],
+    [900, 380],
+  ],
+  widths: [
+    [0, 78],
+    [60, 86],
+    [130, 88],
+    [180, 100],
+    [225, 94],
+    [300, 104],
+    [420, 120],
+    [640, 142],
+    [1000, 166],
+  ],
+});
+
+/** Middle finger: tip is behind the card, opposite the thumb; its palm side
+ * shows past the card's right edge. */
+const MIDDLE = buildDigit({
+  points: [
+    [136, 122],
+    [212, 111],
+    [290, 100],
+    [372, 90],
+    [456, 82],
+    [546, 76],
+    [640, 74],
+    [780, 76],
+    [920, 82],
+  ],
+  widths: [
+    [0, 66],
+    [70, 72],
+    [120, 72],
+    [150, 78],
+    [200, 73],
+    [300, 84],
+    [340, 79],
+    [450, 90],
+    [700, 108],
+    [1000, 124],
+  ],
+});
+
+/** Smaller than the digit is wide, like a real nail; free edge toward -x. */
+const NAIL = "M -30 -15 Q -31 -23 -21 -23 L 14 -23 Q 31 -21 31 0 Q 31 21 14 23 L -21 23 Q -31 23 -30 15 Z";
+
 const SPADE =
   "M0,-70 C 10,-45 62,-20 62,15 C 62,40 42,52 22,48 C 16,47 10,44 8,42 " +
   "C 10,55 16,68 28,80 L -28,80 C -16,68 -10,55 -8,42 C -10,44 -16,47 -22,48 " +
   "C -42,52 -62,40 -62,15 C -62,-20 -10,-45 0,-70 Z";
 
-/** Hard emerald rim on the edges facing the light (top-left). */
+/** Hard emerald rim on the edges facing the light, optionally without the
+ * source graphic so it can be masked separately. */
 function RimFilter({ id, strength = 1, rimOnly = false }: { id: string; strength?: number; rimOnly?: boolean }) {
   return (
-    <filter id={id} x="-15%" y="-15%" width="130%" height="130%" colorInterpolationFilters="sRGB">
-      <feOffset in="SourceAlpha" dx="8" dy="10" result="shifted" />
+    <filter id={id} x="-15%" y="-25%" width="130%" height="150%" colorInterpolationFilters="sRGB">
+      <feOffset in="SourceAlpha" dx="7" dy="9" result="shifted" />
       <feComposite in="SourceAlpha" in2="shifted" operator="out" result="edge" />
-      <feGaussianBlur in="edge" stdDeviation="2.4" result="edgeSoft" />
-      <feFlood floodColor="#8dffd0" floodOpacity={0.95 * strength} result="rimColor" />
+      <feGaussianBlur in="edge" stdDeviation="2.2" result="edgeSoft" />
+      <feFlood floodColor="#8dffd0" floodOpacity={0.9 * strength} result="rimColor" />
       <feComposite in="rimColor" in2="edgeSoft" operator="in" result="rim" />
-      <feGaussianBlur in="edge" stdDeviation="9" result="edgeGlow" />
-      <feFlood floodColor="#1fd99b" floodOpacity={0.55 * strength} result="glowColor" />
+      <feGaussianBlur in="edge" stdDeviation="8" result="edgeGlow" />
+      <feFlood floodColor="#1fd99b" floodOpacity={0.45 * strength} result="glowColor" />
       <feComposite in="glowColor" in2="edgeGlow" operator="in" result="glow" />
       <feMerge>
         {!rimOnly && <feMergeNode in="SourceGraphic" />}
@@ -55,42 +105,41 @@ function RimFilter({ id, strength = 1, rimOnly = false }: { id: string; strength
 function SkinDefs({ p }: { p: string }) {
   return (
     <defs>
-      <RimFilter id={`${p}rim`} />
-      <RimFilter id={`${p}rimSoft`} strength={0.6} />
-      <RimFilter id={`${p}rimFaint`} strength={0.28} />
-      <RimFilter id={`${p}rimOnly`} rimOnly />
-      <linearGradient id={`${p}tipFade`} gradientUnits="userSpaceOnUse" x1="110" y1="100" x2="430" y2="290">
-        <stop offset="0" stopColor="#fff" />
-        <stop offset="0.55" stopColor="#fff" stopOpacity="0.35" />
-        <stop offset="1" stopColor="#fff" stopOpacity="0" />
-      </linearGradient>
-      <mask id={`${p}tipMask`} maskUnits="userSpaceOnUse" x="-200" y="-200" width="1200" height="1200">
-        <rect x="-200" y="-200" width="1200" height="1200" fill={`url(#${p}tipFade)`} />
-      </mask>
+      <RimFilter id={`${p}rimOnly`} rimOnly strength={0.85} />
       <filter id={`${p}blur8`} x="-30%" y="-30%" width="160%" height="160%">
         <feGaussianBlur stdDeviation="8" />
       </filter>
       <filter id={`${p}blur3`} x="-30%" y="-30%" width="160%" height="160%">
-        <feGaussianBlur stdDeviation="3" />
+        <feGaussianBlur stdDeviation="3.2" />
       </filter>
-      <linearGradient id={`${p}thumb`} gradientUnits="userSpaceOnUse" x1="110" y1="100" x2="560" y2="470">
-        <stop offset="0" stopColor="#3b251c" />
-        <stop offset="0.22" stopColor="#170c09" />
-        <stop offset="0.55" stopColor="#080404" />
-        <stop offset="1" stopColor="#010000" />
+      <filter id={`${p}blur2`} x="-30%" y="-30%" width="160%" height="160%">
+        <feGaussianBlur stdDeviation="1.6" />
+      </filter>
+      {/* Toward the hand, which stays out of frame, the digits sink into shadow. */}
+      <linearGradient id={`${p}streakLit`} gradientUnits="userSpaceOnUse" x1="120" y1="0" x2="470" y2="0">
+        <stop offset="0" stopColor="#e2b394" stopOpacity="0.34" />
+        <stop offset="1" stopColor="#e2b394" stopOpacity="0" />
       </linearGradient>
-      <linearGradient id={`${p}mass`} gradientUnits="userSpaceOnUse" x1="400" y1="0" x2="1100" y2="900">
-        <stop offset="0" stopColor="#1a0f0b" />
-        <stop offset="0.3" stopColor="#070303" />
-        <stop offset="1" stopColor="#000000" />
+      <linearGradient id={`${p}streakBounce`} gradientUnits="userSpaceOnUse" x1="120" y1="0" x2="470" y2="0">
+        <stop offset="0" stopColor="#3fe6b0" stopOpacity="0.2" />
+        <stop offset="1" stopColor="#3fe6b0" stopOpacity="0" />
       </linearGradient>
-      <linearGradient id={`${p}finger`} gradientUnits="userSpaceOnUse" x1="160" y1="40" x2="500" y2="170">
-        <stop offset="0" stopColor="#26160f" />
-        <stop offset="1" stopColor="#050202" />
+      <linearGradient id={`${p}shadowFall`} gradientUnits="userSpaceOnUse" x1="300" y1="0" x2="720" y2="0">
+        <stop offset="0" stopColor="#030201" stopOpacity="0" />
+        <stop offset="1" stopColor="#030201" stopOpacity="0.92" />
       </linearGradient>
+      {/* Rim light concentrates near the fingertips, where it would catch. */}
+      <linearGradient id={`${p}rimGrad`} gradientUnits="userSpaceOnUse" x1="110" y1="0" x2="420" y2="0">
+        <stop offset="0" stopColor="#fff" />
+        <stop offset="1" stopColor="#4a4a4a" />
+      </linearGradient>
+      <mask id={`${p}rimFade`} maskUnits="userSpaceOnUse" x="-300" y="-500" width="1800" height="1400">
+        <rect x="-300" y="-500" width="1800" height="1400" fill={`url(#${p}rimGrad)`} />
+      </mask>
       <linearGradient id={`${p}nail`} x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0" stopColor="#9a7261" />
-        <stop offset="1" stopColor="#4a2b22" />
+        <stop offset="0" stopColor="#f3d3c0" />
+        <stop offset="0.55" stopColor="#d9a891" />
+        <stop offset="1" stopColor="#a86f5b" />
       </linearGradient>
       <clipPath id={`${p}cardClip`}>
         <rect x="-190" y="-266" width="380" height="532" rx="28" />
@@ -99,40 +148,72 @@ function SkinDefs({ p }: { p: string }) {
   );
 }
 
-/** Behind the card: the index and middle fingers and the body of the hand. */
+/**
+ * One digit: a smooth cylindrical shade across its width (lit edge toward the
+ * upper left, falling to a green-black underside that picks up bounce from the
+ * scene), a soft highlight streak, then the emerald rim near the tip.
+ */
+function DigitBody({ digit, p, id, gradAt, rim = 1 }: { digit: typeof THUMB; p: string; id: string; gradAt: number; rim?: number }) {
+  const g = widthGradient(digit, gradAt);
+  return (
+    <>
+      <defs>
+        <linearGradient id={`${p}${id}-skin`} gradientUnits="userSpaceOnUse" x1={g.x1} y1={g.y1} x2={g.x2} y2={g.y2}>
+          <stop offset="0" stopColor="#b98a6f" />
+          <stop offset="0.16" stopColor="#9a6c54" />
+          <stop offset="0.48" stopColor="#5f3d2e" />
+          <stop offset="0.82" stopColor="#24140e" />
+          <stop offset="1" stopColor="#0b1612" />
+        </linearGradient>
+      </defs>
+      <path d={digit.outline} fill={`url(#${p}${id}-skin)`} />
+      <path d={digit.outline} fill={`url(#${p}shadowFall)`} />
+      <path d={offsetLine(digit, -0.42, 20, 420)} fill="none" stroke={`url(#${p}streakLit)`} strokeWidth="9" strokeLinecap="round" filter={`url(#${p}blur3)`} />
+      <path d={offsetLine(digit, 0.78, 30, 420)} fill="none" stroke={`url(#${p}streakBounce)`} strokeWidth="7" strokeLinecap="round" filter={`url(#${p}blur3)`} />
+      <g mask={`url(#${p}rimFade)`} opacity={rim}>
+        <path d={digit.outline} fill="#000" filter={`url(#${p}rimOnly)`} />
+      </g>
+    </>
+  );
+}
+
+/** Skin creases: a dark fold with a faint catch-light beside it. */
+function Creases({ digit, spots }: { digit: typeof THUMB; spots: { d: number; span?: number; bow?: number }[] }) {
+  return (
+    <>
+      {spots.map(({ d, span, bow }) => {
+        const path = crease(digit, d, span, bow);
+        const lit = crease(digit, d - 3.5, span, bow);
+        return (
+          <g key={d}>
+            <path d={lit} fill="none" stroke="#f0c7aa" strokeOpacity="0.14" strokeWidth="1.2" strokeLinecap="round" />
+            <path d={path} fill="none" stroke="#120806" strokeOpacity="0.36" strokeWidth="1.7" strokeLinecap="round" />
+          </g>
+        );
+      })}
+    </>
+  );
+}
+
+/** Behind the card: the middle finger, palm side toward us, past the card's edge. */
 export function AceHandBack() {
   const p = "hb-";
   return (
     <svg viewBox={VIEW} className="hero-svg" aria-hidden="true">
       <SkinDefs p={p} />
       <g transform={PLACE}>
-        <g transform={HAND}>
-        {[INDEX, MIDDLE].map((d, i) => (
-          <g key={d}>
-            <path
-              d={d}
-              fill="none"
-              stroke={`url(#${p}finger)`}
-              strokeWidth={i === 0 ? 92 : 88}
-              strokeLinecap="round"
-              filter={`url(#${p}rimFaint)`}
-            />
-            <path
-              d={d}
-              fill="none"
-              stroke="#a5735a"
-              strokeOpacity="0.28"
-              strokeWidth="12"
-              strokeLinecap="round"
-              transform="translate(-6,-22)"
-              filter={`url(#${p}blur3)`}
-            />
-          </g>
-        ))}
-        {/* The palm: no rim of its own, just falling into shadow. */}
-        <path d={MASS} fill={`url(#${p}mass)`} />
+        <g>
+          <DigitBody digit={MIDDLE} p={p} id="mid" gradAt={200} rim={0.4} />
+          {/* Palm-side creases at the fingertip joint (DIP) and the middle joint (PIP). */}
+          <Creases
+            digit={MIDDLE}
+            spots={[
+              { d: 150, span: 0.74, bow: 3 },
+              { d: 304, span: 0.78, bow: 4 },
+            ]}
+          />
         </g>
-        {/* The card's own shadow falling across the fingers behind it. */}
+        {/* The card's own shadow falling across the finger behind it. */}
         <rect
           x="-176"
           y="-250"
@@ -141,7 +222,7 @@ export function AceHandBack() {
           rx="28"
           fill="#000"
           opacity="0.6"
-          transform="translate(24 30)"
+          transform="translate(22 26)"
           filter={`url(#${p}blur8)`}
         />
       </g>
@@ -263,45 +344,34 @@ export function AceCard() {
 /** In front of the card: the thumb pressing on its face. */
 export function AceHandFront() {
   const p = "hf-";
+  const nail = THUMB.at(58);
+  const nailAngle = angleAt(THUMB, 58);
   return (
     <svg viewBox={VIEW} className="hero-svg" aria-hidden="true">
       <SkinDefs p={p} />
       <g transform={PLACE}>
-        {/* The thumb's shadow on the card face. */}
+        {/* The thumb's shadow on the card face, darkest right at the fingertip. */}
         <g clipPath={`url(#${p}cardClip)`}>
-          <g transform={HAND}>
-            <path d={THUMB} fill="#000" opacity="0.55" transform="translate(16 24)" filter={`url(#${p}blur8)`} />
+          <path d={THUMB.outline} fill="#000" opacity="0.55" transform="translate(13 20)" filter={`url(#${p}blur8)`} />
+        </g>
+        <g>
+          <DigitBody digit={THUMB} p={p} id="thumb" gradAt={220} />
+          {/* Knuckle folds over the thumb's tip joint. */}
+          <Creases
+            digit={THUMB}
+            spots={[
+              { d: 176, span: 0.5, bow: 3 },
+              { d: 190, span: 0.6, bow: 3 },
+            ]}
+          />
+          {/* Thumbnail: squared-off free edge toward the card, arched cuticle
+              toward the hand, seen a little translucent over pink skin. */}
+          <g transform={`translate(${nail.p[0].toFixed(1)} ${nail.p[1].toFixed(1)}) rotate(${nailAngle.toFixed(1)})`}>
+            <path d={NAIL} fill={`url(#${p}nail)`} opacity="0.9" />
+            <path d={NAIL} fill="none" stroke="#8dffd0" strokeOpacity="0.28" strokeWidth="1.2" />
+            <path d="M -22 -17 Q -6 -21 11 -18" fill="none" stroke="#fff" strokeOpacity="0.34" strokeWidth="3" strokeLinecap="round" filter={`url(#${p}blur2)`} />
+            <path d="M 36 -14 Q 43 0 36 14" fill="none" stroke="#120806" strokeOpacity="0.32" strokeWidth="1.8" strokeLinecap="round" />
           </g>
-        </g>
-        <g transform={HAND}>
-        <path d={THUMB} fill={`url(#${p}thumb)`} />
-        <g mask={`url(#${p}tipMask)`}>
-          <path d={THUMB} fill="#000" filter={`url(#${p}rimOnly)`} />
-        </g>
-        {/* Soft top light along the thumb, and a warm bounce off the card. */}
-        <path
-          d="M 150 118 C 210 132, 300 176, 380 214"
-          fill="none"
-          stroke="#b57a5f"
-          strokeOpacity="0.26"
-          strokeWidth="14"
-          strokeLinecap="round"
-          filter={`url(#${p}blur3)`}
-        />
-        <path
-          d="M 200 200 C 250 236, 320 280, 390 316"
-          fill="none"
-          stroke="#ffd9bd"
-          strokeOpacity="0.1"
-          strokeWidth="26"
-          strokeLinecap="round"
-          filter={`url(#${p}blur8)`}
-        />
-        {/* Thumbnail. */}
-        <g transform="translate(184 140) rotate(31)">
-          <rect x="-40" y="-27" width="80" height="54" rx="24" fill={`url(#${p}nail)`} filter={`url(#${p}rimSoft)`} />
-          <ellipse cx="-8" cy="-11" rx="20" ry="7" fill="#fff" opacity="0.2" />
-        </g>
         </g>
       </g>
     </svg>
