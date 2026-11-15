@@ -11,9 +11,9 @@ and a host who approves buy-ins.
 
 Repo: [github.com/Gabeliu/poker-game](https://github.com/Gabeliu/poker-game)
 
-> The live link runs on Render's free tier: it spins down after 15 minutes of no traffic (a
-> ~30-60s cold start on the next visit), and since state is in-memory, rooms in progress are lost
-> if it spins down mid-session. See [Deploying](#deploying) for details.
+> The live link runs on Render's free tier: it sleeps after 15 minutes with no table open (about a
+> minute to wake on the next visit), and since state is in-memory, a restart closes any rooms in
+> progress. See [Deploying](#deploying) for a free host that stays on.
 
 ## Features
 
@@ -66,26 +66,46 @@ of that and is what you want exposed either way.
 
 ## Deploying
 
-The app needs a host that runs a persistent Node process with WebSocket support (not a
-serverless/edge platform) — it's a stateful custom server, not a set of API routes. A
-[`render.yaml`](./render.yaml) blueprint is included for [Render](https://render.com):
+The app needs a host that runs **one** persistent Node process with WebSocket support (not a
+serverless/edge platform) — it's a stateful custom server, not a set of API routes. Tables live in
+that process's memory, so:
 
-1. Sign up at [dashboard.render.com](https://dashboard.render.com) (free, no card required for
-   the free web-service tier).
-2. **New +** → **Blueprint** → connect this GitHub repo.
-3. Render detects `render.yaml` and pre-fills the build command, start command, and Node
-   version — click **Apply**.
-4. Once the build finishes you get a public URL (e.g. `https://felt-poker.onrender.com`) that
-   anyone can open to create or join a table.
+- run exactly one instance (a second one would split players at the same table across servers);
+- any restart, including a deploy, closes every open table — don't deploy during a game.
 
-The same build/start commands work on Railway, Fly.io, or a plain VPS if you'd rather use one of
-those instead — the app just needs `npm install && npm run build` then `npm run start`, with a
-`PORT` env var set by the platform.
+### Northflank (free, stays on)
 
-Note: Render's free tier spins the service down after 15 minutes of no traffic (a ~30-60s cold
-start on the next visit), and since state is in-memory, any rooms in progress are lost if it spins
-down mid-session. The paid tier removes the spin-down; see
-[Known limitations](#known-limitations) for the in-memory tradeoff in general.
+[Northflank](https://northflank.com)'s free Sandbox runs services continuously with no sleeping,
+which is what a live table needs. The repo's [`Dockerfile`](./Dockerfile) is everything it needs:
+
+1. Sign up at northflank.com and link your GitHub account.
+2. Create a project, then **Create new → Service → Combined**.
+3. Pick this repository and the `master` branch; under build options choose **Dockerfile**
+   (path `/Dockerfile`, build context `/`).
+4. Networking: port **3000**, protocol **HTTP**, **publicly exposed**.
+5. Health check (optional, under Advanced): HTTP `GET /healthz` on port 3000.
+6. Leave it at **1 instance** on the free compute plan and create the service.
+
+It builds and gives you a public `https://….code.run` URL; every push to `master` redeploys.
+The image was tested locally at that plan's size (0.2 vCPU / 512 MB): it starts in a few seconds
+and uses about 120 MB with tables in play.
+
+To try the image on your own machine: `docker build -t felt . && docker run -p 3000:3000 felt`.
+
+### Render
+
+A [`render.yaml`](./render.yaml) blueprint is included for [Render](https://render.com)
+(**New + → Blueprint →** connect the repo **→ Apply**). Its free tier sleeps a service after 15
+minutes without traffic and takes about a minute to wake, and sleeping wipes memory. To soften
+that, while any table is open the server requests its own public URL every few minutes, so a
+game survives a break where everyone's phone is locked; once the last table has been idle for six
+hours it stops and the service is allowed to sleep. (On another host that sleeps, set
+`KEEP_AWAKE_URL` to the site's address for the same behaviour.) The paid tier doesn't sleep.
+
+### Anywhere else
+
+Any host that builds a Dockerfile works (Railway, Fly.io, a VPS). Without Docker:
+`npm ci && npm run build`, then `npm run start`, with `PORT` set by the platform.
 
 ## Architecture
 
@@ -117,8 +137,8 @@ keeps the whole thing dependency-free to run locally. The one deliberate seam fo
 later is `src/server/services/roomStore.ts`: everything that would need to move to a shared store
 (e.g. Redis + the Socket.IO Redis adapter) is isolated there.
 
-**Reconnection.** Each player gets a random token (stored in `localStorage`, per room) on
-create/join. Refreshing the page re-sends that token; the server reattaches the new socket to the
+**Reconnection.** Each player gets a random token (stored in `localStorage`, with a cookie copy
+for browsers that refuse it, per room) on create/join. Refreshing the page re-sends that token; the server reattaches the new socket to the
 existing seat instead of creating a duplicate player, and marks them `disconnected` (not removed)
 if their socket drops without a reload — a turn timer auto-folds/checks for them if it's their
 turn and they don't come back in time.
