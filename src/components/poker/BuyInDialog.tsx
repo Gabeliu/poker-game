@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -50,6 +51,12 @@ export function BuyInDialog({ player, settings, pendingRequest, handInProgress, 
       setError(res.error);
     } else {
       setOpen(false);
+      // Asked for in the middle of a hand: say up front that the chips
+      // can't be played until the next one, so nobody waits for a stack
+      // that isn't going to change mid-hand.
+      if (handInProgress) {
+        toast(`Request sent. If the host approves, your ${formatChips(parsed)} chips are added at the start of the next hand.`);
+      }
     }
   };
 
@@ -69,7 +76,7 @@ export function BuyInDialog({ player, settings, pendingRequest, handInProgress, 
               <span className="text-sm text-muted-foreground">chips</span>
               <p className="mt-2 text-sm text-muted-foreground">
                 Waiting for the host to approve your request&hellip;
-                {pendingRequest.deferredToNextHand && " It'll be added at the start of the next hand."}
+                {pendingRequest.deferredToNextHand && " A hand is in progress, so the chips are added at the start of the next hand."}
               </p>
             </div>
           </>
@@ -79,7 +86,7 @@ export function BuyInDialog({ player, settings, pendingRequest, handInProgress, 
               <DialogTitle>{isTopUp ? "Request more chips" : "Buy in"}</DialogTitle>
               <DialogDescription>
                 {handInProgress
-                  ? "A hand is in progress — approved chips are added automatically at the start of the next hand."
+                  ? "A hand is in progress, so you can't use new chips in it — once the host approves, they're added to your stack at the start of the next hand."
                   : isTopUp
                     ? "Ask the host to add more chips to your stack."
                     : "How many chips would you like to buy in for? The host must approve before you can play."}

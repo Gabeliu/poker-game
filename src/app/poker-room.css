@@ -19,10 +19,19 @@ button:active:not(:disabled) { translate: 0 1px; }
 .room-header > div:first-child { flex: 0 0 190px; }
 .room-header > div:first-child svg { width: 25px; height: 25px; }
 .room-header > div:first-child span { font-size: 22px; letter-spacing: -1px; }
-.room-title { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 240px; min-width: 0; text-align: center; }
+.room-title { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 340px; min-width: 0; text-align: center; }
 .room-title > p:first-child { font-size: 16px; font-weight: 600; }
 .room-title > p:last-child { margin-top: 4px; letter-spacing: .08em; }
 .room-header > div:last-child { flex: 0 0 auto; }
+/* Stakes and the room code share the title's second line. The code is a
+   button (tap to copy) styled as a small tag, so it reads as "the thing you
+   give a friend" rather than as one more header control. */
+.room-title-meta { display: flex; align-items: center; justify-content: center; gap: 8px; white-space: nowrap; }
+.room-header .room-title button.room-code { display: inline-flex; align-items: center; gap: 5px; height: 22px; min-width: 0; padding: 0 7px; border: 1px solid #b5ea4845; border-radius: 7px; background: #b5ea4812; color: var(--accent-lime); line-height: 1; letter-spacing: 0; }
+.room-header .room-title button.room-code:hover { border-color: #b5ea4880; background: #b5ea4824; }
+.room-code-label { font-size: 8px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--text-secondary); }
+.room-code-value { font-family: var(--font-geist-mono), ui-monospace, monospace; font-size: 11px; font-weight: 700; letter-spacing: .1em; }
+.room-code svg { width: 10px; height: 10px; opacity: .7; }
 /* The floating buy-in card renders inside the header but has its own button
    styling: without the :not(), this hover rule replaced Approve's lime fill
    with a near-transparent one, leaving its dark label invisible. */
@@ -60,7 +69,11 @@ button:active:not(:disabled) { translate: 0 1px; }
 .lobby-hint { color: #9caf9f; font-size: 10px; }
 .community-board { border-radius: 14px; padding: 10px; background: #00190a16; position: relative; }
 .community-board-dimmed { opacity: .5; transition: opacity 300ms; }
-.board-run-label { position: absolute; top: -16px; left: 50%; transform: translateX(-50%); font-size: 9px; letter-spacing: .18em; text-transform: uppercase; color: #a1b9a6; white-space: nowrap; }
+/* A small tag overlapping the board's own top-left corner, rather than
+   centred text floating above it — sitting right on the board it names
+   reads as "attached to this board" even when the two boards are close
+   together, which small centred caption text didn't. */
+.board-run-label { position: absolute; top: -11px; left: 10px; display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 6px; background: #0d1f16f2; border: 1px solid #3a5442b0; font-size: 9px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: #cfe6d2; white-space: nowrap; box-shadow: 0 2px 6px #0007; z-index: 1; }
 /* Two boards stacked with a little breathing room; each half scales down
    so the pair fits the same vertical band a single board used to occupy. */
 .dual-board { display: flex; flex-direction: column; gap: 20px; align-items: center; }
@@ -76,7 +89,9 @@ button:active:not(:disabled) { translate: 0 1px; }
    viewer's own cards, reserving it here and scaling the pot + boards to fit;
    `safe` keeps the top clear if they still have to overflow downward. */
 .table-board { padding: var(--board-pad-top, 0px) 0 var(--board-pad-bottom, 0px); justify-content: safe center; }
-.table-board-content { display: flex; flex-direction: column; align-items: center; gap: inherit; zoom: var(--board-fit, 1); }
+.table-board-content,
+.table-board > .table-lobby { zoom: var(--board-fit, 1); }
+.table-board-content { display: flex; flex-direction: column; align-items: center; gap: inherit; }
 .table-board-dual .dual-board { gap: 10px; }
 .table-board-dual .dual-board .community-board { transform: scale(.62); }
 .self-seat-dual-board { top: 92%; }
@@ -121,7 +136,17 @@ button:active:not(:disabled) { translate: 0 1px; }
 .seat-winner .seat-panel, .self-seat.seat-winner { border-color: var(--room-gold); animation: winner-pulse 1.6s ease-out; }
 .seat-winner .opponent-cards, .self-seat.seat-winner .self-cards { filter: drop-shadow(0 0 9px #d9c08280); }
 .seat-folded .seat-panel { opacity: .6; }
-.opponent-cards { position: absolute; z-index: 1; bottom: calc(100% - 5px); left: 50%; transform: translateX(-50%); }
+/* A column: the two cards, then (only at a run-it-twice showdown) the
+   compact R1/R2 tags right below them — kept out of the seat panel's own
+   flow entirely, so the panel never grows to fit result text. */
+.opponent-cards { position: absolute; z-index: 1; bottom: calc(100% - 6px); left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 3px; }
+/* Small cards: rank over suit, both as large as the card allows (see
+   COMPACT_SIZES in PlayingCard.tsx). */
+.card-compact-rank { font-size: 1.3em; letter-spacing: -.04em; }
+.card-compact-suit { font-size: 1.45em; }
+.run-tags { display: flex; gap: 4px; }
+.run-tag { font-size: 8px; font-weight: 700; letter-spacing: .05em; padding: 1px 5px; border-radius: 5px; background: #12241a; border: 1px solid #2c4432cc; color: #93a795; text-transform: uppercase; line-height: 1.4; }
+.run-tag-won { color: var(--accent-lime-foreground); background: var(--accent-lime); border-color: transparent; box-shadow: 0 0 8px #b5ea4855; }
 .seat-bet { position: absolute; z-index: 2; top: calc(100% + 9px); white-space: nowrap; }
 /* Explicit stacking so the status pill (z-index: 20, in PlayerStatus.tsx)
    always paints above card backs and the bet chip — both occupy the same
@@ -140,7 +165,10 @@ button:active:not(:disabled) { translate: 0 1px; }
 .self-name { max-width: 130px; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 600; }
 .self-name small { color: #a7b5a8; font-weight: 400; }
 .host-label { position: absolute; bottom: -9px; left: 50%; transform: translateX(-50%); border: 1px solid #72855555; border-radius: 20px; background: #23301e; color: #c2d69c; padding: 1px 8px; font-size: 8px; text-transform: uppercase; letter-spacing: .12em; }
-.self-cards { position: absolute; left: 50%; bottom: calc(100% - 3px); transform: translateX(-50%); }
+/* Column: the two hole cards, then (run-it-twice showdown only) the compact
+   R1/R2 tags right below them — matches `.opponent-cards`' same 6px overlap
+   with the panel below, so the two read as one consistent convention. */
+.self-cards { position: absolute; left: 50%; bottom: calc(100% - 6px); transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 4px; }
 /* The rank and the centre suit (2em) are sized off font-size, so it has to
    scale with the card — otherwise a card shrunk by the clamp() below keeps
    its full-size suit, which swallows the rank. */
@@ -164,6 +192,25 @@ button:active:not(:disabled) { translate: 0 1px; }
 .poker-action-positive { background: linear-gradient(var(--accent-lime), #9bc73d); color: #1a2810; box-shadow: 0 3px 0 #3c5425, 0 8px 24px #a5dc371c; }
 .poker-action-neutral { background: linear-gradient(#29352c, #19211c); }
 .winner-summary { max-height: 150px; overflow-y: auto; border-color: #d0bb8940; }
+/* The everyday top-up button under the stack: a real, finger-sized button
+   in the action colour — it used to be 10px grey text that players missed. */
+.buy-chips-button { height: 36px; padding-inline: 12px; gap: 5px; border: 1px solid #b5ea4855; border-radius: 10px; background: #b5ea4814; color: var(--accent-lime); font-size: 12px; font-weight: 600; white-space: nowrap; }
+.buy-chips-button:hover { background: #b5ea4828; color: var(--accent-lime); border-color: #b5ea4890; }
+.buy-chips-button:disabled { border-color: #ffffff1f; background: #ffffff0a; color: var(--text-secondary); opacity: 1; }
+/* Out of chips: nothing else this player can do matters until they buy
+   more, so it gets its own panel and the only pulsing button on screen. */
+.bust-callout { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; max-width: 440px; padding: 10px 12px; border: 1px solid #b5ea4870; border-radius: 14px; background: linear-gradient(180deg, #b5ea481f, #b5ea480a); box-shadow: 0 10px 26px #0007; text-align: left; }
+.bust-callout-title { font-size: 15px; font-weight: 700; color: var(--text-primary); }
+.bust-callout-body { margin-top: 1px; font-size: 11.5px; line-height: 1.35; color: #b9c7bd; }
+.bust-callout-button { flex: none; height: 42px; padding-inline: 16px; font-size: 14px; box-shadow: 0 3px 0 #36511c; }
+.bust-callout-button:not(:disabled) { animation: bust-pulse 1.8s ease-in-out infinite; }
+@keyframes bust-pulse { 0%, 100% { box-shadow: 0 3px 0 #36511c, 0 0 0 0 #b5ea4870; } 55% { box-shadow: 0 3px 0 #36511c, 0 0 0 8px #b5ea4800; } }
+/* "Your chips arrive next hand" — a standing note, not a toast, because it
+   stays true (and worth knowing) until the next hand actually starts. */
+.chips-notice { max-width: 440px; padding: 6px 10px; border: 1px solid #b5ea4845; border-radius: 10px; background: #b5ea4810; color: #d5e2cc; font-size: 11.5px; line-height: 1.4; text-align: center; }
+.chips-notice strong { color: var(--accent-lime); font-weight: 700; }
+.chips-notice-pending { border-color: #ffffff1f; background: #ffffff08; }
+.chips-notice-pending strong { color: var(--text-primary); }
 .winner-summary > div > p > span:first-child { color: var(--room-gold); }
 .card-face-reveal { animation: card-reveal 220ms ease-out; backface-visibility: hidden; }
 
@@ -216,7 +263,7 @@ button:active:not(:disabled) { translate: 0 1px; }
 @keyframes seat-arrive { from { transform: scale(.92); } to { transform: scale(1); } }
 @keyframes card-reveal { from { transform: perspective(600px) rotateY(65deg); } to { transform: perspective(600px) rotateY(0); } }
 @media (min-width: 1600px) { .room-header { padding-inline: 30px; } .table-lobby { gap: 10px; } .table-lobby h1 { font-size: 36px; } .table-stakes { font-size: 25px; } }
-@media (max-width: 1200px) { .room-header > div:first-child { flex-basis: 95px; } .room-header { padding-inline: 15px; } .room-header > div:last-child { gap: 2px; } .poker-table { width: min(calc(100cqw - 72px), calc((100cqh - 60px) * 1.65)); aspect-ratio: 1.65; } .empty-seat, .seat-panel { width: 88px; } .table-lobby { gap: 4px; } .table-lobby .room-eyebrow:first-child { display: none; } .room-title { position: static; transform: none; flex: 1; text-align: left; padding-left: 12px; } .poker-action { min-width: 84px; padding-inline: 12px; } }
+@media (max-width: 1200px) { .room-header > div:first-child { flex-basis: 95px; } .room-header { padding-inline: 15px; } .room-header > div:last-child { gap: 2px; } .poker-table { width: min(calc(100cqw - 72px), calc((100cqh - 60px) * 1.65)); aspect-ratio: 1.65; } .empty-seat, .seat-panel { width: 88px; } .table-lobby { gap: 4px; } .table-lobby .room-eyebrow:first-child { display: none; } .room-title { position: static; transform: none; flex: 1; text-align: left; padding-left: 12px; } .room-title-meta { justify-content: flex-start; } .poker-action { min-width: 84px; padding-inline: 12px; } }
 @media (min-width: 768px) and (max-width: 1050px) { .room-sidebar { display: none; } .game-client > div > .md\:hidden { display: flex; } .room-header > div:last-child > button span { display: none; } }
 @media (min-width: 640px) and (max-width: 1023px) {
   .how-steps { grid-template-columns: repeat(3, 1fr); gap: 24px; }
@@ -228,9 +275,10 @@ button:active:not(:disabled) { translate: 0 1px; }
   .game-client { height: 100dvh; min-height: 620px; border: 0; border-radius: 0; }
   .room-header { min-height: 60px; padding: 8px; flex-wrap: wrap; }
   .room-header > div:first-child { flex: 0 0 24px; }
-  .room-title { order: 3; flex-basis: 100%; padding: 3px 0 0; text-align: center; }
-  .room-title > p:first-child { font-size: 12px; }
-  .room-title > p:last-child { font-size: 9px; margin: 0; }
+  .room-title { order: 3; flex-basis: 100%; padding: 3px 0 0; text-align: center; display: flex; align-items: center; justify-content: center; gap: 8px; }
+  .room-title > p:first-child { font-size: 12px; min-width: 0; }
+  .room-title > p:last-child { font-size: 10px; margin: 0; flex: none; justify-content: center; }
+  .room-title-game { display: none; }
   .room-header > div:last-child { flex: 1; }
   .room-header button:not([data-buyin-request] button) { height: 30px; min-width: 28px; padding-inline: 7px; }
   .poker-table { width: min(calc(100cqw - 58px), calc((100cqh - 80px) * .78)); aspect-ratio: .78; }
@@ -258,6 +306,9 @@ button:active:not(:disabled) { translate: 0 1px; }
   .seat-panel > span { font-size: 9px; }
   .seat-panel .chip-mini-stack { display: none; }
   .opponent-cards [role="img"] { width: 20px; height: 29px; font-size: 8px; border-radius: 4px; }
+  /* Turned over at showdown they're what everyone is looking at: a little
+     larger than the backs, and side by side rather than overlapped. */
+  .opponent-cards-revealed [role="img"] { width: 24px; height: 34px; font-size: 9.5px; border-radius: 5px; }
   .opponent-cards .card-back { border-width: 1px; padding: 1px; }
   .opponent-cards .card-back-brand small { display: none; }
   .seat-bet { padding: 1px 4px; top: calc(100% + 4px); font-size: 9px; }
@@ -295,7 +346,17 @@ button:active:not(:disabled) { translate: 0 1px; }
   .poker-action { min-width: 90px; height: 52px; font-size: 11px; padding: 8px 10px; }
   /* With every contributor now listed (not just winners), the summary can
      run to several rows on a narrow screen — keep it scrollable and compact. */
-  .winner-summary { max-height: 96px; gap: 8px; padding: 8px 10px; font-size: 11px; }
+  .winner-summary { max-height: 104px; gap: 6px 8px; padding: 7px 10px; font-size: 11px; }
+  .winner-summary [role="img"] { width: 26px; height: 37px; font-size: 10px; border-radius: 5px; }
+  .winner-summary > div { gap: 8px; }
+  /* The dock's height comes straight out of the table's: keep the call-out
+     to one compact row, and let the (scrollable) result list give way to it. */
+  .bust-callout { gap: 10px; padding: 8px 10px; }
+  .bust-callout-title { font-size: 13px; }
+  .bust-callout-body { font-size: 11px; }
+  .bust-callout-button { height: 40px; padding-inline: 12px; font-size: 13px; }
+  .action-dock:has(.bust-callout) .winner-summary { max-height: 58px; }
+  .chips-notice { font-size: 11px; padding: 5px 9px; }
   .landing-header-note { font-size: 9px; }
   .landing-page header { padding: 20px; }
   .how-section, .features-section { padding-inline: 20px; }

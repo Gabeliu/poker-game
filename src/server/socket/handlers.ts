@@ -31,6 +31,7 @@ export function registerRoomHandlers(io: AppServer, socket: AppSocket): void {
   socket.on("room:create", (payload, ack) => {
     try {
       const { room, playerId, playerToken } = createRoom(payload.displayName, payload.settings ?? {});
+      detachFromRoom(io, socket, "left the table");
       socket.join(room.id);
       socket.data.roomId = room.id;
       socket.data.playerId = playerId;
@@ -51,6 +52,12 @@ export function registerRoomHandlers(io: AppServer, socket: AppSocket): void {
         payload.displayName,
         payload.playerToken
       );
+      // One connection is only ever at one table. Without this, a player who
+      // went back to the home page and into another room stayed subscribed
+      // to the first one, and its broadcasts kept overwriting their screen.
+      if (roomStore.getSocketLocation(socket.id)?.roomId !== room.id) {
+        detachFromRoom(io, socket, "left the table");
+      }
       socket.join(room.id);
       socket.data.roomId = room.id;
       socket.data.playerId = playerId;
@@ -59,16 +66,25 @@ export function registerRoomHandlers(io: AppServer, socket: AppSocket): void {
       roomStore.markActive(room.id);
       ack({ ok: true, playerId, playerToken });
       const displayName = room.players.find((p) => p.id === playerId)?.displayName ?? "A player";
+      // Told to everyone else — the player themselves can see they're in.
       if (reconnected) {
-        io.to(room.id).emit("toast", { message: `${displayName} reconnected.` });
+        socket.to(room.id).emit("toast", { message: `${displayName} reconnected.` });
       } else {
-        io.to(room.id).emit("toast", { message: `${displayName} joined the table.` });
+        socket.to(room.id).emit("toast", { message: `${displayName} joined the table.` });
         postSystemMessage(room, `${displayName} joined the table`);
       }
       void broadcastRoomState(io, room.id);
     } catch (err) {
       ack({ ok: false, error: errorMessage(err) });
     }
+  });
+
+  socket.on("room:leave", (_payload, ack) => {
+    // Leaving keeps the seat and chips (the stored token brings the player
+    // straight back), but the table has to know they're gone: otherwise they
+    // stay "connected", get dealt in, and stall every hand until they time out.
+    detachFromRoom(io, socket, "left the table");
+    ack({ ok: true });
   });
 
   socket.on("buyin:request", (payload, ack) => {
@@ -98,14 +114,19 @@ export function registerRoomHandlers(io: AppServer, socket: AppSocket): void {
             : `${request.playerDisplayName}'s ${request.amount.toLocaleString()} chip buy-in was rejected`
         );
       }
-      // The chat line is easy to miss, so the player who was turned down also
-      // gets a message on screen, on top of whatever they're looking at.
-      if (request && !payload.approve) {
+      // The chat line is easy to miss, so the player who asked also gets a
+      // message on screen, on top of whatever they're looking at — including
+      // *when* approved chips can be played, since a hand that's already
+      // running never has a stack changed underneath it.
+      if (request) {
+        const amount = request.amount.toLocaleString();
+        const toast: { message: string; variant: "success" | "error" } = !payload.approve
+          ? { message: `The host declined your ${amount} chip buy-in.`, variant: "error" }
+          : request.deferredToNextHand
+            ? { message: `Buy-in approved — your ${amount} chips are added at the start of the next hand.`, variant: "success" }
+            : { message: `Buy-in approved — ${amount} chips added to your stack.`, variant: "success" };
         for (const socketId of roomStore.socketsForPlayer(room.id, request.playerId)) {
-          io.to(socketId).emit("toast", {
-            message: `The host declined your ${request.amount.toLocaleString()} chip buy-in.`,
-            variant: "error",
-          });
+          io.to(socketId).emit("toast", toast);
         }
       }
       ack({ ok: true });
@@ -332,28 +353,37 @@ export function registerRoomHandlers(io: AppServer, socket: AppSocket): void {
   });
 
   socket.on("disconnect", () => {
-    const loc = roomStore.unlinkSocket(socket.id);
-    if (!loc) return;
-    const room = roomStore.get(loc.roomId);
-    if (!room) return;
-    const player = room.players.find((p) => p.id === loc.playerId);
-    if (!player) return;
-
-    // Only mark disconnected if no other socket for this player is still
-    // connected (e.g. a duplicate tab), otherwise a stray disconnect from
-    // an old tab would wrongly flip a reconnected player back to offline.
-    const stillConnected = [...io.sockets.sockets.values()].some(
-      (s) => s.id !== socket.id && s.data.roomId === loc.roomId && s.data.playerId === loc.playerId
-    );
-    if (!stillConnected) {
-      player.connectionStatus = "disconnected";
-      if (room.players.every((p) => p.connectionStatus === "disconnected")) {
-        roomStore.markEmpty(loc.roomId);
-      }
-      void broadcastRoomState(io, loc.roomId);
-      io.to(loc.roomId).emit("toast", { message: `${player.displayName} disconnected.`, variant: "default" });
-    }
+    detachFromRoom(io, socket, "disconnected");
   });
+}
+
+/**
+ * Takes this connection out of whatever room it's in — on a dropped
+ * connection, on "Leave table", or when it moves on to a different room.
+ * The player keeps their seat, chips and token; they're only marked offline,
+ * and only if no other connection of theirs (a second tab, a reconnect that
+ * already landed) is still at the table.
+ */
+function detachFromRoom(io: AppServer, socket: AppSocket, verb: "disconnected" | "left the table"): void {
+  const loc = roomStore.unlinkSocket(socket.id);
+  const previousRoomId = loc?.roomId ?? socket.data.roomId;
+  if (previousRoomId) void socket.leave(previousRoomId);
+  socket.data.roomId = undefined;
+  socket.data.playerId = undefined;
+  socket.data.playerToken = undefined;
+  if (!loc) return;
+
+  const room = roomStore.get(loc.roomId);
+  const player = room?.players.find((p) => p.id === loc.playerId);
+  if (!room || !player) return;
+  if (roomStore.socketsForPlayer(loc.roomId, loc.playerId).length > 0) return;
+
+  player.connectionStatus = "disconnected";
+  if (room.players.every((p) => p.connectionStatus === "disconnected")) {
+    roomStore.markEmpty(loc.roomId);
+  }
+  void broadcastRoomState(io, loc.roomId);
+  io.to(loc.roomId).emit("toast", { message: `${player.displayName} ${verb}.`, variant: "default" });
 }
 
 function requirePlayerId(socket: AppSocket): string {

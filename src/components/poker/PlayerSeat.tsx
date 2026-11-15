@@ -4,12 +4,14 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { isTopCenterPosition, type ArcPosition } from "@/lib/seatLayout";
 import type { PublicPlayer } from "@/lib/types";
+import type { PlayerRunResult } from "@/lib/handResultSummary";
 import { PlayingCard } from "./PlayingCard";
 import { PlayerAvatar } from "./PlayerAvatar";
 import { ChipStack } from "./ChipStack";
 import { PlayerStatus } from "./PlayerStatus";
 import { TurnTimer } from "./TurnTimer";
 import { ConfirmRemoveDialog } from "./ConfirmRemoveDialog";
+import { RunResultTags } from "./RunResultTags";
 import { Crown, WifiOff, X } from "lucide-react";
 
 type BadgeKind = "D" | "SB" | "BB" | null;
@@ -29,14 +31,15 @@ interface PlayerSeatProps {
   turnTimeLimitSeconds: number;
   statusLabel: string | null;
   statusKey: string | number;
-  /** Shown under their revealed cards at showdown, e.g. "Two Pair, Kings and Fives".
-   * This is Run 1's description when the hand ran it twice — see
-   * `secondHandDescription` for Run 2, which is evaluated independently
-   * and can be an entirely different hand. */
-  handDescription?: string | null;
-  /** Run 2's own independently-evaluated hand description, when the hand
-   * ran it twice — never the same value as `handDescription` reused. */
-  secondHandDescription?: string | null;
+  /** This player's net result and per-run outcome, once a hand this player
+   * contributed to has finished — the full hand names live only in the
+   * bottom result summary; the seat only shows a compact won/lost tag per
+   * run (see `RunResultTags`), so the two never have to be kept in sync by
+   * hand and the seat box never has to grow to fit a sentence. */
+  runResult?: PlayerRunResult | null;
+  /** Whether this hand ran it twice at all — controls whether the compact
+   * per-run tags render, independent of whether Run 2 has resolved yet. */
+  isRunItTwice?: boolean;
 }
 
 export function PlayerSeat({
@@ -52,8 +55,8 @@ export function PlayerSeat({
   turnTimeLimitSeconds,
   statusLabel,
   statusKey,
-  handDescription,
-  secondHandDescription,
+  runResult,
+  isRunItTwice,
 }: PlayerSeatProps) {
   const [confirmingRemove, setConfirmingRemove] = useState(false);
   // Cards already in this player's hand when the seat first renders (a
@@ -86,33 +89,35 @@ export function PlayerSeat({
         <PlayerStatus label={statusLabel} statusKey={statusKey} />
 
         {/* Small card backs (or revealed showdown cards) peeking behind the
-            avatar — hidden at the narrowest widths, where mobile prioritises
-            the viewer's own cards over opponents'. */}
+            avatar. Face-down they overlap like a held hand; turned over at
+            showdown they spread side by side, so the left card's rank and
+            suit are never hidden under the right one. The compact per-run tags
+            (run-it-twice only) sit right under the cards, inside this same
+            absolutely-positioned block, so they never add height to the seat
+            panel itself — only the seat's avatar/name/stack/badges live in
+            that normal flow; full hand names belong to the bottom summary. */}
         {(showCardBacks || showRevealedCards) && (
-          <div className="opponent-cards flex gap-0.5">
-            <PlayingCard
-              card={showRevealedCards ? player.holeCards[0] : undefined}
-              faceDown={!showRevealedCards}
-              size="sm"
-              instant={heldAtMount}
-              rotationDeg={-8}
-              className="-mr-2"
-            />
-            <PlayingCard
-              card={showRevealedCards ? player.holeCards[1] : undefined}
-              faceDown={!showRevealedCards}
-              size="sm"
-              instant={heldAtMount}
-              rotationDeg={8}
-              className="-ml-2"
-            />
+          <div className={cn("opponent-cards", showRevealedCards && "opponent-cards-revealed")} data-testid="opponent-cards">
+            <div className="flex gap-0.5">
+              <PlayingCard
+                card={showRevealedCards ? player.holeCards[0] : undefined}
+                faceDown={!showRevealedCards}
+                size="sm"
+                instant={heldAtMount}
+                rotationDeg={showRevealedCards ? -4 : -8}
+                className={showRevealedCards ? undefined : "-mr-2"}
+              />
+              <PlayingCard
+                card={showRevealedCards ? player.holeCards[1] : undefined}
+                faceDown={!showRevealedCards}
+                size="sm"
+                instant={heldAtMount}
+                rotationDeg={showRevealedCards ? 4 : 8}
+                className={showRevealedCards ? undefined : "-ml-2"}
+              />
+            </div>
+            {showRevealedCards && <RunResultTags result={runResult ?? null} isRunItTwice={Boolean(isRunItTwice)} />}
           </div>
-        )}
-        {showRevealedCards && handDescription && (
-          <span className="mb-1 hidden max-w-[110px] flex-col text-center text-[10px] font-medium text-[var(--accent-lime)] sm:flex">
-            <span className="truncate">{secondHandDescription ? `Run 1: ${handDescription}` : handDescription}</span>
-            {secondHandDescription && <span className="truncate">Run 2: {secondHandDescription}</span>}
-          </span>
         )}
 
         <div className="relative">
@@ -158,7 +163,7 @@ export function PlayerSeat({
           <span className="text-[10px] font-bold uppercase tracking-wide text-[var(--danger)]">All-in</span>
         ) : sittingOut ? (
           <span className="text-[10px] text-[var(--text-secondary)]">
-            {!player.hasBoughtIn ? "No chips" : "Sitting out"}
+            {!player.hasBoughtIn || player.chips <= 0 ? "No chips" : "Sitting out"}
           </span>
         ) : (
           <ChipStack amount={player.chips} variant="stack" />

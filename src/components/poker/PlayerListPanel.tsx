@@ -29,7 +29,7 @@ export function PlayerListPanel({ players, meId }: { players: PublicPlayer[]; me
                 {p.id === meId ? " (you)" : ""}
               </p>
               <p className="text-[10px] tabular-nums text-[var(--text-secondary)]">
-                {p.isHost ? "Host · " : ""}{p.connectionStatus === "disconnected" ? "Offline" : p.sittingOut ? "Sitting out" : p.hasBoughtIn ? "Ready" : "Awaiting buy-in"}
+                {p.isHost ? "Host · " : ""}{p.connectionStatus === "disconnected" ? "Offline" : p.sittingOut ? "Sitting out" : !p.hasBoughtIn ? "Awaiting buy-in" : p.chips <= 0 && p.handStatus !== "all-in" && p.handStatus !== "active" ? "Out of chips" : "Ready"}
               </p>
             </div>
             <span className="text-xs tabular-nums text-[var(--text-primary)]">{formatChips(p.chips)}</span>

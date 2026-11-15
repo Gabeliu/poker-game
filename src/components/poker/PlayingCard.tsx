@@ -38,6 +38,12 @@ const SIZE_CLASSES = {
   xl: "w-[min(4.25rem,17cqw)] h-[min(6.25rem,25cqw)] text-lg rounded-[10px] sm:w-[min(6rem,15cqw)] sm:h-[min(8.5rem,21.3cqw)] sm:text-2xl sm:rounded-[14px]",
 } as const;
 
+/** Small cards (an opponent's hand at their seat, the result summary, hand
+ * history) are too small for corner indices plus a centre pip: the pip was
+ * the only place the suit appeared, and anything overlapping the card hid
+ * it. They get a plain rank-over-suit face instead, both as large as fit. */
+const COMPACT_SIZES: ReadonlySet<keyof typeof SIZE_CLASSES> = new Set(["xs", "sm"]);
+
 interface PlayingCardProps {
   card?: Card | null;
   faceDown?: boolean;
@@ -128,26 +134,38 @@ export function PlayingCard({
           // Static only if it was already face-up when it mounted; a card that
           // was on the table face-down still flips when it's turned over.
           className={cn("card-flipper", mounted.instant && dealtFaceUp && "card-flipper-static")}
-          style={{ animationDelay: `${flipDelayMs}ms` }}
+          style={{ animationDelay: `${flipDelayMs}ms`, "--flip-delay": `${flipDelayMs}ms` } as React.CSSProperties}
         >
-          <div className="card-face-front card-face-reveal relative h-full w-full rounded-[inherit] border border-black/10 bg-[var(--card-face)] p-[9%] leading-none">
-            <span className={cn("absolute top-[8%] left-[10%] font-bold", SUIT_COLOR[card.suit])}>
-              {card.rank}
-            </span>
-            <span
+          {COMPACT_SIZES.has(size) ? (
+            <div
               className={cn(
-                "absolute inset-0 flex items-center justify-center text-[2em] opacity-90",
+                "card-face-front card-face-reveal card-face-compact relative flex h-full w-full flex-col items-center justify-center rounded-[inherit] border border-black/10 bg-[var(--card-face)] leading-none",
                 SUIT_COLOR[card.suit]
               )}
             >
-              {SUIT_SYMBOL[card.suit]}
-            </span>
-            <span
-              className={cn("absolute bottom-[8%] right-[10%] rotate-180 font-bold", SUIT_COLOR[card.suit])}
-            >
-              {card.rank}
-            </span>
-          </div>
+              <span className="card-compact-rank font-bold">{card.rank}</span>
+              <span className="card-compact-suit">{SUIT_SYMBOL[card.suit]}</span>
+            </div>
+          ) : (
+            <div className="card-face-front card-face-reveal relative h-full w-full rounded-[inherit] border border-black/10 bg-[var(--card-face)] p-[9%] leading-none">
+              <span className={cn("absolute top-[8%] left-[10%] font-bold", SUIT_COLOR[card.suit])}>
+                {card.rank}
+              </span>
+              <span
+                className={cn(
+                  "absolute inset-0 flex items-center justify-center text-[2em] opacity-90",
+                  SUIT_COLOR[card.suit]
+                )}
+              >
+                {SUIT_SYMBOL[card.suit]}
+              </span>
+              <span
+                className={cn("absolute bottom-[8%] right-[10%] rotate-180 font-bold", SUIT_COLOR[card.suit])}
+              >
+                {card.rank}
+              </span>
+            </div>
+          )}
           <div className="card-face-back-side rounded-[inherit]">
             <CardBack />
           </div>

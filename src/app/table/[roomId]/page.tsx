@@ -21,7 +21,12 @@ import { LoadingExperience } from "@/components/poker/LoadingExperience";
 import { useGameAudio } from "@/hooks/useGameAudio";
 
 export default function TablePage({ params }: { params: Promise<{ roomId: string }> }) {
-  const { roomId } = use(params);
+  const { roomId: roomIdParam } = use(params);
+  // Room ids are upper-case everywhere else (the server, the stored token
+  // key); a hand-typed lower-case link has to mean the same table, or the
+  // join succeeds while this page keeps waiting for a room id that never
+  // matches and sits on the join form forever.
+  const roomId = roomIdParam.toUpperCase();
   const router = useRouter();
   const room = useRoomStore((s) => s.room);
   const connected = useRoomStore((s) => s.connected);
@@ -42,6 +47,7 @@ export default function TablePage({ params }: { params: Promise<{ roomId: string
     sendChat,
     takeSeat,
     chooseRunIt,
+    leaveRoom,
   } = useRoomStore.getState();
 
   // Seeded empty (not read from localStorage) so the client's first render
@@ -51,7 +57,16 @@ export default function TablePage({ params }: { params: Promise<{ roomId: string
   // real stored values are applied client-side, after mount, below.
   const [displayName, setDisplayName] = useState("");
   const [joining, setJoining] = useState(false);
-  const [reconnecting, setReconnecting] = useState(false);
+  // What to show while we aren't at the table yet:
+  //  - "checking": nothing is known yet (the server render, and the first
+  //    client render before localStorage has been read) — a neutral loading
+  //    screen, never the join form;
+  //  - "resuming": a saved seat for this room was found and is being reclaimed;
+  //  - "form": there's genuinely nothing to resume, so ask for a name.
+  // Starting on the form instead flashed "Join table" at a returning player
+  // every time they opened or reloaded the page, before snapping to the table.
+  const [entry, setEntry] = useState<"checking" | "resuming" | "form">("checking");
+  const [leaving, setLeaving] = useState(false);
   const attemptedAutoJoin = useRef(false);
 
   useEffect(() => {
@@ -65,23 +80,42 @@ export default function TablePage({ params }: { params: Promise<{ roomId: string
 
   useEffect(() => {
     if (attemptedAutoJoin.current) return;
-    const hasToken = Boolean(getStoredToken(roomId));
-    if (hasToken) {
-      attemptedAutoJoin.current = true;
-      setTimeout(() => setReconnecting(true), 0);
-      joinRoom(roomId, getStoredDisplayName() || "Player").finally(() => setReconnecting(false));
+    attemptedAutoJoin.current = true;
+    // Already at this table (we just created it, or navigated back to it
+    // without a reload) — the store has the live room, so there's nothing to
+    // rejoin, and rejoining would announce "… reconnected" to everyone.
+    const current = useRoomStore.getState().room;
+    if (current && current.id === roomId && current.you.playerId) return;
+    // Deferred a tick so these land as their own commit rather than
+    // synchronously within the effect.
+    if (!getStoredToken(roomId)) {
+      setTimeout(() => setEntry("form"), 0);
+      return;
     }
+    setTimeout(() => setEntry("resuming"), 0);
+    // Only a failure falls back to the form (where the reason is shown). On
+    // success the loading screen stays up for the beat between the server's
+    // "ok" and the room snapshot that follows it.
+    void joinRoom(roomId, getStoredDisplayName() || "Player").then((res) => {
+      if (!res.ok) setEntry("form");
+    });
   }, [roomId, joinRoom]);
 
   useEffect(() => {
     for (const t of toasts) {
       if (t.variant === "error") toast.error(t.message);
+      else if (t.variant === "success") toast.success(t.message);
       else toast(t.message);
       dismissToast(t.id);
     }
   }, [toasts, dismissToast]);
 
   const isJoined = room && room.id === roomId && room.you.playerId;
+  // Once at the table, anything that takes us back out of it (the host
+  // removing us, the table closing) should land on the join form with its
+  // explanation — not on a loading screen that would never resolve.
+  if (isJoined && entry !== "form") setEntry("form");
+  if (isJoined && joining) setJoining(false);
 
   useGameAudio(isJoined ? room : null);
 
@@ -91,19 +125,35 @@ export default function TablePage({ params }: { params: Promise<{ roomId: string
     setJoining(true);
     storeDisplayName(name);
     const res = await joinRoom(roomId, name);
-    setJoining(false);
+    // On success the overlay stays until the room snapshot lands (cleared
+    // above), so the form never flashes back in between.
     if (!res.ok) {
+      setJoining(false);
       toast.error(res.error);
     }
   };
 
+  const handleLeave = () => {
+    setLeaving(true);
+    leaveRoom();
+    router.push("/");
+  };
+
+  if (leaving || (!isJoined && entry !== "form")) {
+    return (
+      <main className="ambient-page-bg min-h-screen" data-testid="table-entry-loading">
+        <LoadingExperience
+          show
+          text={leaving ? "Leaving table…" : entry === "resuming" ? "Reconnecting…" : "Finding your table…"}
+        />
+      </main>
+    );
+  }
+
   if (!isJoined) {
     return (
       <main className="ambient-page-bg flex min-h-screen flex-col items-center justify-center gap-6 px-4">
-        <LoadingExperience
-          show={reconnecting || joining}
-          text={reconnecting ? "Reconnecting…" : "Taking your seat…"}
-        />
+        <LoadingExperience show={joining} text="Taking your seat…" />
         <div className="flex items-center gap-2">
           <Spade className="h-7 w-7 text-[var(--accent-lime)]" fill="currentColor" />
           <span className="text-xl font-bold text-[var(--text-primary)]">Felt</span>
@@ -113,12 +163,14 @@ export default function TablePage({ params }: { params: Promise<{ roomId: string
           <h1 className="mb-1 text-center text-lg font-semibold text-[var(--text-primary)]">Join table</h1>
           <p className="mb-4 text-center text-sm text-[var(--text-secondary)]">
             Room code{" "}
-            <span className="font-mono font-semibold text-[var(--accent-lime)]">{roomId.toUpperCase()}</span>
+            <span className="font-mono font-semibold text-[var(--accent-lime)]">{roomId}</span>
           </p>
 
           {joinError && (
-            <p className="mb-3 rounded-md bg-[var(--danger)]/10 px-3 py-2 text-center text-sm text-[var(--danger)]">
-              {joinError}
+            <p role="alert" className="mb-3 rounded-md bg-[var(--danger)]/10 px-3 py-2 text-center text-sm text-[var(--danger)]">
+              {joinError === "Room not found."
+                ? "This table isn't open any more — check the code, or ask the host for a new link."
+                : joinError}
             </p>
           )}
 
@@ -172,6 +224,7 @@ export default function TablePage({ params }: { params: Promise<{ roomId: string
           onUpdateSettings={updateSettings}
           onRemovePlayer={removePlayer}
           onTransferOwnership={transferOwnership}
+          onLeave={handleLeave}
         />
 
         <AppShell

@@ -127,10 +127,9 @@ test.describe("Felt poker table — full multiplayer flow", () => {
     await joinRoom(guest, roomId, "Guest");
     await expect(guest.getByTestId("player-seat")).toHaveCount(1);
 
-    // "Leave table" is just a client-side navigation — from the server's
-    // perspective this looks exactly like any other disconnect (closing the
-    // tab, losing network), so closing the host's context here exercises
-    // the same real path a host clicking "Leave table" takes.
+    // Closing the tab (or losing network) drops the connection. The "Leave
+    // table" button reaches the same server-side path through an explicit
+    // room:leave — that route is covered in mobile.spec.ts.
     await hostCtx.close();
 
     await expect(guest.getByText("Host disconnected.")).toBeVisible({ timeout: 10_000 });
