@@ -19,8 +19,10 @@ import { Button } from "@/components/ui/button";
 import { getEligiblePlayers, getStartHandError } from "@/server/engine/seats";
 import { formatChips } from "@/lib/format";
 import { boardResultKey } from "@/lib/resultKey";
+import { summarizeHandResult } from "@/lib/handResultSummary";
 import { PlayerAvatar } from "./PlayerAvatar";
 import { ChipStack } from "./ChipStack";
+import { RunResultTags } from "./RunResultTags";
 import { cn } from "@/lib/utils";
 
 /** Where the pot visually sits within the table, in the same xPct/yPct
@@ -72,7 +74,12 @@ export function PokerTable({ room, isHost, onRemovePlayer, onSit, onStartHand }:
   const eligibleCount = getEligiblePlayers(room.players).length;
   const startError = getStartHandError(room.players);
   const waiting = room.hand.phase === "waiting";
-  useBoardFit(tableRef, topSeatPlayer?.id ?? null, waiting);
+  // Anything that changes where another player's seat or cards are drawn —
+  // the board is laid out around them, so it has to be measured again.
+  const seatObstacleKey = room.players
+    .map((p) => `${p.seat}:${p.hasHoleCards ? 1 : 0}${p.holeCardsRevealed ? 1 : 0}${p.handStatus === "folded" ? 1 : 0}`)
+    .join("|");
+  useBoardFit(tableRef, topSeatPlayer?.id ?? null, waiting, `${mySeat}|${seatObstacleKey}`);
   const result = room.hand.result;
   const secondResult = room.hand.secondBoard?.result ?? null;
   // Run 2 is dealt and revealed strictly after run 1 finishes — don't show
@@ -91,6 +98,21 @@ export function PokerTable({ room, isHost, onRemovePlayer, onSit, onStartHand }:
     room.hand.phase === "hand-complete" &&
     Boolean(result?.revealedHands[playerId]) &&
     !allWinnerIds.has(playerId);
+
+  // Once Run 1 has resolved, every contributor's net result and per-run
+  // outcome — the single source of truth both the seats' compact tags and
+  // the bottom summary panel read from, so they can never show different
+  // winners or different colours for the same run.
+  const isRunItTwice = Boolean(room.hand.secondBoard);
+  const runResultByPlayerId = new Map(
+    result
+      ? summarizeHandResult(
+          room.players.filter((p) => p.totalCommittedThisHand > 0),
+          result,
+          secondResult
+        ).map((s) => [s.playerId, s] as const)
+      : []
+  );
 
   const seatPointFor = (playerId: string): ArcPosition | null => {
     if (playerId === room.you.playerId) return SELF_POINT;
@@ -284,8 +306,8 @@ export function PokerTable({ room, isHost, onRemovePlayer, onSit, onStartHand }:
                 turnTimeLimitSeconds={room.settings.turnTimeLimitSeconds}
                 statusLabel={statusLabels[player.id]?.label ?? null}
                 statusKey={statusLabels[player.id]?.key ?? 0}
-                handDescription={room.hand.result?.revealedHands[player.id]?.description ?? null}
-                secondHandDescription={room.hand.secondBoard?.result?.revealedHands[player.id]?.description ?? null}
+                runResult={runResultByPlayerId.get(player.id) ?? null}
+                isRunItTwice={isRunItTwice}
                 onRemove={() => onRemovePlayer(player.id)}
               />
             );
@@ -315,7 +337,12 @@ export function PokerTable({ room, isHost, onRemovePlayer, onSit, onStartHand }:
       {me &&
         (mySeat !== null ? (
           <div className={cn("self-seat", me.id === room.hand.activePlayerId && "seat-active", allWinnerIds.has(me.id) && "seat-winner", isLoser(me.id) && "seat-loser", showDualBoard && "self-seat-dual-board")}>
-            <div className="self-cards"><HoleCards cards={me.holeCards} folded={me.handStatus === "folded"} /></div>
+            <div className="self-cards">
+              <HoleCards cards={me.holeCards} folded={me.handStatus === "folded"} />
+              {me.handStatus !== "folded" && me.holeCards.length > 0 && (
+                <RunResultTags result={runResultByPlayerId.get(me.id) ?? null} isRunItTwice={isRunItTwice} />
+              )}
+            </div>
             {me.currentBet > 0 && <ChipStack amount={me.currentBet} variant="bet" className="self-bet" />}
             <div className="self-identity">
               <PlayerAvatar name={me.displayName} size="sm" />
@@ -323,17 +350,6 @@ export function PokerTable({ room, isHost, onRemovePlayer, onSit, onStartHand }:
               {me.isHost && <span className="host-label">Host</span>}
               {badgeFor(mySeat) && <span className={cn("dealer-puck", badgeFor(mySeat) !== "D" && "blind-puck")}>{badgeFor(mySeat)}</span>}
             </div>
-            {room.hand.result?.revealedHands[me.id]?.description && (
-              <span className="flex flex-col text-xs font-medium text-[var(--accent-lime)]">
-                <span>
-                  {room.hand.secondBoard ? "Run 1: " : ""}
-                  {room.hand.result.revealedHands[me.id].description}
-                </span>
-                {room.hand.secondBoard?.result?.revealedHands[me.id]?.description && (
-                  <span>Run 2: {room.hand.secondBoard.result.revealedHands[me.id].description}</span>
-                )}
-              </span>
-            )}
           </div>
         ) : (
           <div className="spectator-hint">

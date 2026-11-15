@@ -35,6 +35,10 @@ interface RoomStoreState {
   resync: () => void;
   createRoom: (displayName: string, settings: Partial<RoomSettings>) => Promise<Ack & { roomId?: string }>;
   joinRoom: (roomId: string, displayName: string) => Promise<Ack>;
+  /** Walks away from the current table: tells the server (so the seat shows
+   * as away instead of staying "connected") and drops the local copy of the
+   * room. The stored token is kept, so coming back resumes the same seat. */
+  leaveRoom: () => void;
   requestBuyIn: (amount: number, type: BuyInRequestType) => Promise<Ack>;
   resolveBuyIn: (requestId: string, approve: boolean) => Promise<Ack>;
   updateSettings: (settings: Partial<RoomSettings>) => Promise<Ack>;
@@ -52,6 +56,11 @@ interface RoomStoreState {
 let listenersInitialized = false;
 let toastCounter = 0;
 let lastResyncAt = 0;
+/** The room this client is currently in, or on its way into. A snapshot of
+ * any other room is ignored — a late push from a table the player has
+ * already left must never replace the one they're looking at. Null while
+ * between rooms (a create is in flight and its id isn't known yet). */
+let expectedRoomId: string | null = null;
 
 export const useRoomStore = create<RoomStoreState>((set, get) => ({
   room: null,
@@ -139,7 +148,15 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
         // restarted and lost its token map) — fall back to a real join,
         // which re-validates and re-links from scratch.
         const name = getStoredDisplayName() || "Player";
-        void get().joinRoom(roomId, name);
+        void get().joinRoom(roomId, name).then((joined) => {
+          // The table itself is gone (rooms live in server memory, so a
+          // restart closes them). Drop the stale copy rather than leave a
+          // frozen table on screen where every button fails — the page
+          // falls back to the join screen, which shows why.
+          if (!joined.ok && get().room?.id === roomId) {
+            set({ room: null, myPlayerId: null, appliedStateVersion: -1 });
+          }
+        });
       }
     });
   },
@@ -147,8 +164,11 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
   createRoom: (displayName, settings) =>
     new Promise((resolve) => {
       const socket = getSocket();
+      expectedRoomId = null;
+      set({ room: null, appliedStateVersion: -1, joinError: null });
       socket.emit("room:create", { displayName, settings }, (res) => {
         if (res.ok) {
+          expectedRoomId = res.roomId;
           storeToken(res.roomId, res.playerToken);
           set({ myPlayerId: res.playerId });
           resolve({ ok: true, roomId: res.roomId });
@@ -163,6 +183,8 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
     new Promise((resolve) => {
       const socket = getSocket();
       const token = getStoredToken(roomId);
+      expectedRoomId = roomId.toUpperCase();
+      if (get().room && get().room!.id !== expectedRoomId) set({ room: null, appliedStateVersion: -1 });
       socket.emit("room:join", { roomId, displayName, playerToken: token }, (res) => {
         if (res.ok) {
           storeToken(roomId, res.playerToken);
@@ -174,6 +196,13 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
         }
       });
     }),
+
+  leaveRoom: () => {
+    const roomId = get().room?.id ?? expectedRoomId;
+    expectedRoomId = null;
+    set({ room: null, myPlayerId: null, joinError: null, appliedStateVersion: -1 });
+    if (roomId) getSocket().emit("room:leave", { roomId }, () => {});
+  },
 
   requestBuyIn: (amount, type) =>
     emitWithAck("buyin:request", { roomId: get().room!.id, amount, type }),
@@ -215,6 +244,7 @@ function applyView(
   opts?: { fromResync?: boolean }
 ): void {
   const current = get();
+  if (expectedRoomId !== null && view.id !== expectedRoomId) return;
   if (current.room?.id === view.id && view.stateVersion < current.appliedStateVersion) return;
   set({
     room: view,

@@ -23,6 +23,14 @@ export interface ClientToServerEvents {
     ack: (res: { ok: true; playerId: string; playerToken: string } | { ok: false; error: string }) => void
   ) => void;
 
+  /** The player is walking away from the table (the "Leave table" button).
+   * Their seat, chips and token are kept — they're just marked offline, the
+   * same as a dropped connection, and stop receiving this room's state. */
+  "room:leave": (
+    payload: { roomId: string },
+    ack: (res: { ok: true } | { ok: false; error: string }) => void
+  ) => void;
+
   "buyin:request": (
     payload: { roomId: string; amount: number; type: BuyInRequestType },
     ack: (res: { ok: true } | { ok: false; error: string }) => void

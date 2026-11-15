@@ -110,6 +110,24 @@ function makeRoom(players: Player[], overrides: Partial<RoomState["settings"]> =
   };
 }
 
+describe("a fold lasts until the next deal", () => {
+  it("keeps a folded player marked folded once the hand is over, then deals them back in", () => {
+    const room = makeRoom([makePlayer("p1", 0, 100), makePlayer("p2", 1, 100), makePlayer("p3", 2, 100)]);
+    const deck = new Deck();
+    startHand(room, deck);
+    // Everyone folds round to the last player, who wins uncontested.
+    while (room.hand.phase !== "hand-complete") {
+      expect(submitAction(room, deck, room.hand.activePlayerId!, { action: "fold" }).ok).toBe(true);
+    }
+    const statuses = room.players.map((p) => p.handStatus);
+    expect(statuses.filter((s) => s === "folded")).toHaveLength(2);
+    expect(statuses.filter((s) => s === "waiting")).toHaveLength(1);
+
+    startHand(room, new Deck());
+    expect(room.players.every((p) => p.handStatus === "active")).toBe(true);
+  });
+});
+
 describe("startHand", () => {
   it("throws if fewer than 2 eligible players", () => {
     const room = makeRoom([makePlayer("p1", 0, 100)]);

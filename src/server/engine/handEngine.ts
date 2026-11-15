@@ -704,7 +704,10 @@ function finalizeHand(room: RoomState): void {
 
   for (const player of room.players) {
     player.currentBet = 0;
-    if (player.hasBoughtIn) {
+    // A fold stays a fold until the next deal (startHand resets everyone):
+    // clearing it here made folded players' card backs pop back up on
+    // everyone's screen the moment the hand ended, as if they'd stayed in.
+    if (player.hasBoughtIn && player.handStatus !== "folded") {
       player.handStatus = player.chips > 0 ? "waiting" : "sitting-out";
     }
   }

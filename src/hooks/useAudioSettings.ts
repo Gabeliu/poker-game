@@ -11,6 +11,7 @@ export function useAudioSettings(): AudioSettings & {
   setMasterVolume: (v: number) => void;
   setGameVolume: (v: number) => void;
   setNotifyVolume: (v: number) => void;
+  setPlayWhenSilenced: (on: boolean) => void;
 } {
   const [settings, setSettings] = useState<AudioSettings>(() => audioManager.getSettings());
 
@@ -24,5 +25,6 @@ export function useAudioSettings(): AudioSettings & {
     setMasterVolume: (v) => audioManager.setMasterVolume(v),
     setGameVolume: (v) => audioManager.setGameVolume(v),
     setNotifyVolume: (v) => audioManager.setNotifyVolume(v),
+    setPlayWhenSilenced: (on) => audioManager.setPlayWhenSilenced(on),
   };
 }

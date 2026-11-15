@@ -41,4 +41,9 @@ export interface AudioSettings {
   masterVolume: number;
   gameVolume: number;
   notifyVolume: number;
+  /** iPhone/iPad only: keep playing when the ring/silent switch is set to
+   * silent. Web Audio is otherwise treated like a ringtone there and muted
+   * outright, which reads as "sound is broken". The trade-off is that it
+   * takes over from music playing in another app, hence the setting. */
+  playWhenSilenced: boolean;
 }

@@ -17,9 +17,12 @@ export async function broadcastRoomState(io: AppServer, roomId: string): Promise
 
   const sockets = await io.in(roomId).fetchSockets();
   for (const socket of sockets) {
+    // Only connections currently linked to a player *in this room* get its
+    // state. A socket still subscribed here but since linked elsewhere would
+    // otherwise be sent this room's view under another room's player id.
     const loc = roomStore.getSocketLocation(socket.id);
-    const view = buildClientView(room, loc?.playerId ?? null);
-    socket.emit("room:state", view);
+    if (!loc || loc.roomId !== roomId) continue;
+    socket.emit("room:state", buildClientView(room, loc.playerId));
   }
 }
 

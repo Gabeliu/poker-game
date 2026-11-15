@@ -359,6 +359,24 @@
 }
 .card-flipper > .card-face-back-side {
   transform: rotateY(180deg);
+  /* The flip relies on backface-visibility to hide this face once the card
+     has turned over. Where a browser doesn't honour that (no 3D compositing:
+     some WebViews, GPU-less setups) it would stay painted on top and every
+     face-up card would read as face-down — so it's also retired outright
+     the moment the flip ends. In engines that do 3D this changes nothing. */
+  animation: card-back-retire 560ms step-end var(--flip-delay, 0ms) forwards;
+}
+.card-flipper-static > .card-face-back-side {
+  animation: none;
+  visibility: hidden;
+}
+@keyframes card-back-retire {
+  from {
+    visibility: visible;
+  }
+  to {
+    visibility: hidden;
+  }
 }
 .card-flipper .card-face-reveal {
   animation: none;

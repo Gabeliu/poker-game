@@ -1,10 +1,9 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Link2, LogOut, Settings, Spade } from "lucide-react";
+import { Copy, Link2, LogOut, Settings, Spade } from "lucide-react";
 import type { ClientRoomView } from "@/lib/types";
-import { copyInviteLink } from "@/lib/invite";
+import { copyInviteLink, copyRoomCode } from "@/lib/invite";
 import { HostRequestsPanel } from "./HostRequestsPanel";
 import { HostSettingsDialog } from "./HostSettingsDialog";
 import { LedgerPanel } from "./LedgerPanel";
@@ -18,6 +17,9 @@ interface RoomControlsProps {
   onUpdateSettings: (settings: Partial<import("@/lib/types").RoomSettings>) => Promise<{ ok: true } | { ok: false; error: string }>;
   onRemovePlayer: (playerId: string) => void;
   onTransferOwnership: (playerId: string) => void;
+  /** Leaves the table for the home page — tells the server too, so the seat
+   * shows as away rather than staying "connected". */
+  onLeave: () => void;
 }
 
 /** Thin, minimal top nav — logo left, room/blinds center, actions right.
@@ -31,8 +33,8 @@ export function RoomControls({
   onUpdateSettings,
   onRemovePlayer,
   onTransferOwnership,
+  onLeave,
 }: RoomControlsProps) {
-  const router = useRouter();
   const me = room.players.find((p) => p.id === room.you.playerId);
 
   return (
@@ -43,9 +45,27 @@ export function RoomControls({
       </div>
 
       <div className="room-title">
-        <p className="truncate text-sm font-medium text-[var(--text-primary)]">{room.settings.roomName}</p>
-        <p className="text-[10px] text-[var(--text-secondary)]">
-          {room.settings.smallBlind} / {room.settings.bigBlind} · No Limit Hold’em
+        <p className="room-title-name truncate text-sm font-medium text-[var(--text-primary)]">{room.settings.roomName}</p>
+        <p className="room-title-meta text-[10px] text-[var(--text-secondary)]">
+          <span>
+            {room.settings.smallBlind} / {room.settings.bigBlind}
+            <span className="room-title-game"> · No Limit Hold’em</span>
+          </span>
+          {/* The code friends type on the home page to join — always on
+              screen at the table, and one tap copies it. */}
+          <button
+            type="button"
+            className="room-code"
+            data-testid="room-code"
+            data-room-code={room.id}
+            aria-label={`Room code ${room.id.split("").join(" ")}. Tap to copy.`}
+            title="Copy room code"
+            onClick={() => copyRoomCode(room.id)}
+          >
+            <span className="room-code-label" aria-hidden="true">Code</span>
+            <span className="room-code-value" aria-hidden="true">{room.id}</span>
+            <Copy aria-hidden="true" />
+          </button>
         </p>
       </div>
 
@@ -95,7 +115,7 @@ export function RoomControls({
           size="icon"
           className="text-[var(--text-secondary)] hover:bg-[var(--danger)]/10 hover:text-[var(--danger)]"
           aria-label="Leave table"
-          onClick={() => router.push("/")}
+          onClick={onLeave}
         >
           <LogOut className="h-4 w-4" />
         </Button>
