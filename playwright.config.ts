@@ -2,6 +2,9 @@ import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./e2e",
+  // Underscore-prefixed specs are throwaway debugging scripts, not part of
+  // the suite — run one explicitly by path when it's wanted.
+  testIgnore: "**/_*.spec.ts",
   fullyParallel: false,
   workers: 1,
   retries: 0,

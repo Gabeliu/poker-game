@@ -39,6 +39,13 @@ interface RoomStoreState {
    * as away instead of staying "connected") and drops the local copy of the
    * room. The stored token is kept, so coming back resumes the same seat. */
   leaveRoom: () => void;
+  /** Leaves `roomId` a moment from now unless `cancelLeave` is called first.
+   * For the table page going away (browser Back, any navigation that isn't
+   * the Leave button): the deferral is what lets a page that is torn down
+   * and immediately put back — React does this in development — carry on
+   * as if nothing happened. */
+  leaveSoon: (roomId: string) => void;
+  cancelLeave: () => void;
   requestBuyIn: (amount: number, type: BuyInRequestType) => Promise<Ack>;
   resolveBuyIn: (requestId: string, approve: boolean) => Promise<Ack>;
   updateSettings: (settings: Partial<RoomSettings>) => Promise<Ack>;
@@ -61,6 +68,10 @@ let lastResyncAt = 0;
  * already left must never replace the one they're looking at. Null while
  * between rooms (a create is in flight and its id isn't known yet). */
 let expectedRoomId: string | null = null;
+/** The room:join currently awaiting its answer, so asking twice for the same
+ * room (two effects, a double tap) sends one request and shares the result. */
+let joinInFlight: { roomId: string; promise: Promise<Ack> } | null = null;
+let pendingLeave: ReturnType<typeof setTimeout> | null = null;
 
 export const useRoomStore = create<RoomStoreState>((set, get) => ({
   room: null,
@@ -179,13 +190,16 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
       });
     }),
 
-  joinRoom: (roomId, displayName) =>
-    new Promise((resolve) => {
+  joinRoom: (roomId, displayName) => {
+    const target = roomId.toUpperCase();
+    if (joinInFlight?.roomId === target) return joinInFlight.promise;
+    const promise = new Promise<Ack>((resolve) => {
       const socket = getSocket();
       const token = getStoredToken(roomId);
-      expectedRoomId = roomId.toUpperCase();
+      expectedRoomId = target;
       if (get().room && get().room!.id !== expectedRoomId) set({ room: null, appliedStateVersion: -1 });
       socket.emit("room:join", { roomId, displayName, playerToken: token }, (res) => {
+        if (joinInFlight?.promise === promise) joinInFlight = null;
         if (res.ok) {
           storeToken(roomId, res.playerToken);
           set({ myPlayerId: res.playerId, joinError: null });
@@ -195,13 +209,33 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
           resolve(res);
         }
       });
-    }),
+    });
+    joinInFlight = { roomId: target, promise };
+    return promise;
+  },
 
   leaveRoom: () => {
     const roomId = get().room?.id ?? expectedRoomId;
     expectedRoomId = null;
+    joinInFlight = null;
     set({ room: null, myPlayerId: null, joinError: null, appliedStateVersion: -1 });
     if (roomId) getSocket().emit("room:leave", { roomId }, () => {});
+  },
+
+  leaveSoon: (roomId) => {
+    const target = roomId.toUpperCase();
+    if (pendingLeave) clearTimeout(pendingLeave);
+    pendingLeave = setTimeout(() => {
+      pendingLeave = null;
+      // Only if that's still the table we're at — not one left already (the
+      // Leave button), and not a different one joined in the meantime.
+      if ((get().room?.id ?? expectedRoomId) === target) get().leaveRoom();
+    }, 0);
+  },
+
+  cancelLeave: () => {
+    if (pendingLeave) clearTimeout(pendingLeave);
+    pendingLeave = null;
   },
 
   requestBuyIn: (amount, type) =>

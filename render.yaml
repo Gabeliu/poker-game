@@ -6,7 +6,7 @@ services:
     branch: master
     buildCommand: npm install && npm run build
     startCommand: npm run start
-    healthCheckPath: /
+    healthCheckPath: /healthz
     envVars:
       # NOTE: do NOT set NODE_ENV=production here. Render applies env vars
       # during the build step too, and npm treats NODE_ENV=production as a

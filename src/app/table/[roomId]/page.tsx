@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useRef, useState } from "react";
+import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -48,6 +48,8 @@ export default function TablePage({ params }: { params: Promise<{ roomId: string
     takeSeat,
     chooseRunIt,
     leaveRoom,
+    leaveSoon,
+    cancelLeave,
   } = useRoomStore.getState();
 
   // Seeded empty (not read from localStorage) so the client's first render
@@ -67,7 +69,6 @@ export default function TablePage({ params }: { params: Promise<{ roomId: string
   // every time they opened or reloaded the page, before snapping to the table.
   const [entry, setEntry] = useState<"checking" | "resuming" | "form">("checking");
   const [leaving, setLeaving] = useState(false);
-  const attemptedAutoJoin = useRef(false);
 
   useEffect(() => {
     initListeners();
@@ -78,19 +79,24 @@ export default function TablePage({ params }: { params: Promise<{ roomId: string
     if (stored) setTimeout(() => setDisplayName(stored), 0);
   }, []);
 
+  // Arriving at the table, and going away from it. Leaving by any route —
+  // the browser's Back button, a link, not just the header's Leave button —
+  // tells the server, so the seat shows as away instead of "connected" and
+  // being dealt into hands nobody is there to play. (Closing the tab is
+  // covered by the socket disconnecting.)
   useEffect(() => {
-    if (attemptedAutoJoin.current) return;
-    attemptedAutoJoin.current = true;
-    // Already at this table (we just created it, or navigated back to it
-    // without a reload) — the store has the live room, so there's nothing to
-    // rejoin, and rejoining would announce "… reconnected" to everyone.
+    cancelLeave();
+    const departing = () => leaveSoon(roomId);
+    // Already at this table (we just created it, or came straight back to
+    // it) — the store has the live room, so there's nothing to rejoin, and
+    // rejoining would announce "… reconnected" to everyone.
     const current = useRoomStore.getState().room;
-    if (current && current.id === roomId && current.you.playerId) return;
+    if (current && current.id === roomId && current.you.playerId) return departing;
     // Deferred a tick so these land as their own commit rather than
     // synchronously within the effect.
     if (!getStoredToken(roomId)) {
       setTimeout(() => setEntry("form"), 0);
-      return;
+      return departing;
     }
     setTimeout(() => setEntry("resuming"), 0);
     // Only a failure falls back to the form (where the reason is shown). On
@@ -99,7 +105,8 @@ export default function TablePage({ params }: { params: Promise<{ roomId: string
     void joinRoom(roomId, getStoredDisplayName() || "Player").then((res) => {
       if (!res.ok) setEntry("form");
     });
-  }, [roomId, joinRoom]);
+    return departing;
+  }, [roomId, joinRoom, leaveSoon, cancelLeave]);
 
   useEffect(() => {
     for (const t of toasts) {
