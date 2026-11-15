@@ -153,7 +153,9 @@ export function joinRoom(
   const sanitizedName = sanitizeDisplayName(displayName);
   const nameTaken = room.players.some((p) => p.displayName.toLowerCase() === sanitizedName.toLowerCase());
   if (nameTaken) {
-    throw new RoomServiceError("That name is already taken at this table. Try a different one.");
+    throw new RoomServiceError(
+      "That name is already taken at this table. If it's you from another browser or device, go back to that one — otherwise pick a different name."
+    );
   }
 
   const playerId = generatePlayerId();

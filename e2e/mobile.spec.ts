@@ -319,4 +319,51 @@ test.describe("on a phone", () => {
     await expect(loser.getByTestId("out-of-chips")).toHaveCount(0);
     await shot(loser, "9-rebought");
   });
+
+  test("the browser's Back button leaves the table too, and coming forward again takes the seat back", async ({ browser }) => {
+    const host = await phonePage(browser);
+    const guest = await phonePage(browser);
+    const roomId = await createRoom(host, "Host");
+    await joinAndSit(guest, roomId, "Guest");
+    await expect(guest.getByTestId("player-seat")).toHaveCount(1);
+
+    // Back to the home page without touching the Leave button…
+    await host.goBack();
+    await host.waitForURL((url) => url.pathname === "/");
+    // …still tells the table, instead of the host staying "connected".
+    await expect(guest.getByText("Host left the table.")).toBeVisible({ timeout: 10_000 });
+
+    // Forward again: straight back into the same seat, no join form.
+    await host.goForward();
+    await expect(host.getByTestId("room-code")).toHaveAttribute("data-room-code", roomId, { timeout: 10_000 });
+    await expect(host.getByTestId("table-join-submit")).toHaveCount(0);
+    await expect(guest.getByText("Host reconnected.")).toBeVisible({ timeout: 10_000 });
+    await expect(host.getByTestId("player-seat")).toHaveCount(1);
+  });
+
+  test("a toast sits below the header, clear of its buttons and the drawer buttons", async ({ browser }) => {
+    const host = await phonePage(browser);
+    await createRoom(host, "Host");
+    await host.getByTestId("room-code").click(); // "Room code … copied" (or spelled out, without clipboard access)
+    const toast = host.locator("[data-sonner-toast]").first();
+    await expect(toast).toBeVisible();
+    await host.waitForTimeout(500); // let it finish sliding in
+    const box = (await toast.boundingBox())!;
+    const header = (await host.locator(".room-header").boundingBox())!;
+    expect(box.y, "toast overlaps the header").toBeGreaterThanOrEqual(header.y + header.height);
+    for (const name of ["Open players and history", "Open chat"]) {
+      const button = (await host.getByRole("button", { name }).boundingBox())!;
+      const overlapsX = box.x < button.x + button.width && box.x + box.width > button.x;
+      expect(overlapsX, `toast covers "${name}"`).toBe(false);
+    }
+    // The header's controls stay usable while it's showing.
+    await host.getByTestId("sound-control-trigger").click();
+    await expect(host.getByTestId("sound-master-toggle")).toBeVisible();
+  });
+
+  test("the server answers its health check without rendering a page", async ({ request }) => {
+    const res = await request.get("/healthz");
+    expect(res.status()).toBe(200);
+    expect(await res.text()).toBe("ok");
+  });
 });

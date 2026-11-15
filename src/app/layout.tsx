@@ -38,7 +38,18 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full flex flex-col bg-background text-foreground">
         <TooltipProvider delayDuration={200}>
           {children}
-          <Toaster theme="dark" position="top-center" richColors closeButton />
+          {/* On a phone a top toast used to sit right over the table header,
+              blocking its buttons (invite, sound, settings, leave) for as
+              long as it showed — and "… reconnected" toasts arrive every
+              time someone unlocks their phone. Below the header, and inset
+              far enough to leave the two round drawer buttons tappable. */}
+          <Toaster
+            theme="dark"
+            position="top-center"
+            richColors
+            closeButton
+            mobileOffset={{ top: 90, left: 50, right: 50 }}
+          />
         </TooltipProvider>
       </body>
     </html>

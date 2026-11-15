@@ -19,7 +19,9 @@ export function PlayerListPanel({ players, meId }: { players: PublicPlayer[]; me
             key={p.id}
             className={cn(
               "flex items-center gap-2 rounded-lg px-1.5 py-1.5",
-              p.id === meId && "bg-[var(--accent-lime)]/8 ring-1 ring-[var(--accent-lime)]/25"
+              // Inset: the sidebar scrolls, and a scroll area clips anything drawn
+              // outside its children — an outer ring lost its left and right edges.
+              p.id === meId && "bg-[var(--accent-lime)]/8 ring-1 ring-inset ring-[var(--accent-lime)]/25"
             )}
           >
             <PlayerAvatar name={p.displayName} size="xs" dimmed={!p.hasBoughtIn} />

@@ -49,6 +49,10 @@ export const roomStore = {
   has(roomId: string): boolean {
     return rooms.has(roomId);
   },
+  /** How many tables currently exist (in play or idle, until reaped). */
+  size(): number {
+    return rooms.size;
+  },
 
   getOrCreateDeck(roomId: string): Deck {
     let deck = decks.get(roomId);
