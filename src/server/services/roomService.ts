@@ -4,7 +4,12 @@ import { MAX_BIG_BLIND, MAX_SMALL_BLIND, validateBlinds } from "@/lib/blinds";
 import { roomStore } from "./roomStore";
 import { generatePlayerId, generatePlayerToken, generateRoomId } from "@/server/utils/ids";
 
-export class RoomServiceError extends Error {}
+export class RoomServiceError extends Error {
+  /** Machine-readable kind, for the few errors a client reacts to specifically. */
+  constructor(message: string, readonly code?: "name-taken") {
+    super(message);
+  }
+}
 
 const DEFAULT_SETTINGS: RoomSettings = {
   roomName: "Poker Night",
@@ -153,9 +158,7 @@ export function joinRoom(
   const sanitizedName = sanitizeDisplayName(displayName);
   const nameTaken = room.players.some((p) => p.displayName.toLowerCase() === sanitizedName.toLowerCase());
   if (nameTaken) {
-    throw new RoomServiceError(
-      "That name is already taken at this table. If it's you from another browser or device, go back to that one — otherwise pick a different name."
-    );
+    throw new RoomServiceError("That name is already taken at this table.", "name-taken");
   }
 
   const playerId = generatePlayerId();
@@ -267,6 +270,7 @@ export function removePlayer(room: RoomState, playerId: string): void {
 
   room.players = room.players.filter((p) => p.id !== playerId);
   room.buyInRequests = room.buyInRequests.filter((r) => r.playerId !== playerId || r.status !== "pending");
+  if (room.seatClaims) room.seatClaims = room.seatClaims.filter((c) => c.playerId !== playerId);
 
   if (room.hostPlayerId === playerId && room.players.length > 0) {
     // Prefer handing off to a seated player (an unseated one sorts last via the fallback).

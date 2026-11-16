@@ -20,6 +20,8 @@ interface RoomControlsProps {
   /** Leaves the table for the home page — tells the server too, so the seat
    * shows as away rather than staying "connected". */
   onLeave: () => void;
+  /** Something else is using the floating corner under the header right now. */
+  hideFloatingRequests?: boolean;
 }
 
 /** Thin, minimal top nav — logo left, room/blinds center, actions right.
@@ -34,6 +36,7 @@ export function RoomControls({
   onRemovePlayer,
   onTransferOwnership,
   onLeave,
+  hideFloatingRequests,
 }: RoomControlsProps) {
   const me = room.players.find((p) => p.id === room.you.playerId);
 
@@ -83,7 +86,7 @@ export function RoomControls({
 
         {me && <LedgerPanel entries={room.ledger.filter((e) => e.playerId === me.id)} currentChips={me.chips} />}
 
-        {isHost && <HostRequestsPanel requests={room.buyInRequests} onResolve={onResolveBuyIn} />}
+        {isHost && <HostRequestsPanel requests={room.buyInRequests} onResolve={onResolveBuyIn} hideFloating={hideFloatingRequests} />}
 
         <SoundControl />
 

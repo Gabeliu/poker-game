@@ -205,6 +205,29 @@ button:active:not(:disabled) { translate: 0 1px; }
 .bust-callout-button { flex: none; height: 42px; padding-inline: 16px; font-size: 14px; box-shadow: 0 3px 0 #36511c; }
 .bust-callout-button:not(:disabled) { animation: bust-pulse 1.8s ease-in-out infinite; }
 @keyframes bust-pulse { 0%, 100% { box-shadow: 0 3px 0 #36511c, 0 0 0 0 #b5ea4870; } 55% { box-shadow: 0 3px 0 #36511c, 0 0 0 8px #b5ea4800; } }
+/* Seat requests: a card in the corner under the header, for whoever can
+   answer it. Styled after the buy-in request card it takes the place of. */
+.seat-claims { position: absolute; z-index: 50; top: 86px; right: 14px; display: flex; flex-direction: column; gap: 8px; width: min(330px, calc(100% - 28px)); }
+.seat-claim-card { padding: 13px 14px 14px; border: 1px solid #ffffff1c; border-radius: 16px; background: #0a0f0cf2; box-shadow: 0 16px 40px #0009; backdrop-filter: blur(16px); animation: seat-claim-in 200ms ease-out; }
+@keyframes seat-claim-in { from { opacity: 0; transform: translateY(-6px); } }
+.seat-claim-eyebrow { font-size: 10px; font-weight: 600; letter-spacing: .15em; text-transform: uppercase; color: var(--accent-purple); }
+.seat-claim-title { margin-top: 4px; font-size: 13.5px; line-height: 1.4; color: var(--text-primary); }
+.seat-claim-title strong { color: var(--accent-lime); font-weight: 700; }
+.seat-claim-note { margin-top: 5px; font-size: 11.5px; line-height: 1.45; color: var(--text-secondary); }
+.seat-claim-actions { display: flex; gap: 8px; margin-top: 11px; }
+.seat-claim-actions button { flex: 1; min-height: 36px; border-radius: 9px; font-size: 12.5px; font-weight: 600; }
+.seat-claim-approve { background: var(--accent-lime); color: var(--accent-lime-foreground); }
+.seat-claim-reject { border: 1px solid color-mix(in oklch, var(--danger) 40%, transparent); color: var(--danger); }
+.seat-claim-reject:hover:not(:disabled) { background: color-mix(in oklch, var(--danger) 12%, transparent); }
+.seat-claim-reject:disabled { opacity: .45; }
+.seat-claim-back { border: 1px solid #ffffff1f; color: var(--text-secondary); }
+.seat-claim-reasons { display: flex; flex-direction: column; gap: 3px; margin-top: 8px; }
+.seat-claim-reason { display: flex; align-items: flex-start; gap: 9px; padding: 7px 8px; border-radius: 8px; font-size: 12.5px; line-height: 1.35; color: var(--text-primary); cursor: pointer; }
+.seat-claim-reason:hover { background: #ffffff0a; }
+.seat-claim-reason:has(input:checked) { background: #ffffff0f; }
+.seat-claim-reason input { flex: none; margin-top: 2px; width: 15px; height: 15px; accent-color: var(--accent-lime); }
+.seat-claim-custom { margin-top: 4px; width: 100%; padding: 8px 10px; border: 1px solid #ffffff24; border-radius: 8px; background: #0006; color: var(--text-primary); font-size: 13px; outline: none; }
+.seat-claim-custom:focus { border-color: color-mix(in oklch, var(--accent-lime) 55%, transparent); }
 /* "Your chips arrive next hand" — a standing note, not a toast, because it
    stays true (and worth knowing) until the next hand actually starts. */
 .chips-notice { max-width: 440px; padding: 6px 10px; border: 1px solid #b5ea4845; border-radius: 10px; background: #b5ea4810; color: #d5e2cc; font-size: 11.5px; line-height: 1.4; text-align: center; }
@@ -357,6 +380,9 @@ button:active:not(:disabled) { translate: 0 1px; }
   .bust-callout-button { height: 40px; padding-inline: 12px; font-size: 13px; }
   .action-dock:has(.bust-callout) .winner-summary { max-height: 58px; }
   .chips-notice { font-size: 11px; padding: 5px 9px; }
+  .seat-claims { top: 92px; right: 10px; width: min(330px, calc(100% - 20px)); }
+  /* 16px so focusing it doesn't make iOS zoom the whole page. */
+  .seat-claim-custom { font-size: 16px; }
   .landing-header-note { font-size: 9px; }
   .landing-page header { padding: 20px; }
   .how-section, .features-section { padding-inline: 20px; }

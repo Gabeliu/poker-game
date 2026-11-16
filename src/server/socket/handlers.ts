@@ -14,6 +14,13 @@ import {
   updateSettings,
 } from "@/server/services/roomService";
 import { requestBuyIn, resolveBuyInRequest } from "@/server/services/buyInService";
+import {
+  removeSeatClaim,
+  requestSeatClaim,
+  sanitizeRejectionReason,
+  takeSeatClaim,
+} from "@/server/services/seatClaimService";
+import { generatePlayerToken } from "@/server/utils/ids";
 import { postChatMessage, postSystemMessage } from "@/server/services/chatService";
 import { chooseRunIt, HandEngineError, startHand, submitAction } from "@/server/engine/handEngine";
 import { broadcastRoomState, scheduleHandFlowTimer, scheduleTurnTimer } from "./broadcast";
@@ -58,6 +65,9 @@ export function registerRoomHandlers(io: AppServer, socket: AppSocket): void {
       if (roomStore.getSocketLocation(socket.id)?.roomId !== room.id) {
         detachFromRoom(io, socket, "left the table");
       }
+      // In as a player now (by token, or under another name) — a seat
+      // request this connection still had waiting no longer means anything.
+      dropClaimForSocket(io, socket);
       socket.join(room.id);
       socket.data.roomId = room.id;
       socket.data.playerId = playerId;
@@ -73,6 +83,59 @@ export function registerRoomHandlers(io: AppServer, socket: AppSocket): void {
         socket.to(room.id).emit("toast", { message: `${displayName} joined the table.` });
         postSystemMessage(room, `${displayName} joined the table`);
       }
+      void broadcastRoomState(io, room.id);
+    } catch (err) {
+      ack({ ok: false, error: errorMessage(err), code: err instanceof RoomServiceError ? err.code : undefined });
+    }
+  });
+
+  socket.on("seatClaim:request", (payload, ack) => {
+    try {
+      const room = getRoomOrThrow(String(payload.roomId ?? "").toUpperCase());
+      if (roomStore.getSocketLocation(socket.id)?.roomId === room.id) {
+        throw new RoomServiceError("You're already at this table.");
+      }
+      dropClaimForSocket(io, socket); // one request at a time per connection
+      const claim = requestSeatClaim(room, payload.displayName);
+      roomStore.linkClaim(claim.id, socket.id, room.id);
+      ack({ ok: true });
+      void broadcastRoomState(io, room.id);
+    } catch (err) {
+      ack({ ok: false, error: errorMessage(err) });
+    }
+  });
+
+  socket.on("seatClaim:cancel", (_payload, ack) => {
+    dropClaimForSocket(io, socket);
+    ack({ ok: true });
+  });
+
+  socket.on("seatClaim:resolve", (payload, ack) => {
+    try {
+      const room = getRoomOrThrow(payload.roomId);
+      const resolverId = requirePlayerId(socket);
+      const claim = takeSeatClaim(room, payload.claimId, resolverId);
+      const askerSocketId = roomStore.unlinkClaim(claim.id);
+      const asker = askerSocketId ? io.sockets.sockets.get(askerSocketId) : undefined;
+      const player = room.players.find((p) => p.id === claim.playerId);
+
+      if (payload.approve && asker && player) {
+        // The seat changes hands: a fresh token for the new browser, and
+        // every old one retired so the previous browser can't come back in
+        // alongside it. The seat itself — chips, cards, position, hostship —
+        // is untouched; only who is holding it changes.
+        const playerToken = generatePlayerToken();
+        roomStore.revokeTokensForPlayer(room.id, player.id);
+        roomStore.registerToken(room.id, playerToken, player.id);
+        evictPlayerSockets(io, room.id, player.id, "Your seat was moved to another browser or device, with the host's approval.");
+        player.connectionStatus = "disconnected"; // until the new browser's join lands, a moment from now
+        postSystemMessage(room, `${player.displayName} moved to another device`);
+        asker.emit("seatClaim:approved", { roomId: room.id, playerToken });
+      } else if (!payload.approve) {
+        asker?.emit("seatClaim:rejected", { roomId: room.id, reason: sanitizeRejectionReason(payload.reason) });
+      }
+
+      ack({ ok: true });
       void broadcastRoomState(io, room.id);
     } catch (err) {
       ack({ ok: false, error: errorMessage(err) });
@@ -178,6 +241,7 @@ export function registerRoomHandlers(io: AppServer, socket: AppSocket): void {
       const playerId = requirePlayerId(socket);
       assertHost(room, playerId);
       const removedName = room.players.find((p) => p.id === payload.playerId)?.displayName;
+      const claimsOnSeat = (room.seatClaims ?? []).filter((c) => c.playerId === payload.playerId);
       removePlayer(room, payload.playerId);
       if (removedName) postSystemMessage(room, `${removedName} left the table`);
 
@@ -187,14 +251,17 @@ export function registerRoomHandlers(io: AppServer, socket: AppSocket): void {
       // `you.playerId`, looks "still joined," and every action they take
       // (including trying to buy back in) silently fails server-side with
       // "Player not found," leaving them stuck with no way back in.
-      for (const socketId of roomStore.unlinkPlayer(room.id, payload.playerId)) {
-        const removedSocket = io.sockets.sockets.get(socketId);
-        if (removedSocket) {
-          removedSocket.leave(room.id);
-          removedSocket.data.roomId = undefined;
-          removedSocket.data.playerId = undefined;
-          removedSocket.data.playerToken = undefined;
-          removedSocket.emit("you:removed", { reason: "The host removed you from this table." });
+      evictPlayerSockets(io, room.id, payload.playerId, "The host removed you from this table.");
+
+      // Anyone who was asking for that seat: it no longer exists, but the
+      // name is free again.
+      for (const claim of claimsOnSeat) {
+        const askerSocketId = roomStore.unlinkClaim(claim.id);
+        if (askerSocketId) {
+          io.to(askerSocketId).emit("seatClaim:rejected", {
+            roomId: room.id,
+            reason: "That seat was removed from the table — you can join under that name now.",
+          });
         }
       }
 
@@ -365,6 +432,7 @@ export function registerRoomHandlers(io: AppServer, socket: AppSocket): void {
  * already landed) is still at the table.
  */
 function detachFromRoom(io: AppServer, socket: AppSocket, verb: "disconnected" | "left the table"): void {
+  dropClaimForSocket(io, socket);
   const loc = roomStore.unlinkSocket(socket.id);
   const previousRoomId = loc?.roomId ?? socket.data.roomId;
   if (previousRoomId) void socket.leave(previousRoomId);
@@ -384,6 +452,32 @@ function detachFromRoom(io: AppServer, socket: AppSocket, verb: "disconnected" |
   }
   void broadcastRoomState(io, loc.roomId);
   io.to(loc.roomId).emit("toast", { message: `${player.displayName} ${verb}.`, variant: "default" });
+}
+
+/** Withdraws the seat request a connection has waiting, if any — it went
+ * away, changed its mind, or got in some other way — so the host isn't left
+ * looking at a request nobody is waiting on. */
+function dropClaimForSocket(io: AppServer, socket: AppSocket): void {
+  const pending = roomStore.claimForSocket(socket.id);
+  if (!pending) return;
+  roomStore.unlinkClaim(pending.claimId);
+  const room = roomStore.get(pending.roomId);
+  if (room && removeSeatClaim(room, pending.claimId)) void broadcastRoomState(io, room.id);
+}
+
+/** Cuts every connection currently acting as a player loose from them
+ * (their sockets stay open, but are nobody at this table any more) and tells
+ * each one why. */
+function evictPlayerSockets(io: AppServer, roomId: string, playerId: string, reason: string): void {
+  for (const socketId of roomStore.unlinkPlayer(roomId, playerId)) {
+    const evicted = io.sockets.sockets.get(socketId);
+    if (!evicted) continue;
+    void evicted.leave(roomId);
+    evicted.data.roomId = undefined;
+    evicted.data.playerId = undefined;
+    evicted.data.playerToken = undefined;
+    evicted.emit("you:removed", { reason });
+  }
 }
 
 function requirePlayerId(socket: AppSocket): string {
