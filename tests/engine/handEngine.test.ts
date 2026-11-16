@@ -808,3 +808,75 @@ describe("player busting", () => {
     expect(short.handStatus).toBe("sitting-out");
   });
 });
+
+describe("a blind posted short of the full amount", () => {
+  const totalChips = (room: RoomState) => room.players.reduce((sum, p) => sum + p.chips, 0);
+
+  it("heads-up: the covering player isn't asked to call chips nobody could win", () => {
+    // Blinds 5/10. The big blind only has 3; the dealer's small blind (5)
+    // already covers it, so there is nothing left for anyone to decide.
+    const room = makeRoom([makePlayer("deep", 0, 100), makePlayer("short", 1, 3)]);
+    startHand(room, new Deck());
+
+    expect(room.hand.phase).toBe("hand-complete");
+    expect(room.hand.activePlayerId).toBeNull();
+    expect(totalChips(room)).toBe(103);
+    // Only the 3 chips each were ever at stake.
+    const deep = room.players[0];
+    expect([97, 100, 103]).toContain(deep.chips);
+    expect(deep.handHistory.at(-1)!.netChange).toBe(deep.chips - 100);
+  });
+
+  it("heads-up: when the short blind is more than the other blind, only the difference is owed", () => {
+    // The big blind posts 8 of 10; the small blind has 5 in, so owes 3 — not 5.
+    const room = makeRoom([makePlayer("deep", 0, 100), makePlayer("short", 1, 8)]);
+    const deck = new Deck();
+    startHand(room, deck);
+
+    expect(room.hand.activePlayerId).toBe("deep");
+    expect(room.hand.currentBetAmount).toBe(8);
+    expect(submitAction(room, deck, "deep", { action: "call" }).ok).toBe(true);
+    expect(room.hand.phase).toBe("hand-complete");
+    expect(totalChips(room)).toBe(108);
+    expect([92, 100, 108]).toContain(room.players[0].chips);
+  });
+
+  it("three-handed: folding round to a small blind that covers a short big blind ends the betting", () => {
+    const room = makeRoom([makePlayer("button", 0, 100), makePlayer("sb", 1, 100), makePlayer("bb", 2, 3)]);
+    const deck = new Deck();
+    startHand(room, deck);
+
+    expect(room.hand.activePlayerId).toBe("button");
+    expect(submitAction(room, deck, "button", { action: "fold" }).ok).toBe(true);
+    expect(room.hand.phase).toBe("hand-complete");
+    expect(totalChips(room)).toBe(203);
+  });
+
+  it("with two players still able to act, the full big blind is still the price to call", () => {
+    const room = makeRoom([makePlayer("button", 0, 100), makePlayer("sb", 1, 100), makePlayer("bb", 2, 3)]);
+    startHand(room, new Deck());
+    expect(room.hand.currentBetAmount).toBe(10);
+  });
+});
+
+describe("going all-in as a raise", () => {
+  it("re-opens the action when it is a full raise, and not when it falls short of one", () => {
+    // 5/10 blinds, three players. The button shoves for 100 (a full raise):
+    // the blinds, who haven't acted, still have to — and so would anyone who had.
+    const room = makeRoom([makePlayer("button", 0, 100), makePlayer("sb", 1, 500), makePlayer("bb", 2, 500)]);
+    const deck = new Deck();
+    startHand(room, deck);
+    expect(submitAction(room, deck, "button", { action: "all-in" }).ok).toBe(true);
+    expect(room.hand.currentBetAmount).toBe(100);
+    expect(room.hand.minRaiseAmount).toBe(90);
+    expect(room.hand.lastAggressorId).toBe("button");
+    expect(room.hand.activePlayerId).toBe("sb");
+
+    // The small blind re-raises to 300; the big blind shoves 500 over it (a
+    // full raise again), so the small blind is back on the clock.
+    expect(submitAction(room, deck, "sb", { action: "raise", amount: 300 }).ok).toBe(true);
+    expect(submitAction(room, deck, "bb", { action: "all-in" }).ok).toBe(true);
+    expect(room.hand.activePlayerId).toBe("sb");
+    expect(room.players[1].hasActedThisStreet).toBe(false);
+  });
+});

@@ -200,6 +200,18 @@ export function advanceGameFlow(room: RoomState, deck: Deck, fromSeat: number, o
     roundComplete = canAct.every((p) => p.hasActedThisStreet && p.currentBet === room.hand.currentBetAmount);
   } else if (canAct.length === 1) {
     const lone = canAct[0];
+    // Everyone else still in is all-in, so the most this player can owe is
+    // the largest of *their* bets — which can be less than the nominal bet
+    // to call when a big blind was posted short. Without this the player was
+    // asked to "call" chips nobody could win, and could even fold a hand they
+    // already had covered.
+    const highestOtherBet = Math.max(
+      0,
+      ...getPlayersStillInHand(room.players)
+        .filter((p) => p.id !== lone.id)
+        .map((p) => p.currentBet)
+    );
+    room.hand.currentBetAmount = Math.min(room.hand.currentBetAmount, Math.max(highestOtherBet, lone.currentBet));
     const owesCall = lone.currentBet < room.hand.currentBetAmount;
     roundComplete = !owesCall;
   } else {

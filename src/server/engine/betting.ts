@@ -148,7 +148,10 @@ export function applyAction(
       player.hasActedThisStreet = true;
       player.handStatus = "all-in";
 
-      if (target > hand.currentBetAmount) {
+      // Decided before the bet to call is moved up to this shove — compared
+      // afterwards it could never be true.
+      const raised = target > hand.currentBetAmount;
+      if (raised) {
         if (isFullRaise) {
           hand.minRaiseAmount = target - hand.currentBetAmount;
           hand.lastAggressorId = player.id;
@@ -156,7 +159,7 @@ export function applyAction(
         hand.currentBetAmount = target;
       }
 
-      return { ok: true, wasAggressive: target > hand.currentBetAmount };
+      return { ok: true, wasAggressive: raised && isFullRaise };
     }
 
     default:
