@@ -20,7 +20,32 @@ export interface ClientToServerEvents {
 
   "room:join": (
     payload: { roomId: string; displayName: string; playerToken?: string },
-    ack: (res: { ok: true; playerId: string; playerToken: string } | { ok: false; error: string }) => void
+    ack: (
+      res:
+        | { ok: true; playerId: string; playerToken: string }
+        // "name-taken": someone at the table already has that name — which
+        // may be this very person, from another browser (see seatClaim:*).
+        | { ok: false; error: string; code?: "name-taken" }
+    ) => void
+  ) => void;
+
+  /** "That taken name is me — give me my seat back." Opens a request that
+   * the host answers; the asker hears back via seatClaim:approved/rejected. */
+  "seatClaim:request": (
+    payload: { roomId: string; displayName: string },
+    ack: (res: { ok: true } | { ok: false; error: string }) => void
+  ) => void;
+
+  /** The asker changed their mind. */
+  "seatClaim:cancel": (
+    payload: { roomId: string },
+    ack: (res: { ok: true } | { ok: false; error: string }) => void
+  ) => void;
+
+  /** The host's answer. `reason` is shown to the asker when rejecting. */
+  "seatClaim:resolve": (
+    payload: { roomId: string; claimId: string; approve: boolean; reason?: string },
+    ack: (res: { ok: true } | { ok: false; error: string }) => void
   ) => void;
 
   /** The player is walking away from the table (the "Leave table" button).
@@ -109,6 +134,10 @@ export interface ServerToClientEvents {
    * the whole room. Tells that one client to reset back to a fresh join. */
   "you:removed": (payload: { reason: string }) => void;
   "toast": (payload: { message: string; variant?: "default" | "success" | "error" }) => void;
+  /** To the asker only: the seat is theirs — this token now opens it. */
+  "seatClaim:approved": (payload: { roomId: string; playerToken: string }) => void;
+  /** To the asker only: turned down, with the host's reason. */
+  "seatClaim:rejected": (payload: { roomId: string; reason: string }) => void;
 }
 
 // Not used (single-process server); reserved for future horizontal scaling

@@ -108,6 +108,19 @@ export interface LedgerEntry {
   note?: string;
 }
 
+// ---------- Seat claims ----------
+
+/** Someone without this seat's token (the same player in another browser or
+ * on another device, as far as they say) asking to be given it. Waits for a
+ * person at the table to approve or reject — see seatClaimService. */
+export interface SeatClaim {
+  id: string;
+  /** The seat being asked for. */
+  playerId: string;
+  playerDisplayName: string;
+  createdAt: number;
+}
+
 // ---------- Chat / table activity ----------
 
 export type ChatMessageType = "chat" | "system";
@@ -269,6 +282,8 @@ export interface RoomState {
   ledger: LedgerEntry[];
   hand: HandState;
   chatMessages: ChatMessage[];
+  /** Seat requests waiting for an answer (absent until the first one). */
+  seatClaims?: SeatClaim[];
 }
 
 /** What's broadcast to a specific client: hole cards hidden for others. */

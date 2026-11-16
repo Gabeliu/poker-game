@@ -18,6 +18,11 @@ const decks = new Map<string, Deck>();
 const playerTokensByRoom = new Map<string, Map<string, string>>();
 /** socket.id -> current room/player, used to clean up on disconnect. */
 const socketLocations = new Map<string, { roomId: string; playerId: string }>();
+/** Seat-claim id -> the connection that asked (not a player, so it has no
+ * socketLocation), and back again — to answer them, and to drop the claim if
+ * they go away before it's answered. */
+const claimSockets = new Map<string, { socketId: string; roomId: string }>();
+const claimBySocket = new Map<string, string>();
 /** roomId -> active turn timer, so we can clear it when the turn changes. */
 const turnTimers = new Map<string, ReturnType<typeof setTimeout>>();
 /** roomId -> active reveal/runout timer (all-in staged reveal, run-it decision) — a
@@ -43,6 +48,9 @@ export const roomStore = {
     playerTokensByRoom.delete(roomId);
     stateVersions.delete(roomId);
     emptySince.delete(roomId);
+    for (const [claimId, entry] of [...claimSockets]) {
+      if (entry.roomId === roomId) roomStore.unlinkClaim(claimId);
+    }
     clearTurnTimer(roomId);
     clearRevealTimer(roomId);
   },
@@ -78,6 +86,31 @@ export const roomStore = {
   },
   resolveToken(roomId: string, token: string): string | undefined {
     return playerTokensByRoom.get(roomId)?.get(token);
+  },
+  /** Retires every token that opens a given seat — used when the seat is
+   * handed to another browser, so the old one can't walk back in beside it. */
+  revokeTokensForPlayer(roomId: string, playerId: string): void {
+    const map = playerTokensByRoom.get(roomId);
+    if (!map) return;
+    for (const [token, id] of [...map]) if (id === playerId) map.delete(token);
+  },
+
+  linkClaim(claimId: string, socketId: string, roomId: string): void {
+    claimSockets.set(claimId, { socketId, roomId });
+    claimBySocket.set(socketId, claimId);
+  },
+  /** Forgets who asked for a claim, returning their socket id if known. */
+  unlinkClaim(claimId: string): string | undefined {
+    const entry = claimSockets.get(claimId);
+    claimSockets.delete(claimId);
+    if (entry && claimBySocket.get(entry.socketId) === claimId) claimBySocket.delete(entry.socketId);
+    return entry?.socketId;
+  },
+  /** The claim a connection has waiting, if any. */
+  claimForSocket(socketId: string): { claimId: string; roomId: string } | undefined {
+    const claimId = claimBySocket.get(socketId);
+    const entry = claimId ? claimSockets.get(claimId) : undefined;
+    return claimId && entry ? { claimId, roomId: entry.roomId } : undefined;
   },
 
   linkSocket(socketId: string, roomId: string, playerId: string): void {

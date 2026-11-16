@@ -10,9 +10,12 @@ import { BuyInRequest } from "./BuyInRequest";
 interface HostRequestsPanelProps {
   requests: BuyInRequestData[];
   onResolve: (requestId: string, approve: boolean) => void;
+  /** Don't auto-surface the newest request as a floating card (the bell and
+   * its list still work) — the corner is taken by something more urgent. */
+  hideFloating?: boolean;
 }
 
-export function HostRequestsPanel({ requests, onResolve }: HostRequestsPanelProps) {
+export function HostRequestsPanel({ requests, onResolve, hideFloating }: HostRequestsPanelProps) {
   const pending = requests.filter((r) => r.status === "pending");
   const [dismissedFloating, setDismissedFloating] = useState<Set<string>>(new Set());
 
@@ -28,7 +31,7 @@ export function HostRequestsPanel({ requests, onResolve }: HostRequestsPanelProp
 
   return (
     <>
-      {newest && (
+      {newest && !hideFloating && (
         <div className="absolute right-4 top-16 z-50 sm:right-6">
           <BuyInRequest
             playerName={newest.playerDisplayName}

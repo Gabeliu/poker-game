@@ -11,13 +11,29 @@ import type {
 } from "@/lib/types";
 import { clearStoredToken, getSocket, getStoredDisplayName, getStoredToken, storeToken } from "@/lib/socketClient";
 
-type Ack = { ok: true } | { ok: false; error: string };
+type Ack = { ok: true } | { ok: false; error: string; code?: "name-taken" };
+
+/** Where this browser stands on asking for a seat it has no token for (see
+ * seatClaimService on the server): nothing asked, waiting on the host, given
+ * the seat (and on the way in), or turned down with the host's reason. */
+export interface SeatClaimState {
+  status: "idle" | "pending" | "approved" | "rejected";
+  /** The name whose seat was asked for. */
+  name: string;
+  /** The host's reason, when rejected. */
+  reason: string;
+}
+const NO_SEAT_CLAIM: SeatClaimState = { status: "idle", name: "", reason: "" };
 
 interface RoomStoreState {
   room: ClientRoomView | null;
   myPlayerId: string | null;
   connected: boolean;
   joinError: string | null;
+  /** The name a join was just refused for because someone at the table
+   * already has it — the cue to offer "that's me, ask for my seat back". */
+  nameTaken: string | null;
+  seatClaim: SeatClaimState;
   toasts: { id: number; message: string; variant?: "default" | "success" | "error" }[];
   /** Bumped every time a resync (as opposed to a normal room:state push)
    * lands — presentation code (e.g. the transient status-pill labels) uses
@@ -46,6 +62,11 @@ interface RoomStoreState {
    * as if nothing happened. */
   leaveSoon: (roomId: string) => void;
   cancelLeave: () => void;
+  /** Asks the host for the seat held under `displayName`. */
+  requestSeatClaim: (roomId: string, displayName: string) => Promise<Ack>;
+  cancelSeatClaim: (roomId: string) => void;
+  /** The host's answer to someone else's request; `reason` goes to the asker. */
+  resolveSeatClaim: (claimId: string, approve: boolean, reason?: string) => Promise<Ack>;
   requestBuyIn: (amount: number, type: BuyInRequestType) => Promise<Ack>;
   resolveBuyIn: (requestId: string, approve: boolean) => Promise<Ack>;
   updateSettings: (settings: Partial<RoomSettings>) => Promise<Ack>;
@@ -78,6 +99,8 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
   myPlayerId: null,
   connected: false,
   joinError: null,
+  nameTaken: null,
+  seatClaim: NO_SEAT_CLAIM,
   toasts: [],
   resyncNonce: 0,
   appliedStateVersion: -1,
@@ -91,7 +114,15 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
       set({ connected: true });
       get().resync();
     });
-    socket.on("disconnect", () => set({ connected: false }));
+    socket.on("disconnect", () => {
+      // A waiting seat request doesn't survive the connection: the server
+      // drops it when the asker goes away, so say so rather than wait forever.
+      if (get().seatClaim.status === "pending") {
+        set({ connected: false, seatClaim: NO_SEAT_CLAIM, joinError: "The connection dropped before the host answered — ask again." });
+      } else {
+        set({ connected: false });
+      }
+    });
     socket.on("room:state", (view) => applyView(set, get, view));
 
     // The root cause of the mobile "frozen after backgrounding" bug:
@@ -137,6 +168,21 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
     socket.on("toast", (payload) => {
       const id = ++toastCounter;
       set((s) => ({ toasts: [...s.toasts, { id, message: payload.message, variant: payload.variant }] }));
+    });
+    socket.on("seatClaim:approved", ({ roomId, playerToken }) => {
+      // The seat is ours: this token opens it, so the ordinary join now
+      // lands in it — the same path as coming back after a reload.
+      const name = get().seatClaim.name || getStoredDisplayName() || "Player";
+      storeToken(roomId, playerToken);
+      set({ seatClaim: { status: "approved", name, reason: "" }, joinError: null, nameTaken: null });
+      void get()
+        .joinRoom(roomId, name)
+        .then((res) => {
+          if (!res.ok) set({ seatClaim: NO_SEAT_CLAIM });
+        });
+    });
+    socket.on("seatClaim:rejected", ({ reason }) => {
+      set((s) => ({ seatClaim: { status: "rejected", name: s.seatClaim.name, reason }, joinError: null, nameTaken: null }));
     });
   },
 
@@ -198,14 +244,16 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
       const token = getStoredToken(roomId);
       expectedRoomId = target;
       if (get().room && get().room!.id !== expectedRoomId) set({ room: null, appliedStateVersion: -1 });
+      // Trying again (under another name, say) puts an earlier "no" behind us.
+      if (get().seatClaim.status === "rejected") set({ seatClaim: NO_SEAT_CLAIM });
       socket.emit("room:join", { roomId, displayName, playerToken: token }, (res) => {
         if (joinInFlight?.promise === promise) joinInFlight = null;
         if (res.ok) {
           storeToken(roomId, res.playerToken);
-          set({ myPlayerId: res.playerId, joinError: null });
+          set({ myPlayerId: res.playerId, joinError: null, nameTaken: null });
           resolve({ ok: true });
         } else {
-          set({ joinError: res.error });
+          set({ joinError: res.error, nameTaken: res.code === "name-taken" ? displayName.trim() : null });
           resolve(res);
         }
       });
@@ -218,9 +266,29 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
     const roomId = get().room?.id ?? expectedRoomId;
     expectedRoomId = null;
     joinInFlight = null;
-    set({ room: null, myPlayerId: null, joinError: null, appliedStateVersion: -1 });
+    set({ room: null, myPlayerId: null, joinError: null, nameTaken: null, seatClaim: NO_SEAT_CLAIM, appliedStateVersion: -1 });
     if (roomId) getSocket().emit("room:leave", { roomId }, () => {});
   },
+
+  requestSeatClaim: (roomId, displayName) =>
+    new Promise((resolve) => {
+      getSocket().emit("seatClaim:request", { roomId, displayName }, (res) => {
+        if (res.ok) {
+          set({ seatClaim: { status: "pending", name: displayName.trim(), reason: "" }, joinError: null, nameTaken: null });
+        } else {
+          set({ joinError: res.error });
+        }
+        resolve(res);
+      });
+    }),
+
+  cancelSeatClaim: (roomId) => {
+    set({ seatClaim: NO_SEAT_CLAIM });
+    getSocket().emit("seatClaim:cancel", { roomId }, () => {});
+  },
+
+  resolveSeatClaim: (claimId, approve, reason) =>
+    emitWithAck("seatClaim:resolve", { roomId: get().room!.id, claimId, approve, reason }),
 
   leaveSoon: (roomId) => {
     const target = roomId.toUpperCase();
@@ -282,6 +350,9 @@ function applyView(
   if (current.room?.id === view.id && view.stateVersion < current.appliedStateVersion) return;
   set({
     room: view,
+    // At the table now, however we got here — any seat request is settled.
+    seatClaim: NO_SEAT_CLAIM,
+    nameTaken: null,
     myPlayerId: view.you.playerId,
     appliedStateVersion: view.stateVersion,
     resyncNonce: opts?.fromResync ? current.resyncNonce + 1 : current.resyncNonce,

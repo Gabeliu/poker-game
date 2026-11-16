@@ -27,6 +27,8 @@ Repo: [github.com/Gabeliu/poker-game](https://github.com/Gabeliu/poker-game)
   same time, including anyone who reconnects mid-reveal
 - Net profit/loss shown for every player after each hand, with a per-run breakdown when a hand ran
   twice
+- Switched browser or device mid-game? A player whose name is "taken" by their own old session can
+  ask for the seat back; the host approves, or rejects with a reason the player is shown
 - Survives backgrounded mobile tabs: the client resyncs on focus/visibility/reconnect using a
   state version so a stale snapshot can never overwrite a newer one
 - Chat, per-player hand history, sounds, and host controls (kicks are only allowed between hands,
@@ -142,6 +144,12 @@ for browsers that refuse it, per room) on create/join. Refreshing the page re-se
 existing seat instead of creating a duplicate player, and marks them `disconnected` (not removed)
 if their socket drops without a reload — a turn timer auto-folds/checks for them if it's their
 turn and they don't come back in time.
+
+**Seat claims.** A token only lives in the browser that got it, so the same player arriving from a
+different browser is a stranger whose own name is taken. They can open a seat claim by name; the
+host answers it (any connected player can, if the claim is for the host's own seat and the host is
+offline — otherwise a host who lost their browser could never return). Approval issues a fresh
+token, retires the old ones, and signs the previous browser out; the seat itself is untouched.
 
 ## Testing
 

@@ -5,6 +5,7 @@ import type { ClientRoomView, HandPhase } from "@/lib/types";
 import { audioManager } from "@/audio/AudioManager";
 import { panForPlayer } from "@/lib/seatLayout";
 import { boardResultKey } from "@/lib/resultKey";
+import { canResolveSeatClaim } from "@/lib/seatClaims";
 
 interface PlayerSnapshot {
   handStatus: string;
@@ -38,6 +39,7 @@ export function useGameAudio(room: ClientRoomView | null): void {
   const prevSecondResultKeyRef = useRef("");
   const prevBuyInRef = useRef<Map<string, string>>(new Map());
   const prevChatCountRef = useRef(0);
+  const prevSeatClaimIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     audioManager.attachUnlockListeners();
@@ -56,6 +58,7 @@ export function useGameAudio(room: ClientRoomView | null): void {
       prevSecondResultKeyRef.current = boardResultKey(room.hand.handNumber, room.hand.secondBoard?.result);
       prevBuyInRef.current = new Map(room.buyInRequests.map((r) => [r.id, r.status]));
       prevChatCountRef.current = room.chatMessages.length;
+      prevSeatClaimIdsRef.current = new Set((room.seatClaims ?? []).map((c) => c.id));
       return;
     }
 
@@ -141,6 +144,13 @@ export function useGameAudio(room: ClientRoomView | null): void {
     if (room.chatMessages.length > prevChatCountRef.current) {
       audioManager.play("chat-message");
     }
+
+    // A seat request this viewer is the one to answer.
+    const seatClaims = room.seatClaims ?? [];
+    if (seatClaims.some((c) => !prevSeatClaimIdsRef.current.has(c.id) && canResolveSeatClaim(room, meId, c))) {
+      audioManager.play("buyin-request");
+    }
+    prevSeatClaimIdsRef.current = new Set(seatClaims.map((c) => c.id));
 
     prevPlayersRef.current = nextPlayers;
     prevPhaseRef.current = room.hand.phase;

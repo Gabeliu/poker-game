@@ -19,6 +19,8 @@ import { PlayerListPanel } from "@/components/poker/PlayerListPanel";
 import { ChatPanel } from "@/components/poker/ChatPanel";
 import { LoadingExperience } from "@/components/poker/LoadingExperience";
 import { useGameAudio } from "@/hooks/useGameAudio";
+import { SeatClaimRequests } from "@/components/poker/SeatClaimRequests";
+import { canResolveSeatClaim } from "@/lib/seatClaims";
 
 export default function TablePage({ params }: { params: Promise<{ roomId: string }> }) {
   const { roomId: roomIdParam } = use(params);
@@ -31,6 +33,8 @@ export default function TablePage({ params }: { params: Promise<{ roomId: string
   const room = useRoomStore((s) => s.room);
   const connected = useRoomStore((s) => s.connected);
   const joinError = useRoomStore((s) => s.joinError);
+  const nameTaken = useRoomStore((s) => s.nameTaken);
+  const seatClaim = useRoomStore((s) => s.seatClaim);
   const toasts = useRoomStore((s) => s.toasts);
   const dismissToast = useRoomStore((s) => s.dismissToast);
   const {
@@ -50,6 +54,9 @@ export default function TablePage({ params }: { params: Promise<{ roomId: string
     leaveRoom,
     leaveSoon,
     cancelLeave,
+    requestSeatClaim,
+    cancelSeatClaim,
+    resolveSeatClaim,
   } = useRoomStore.getState();
 
   // Seeded empty (not read from localStorage) so the client's first render
@@ -136,8 +143,19 @@ export default function TablePage({ params }: { params: Promise<{ roomId: string
     // above), so the form never flashes back in between.
     if (!res.ok) {
       setJoining(false);
-      toast.error(res.error);
+      // A taken name gets its own explanation and next step on the form.
+      if (res.code !== "name-taken") toast.error(res.error);
     }
+  };
+
+  // "That taken name is me" — offered only for the exact name just refused.
+  const canAskForSeat =
+    nameTaken !== null && nameTaken.toLowerCase() === displayName.trim().toLowerCase() && seatClaim.status === "idle";
+  const [askingForSeat, setAskingForSeat] = useState(false);
+  const handleAskForSeat = async () => {
+    setAskingForSeat(true);
+    await requestSeatClaim(roomId, displayName.trim());
+    setAskingForSeat(false);
   };
 
   const handleLeave = () => {
@@ -160,7 +178,7 @@ export default function TablePage({ params }: { params: Promise<{ roomId: string
   if (!isJoined) {
     return (
       <main className="ambient-page-bg flex min-h-screen flex-col items-center justify-center gap-6 px-4">
-        <LoadingExperience show={joining} text="Taking your seat…" />
+        <LoadingExperience show={joining || seatClaim.status === "approved"} text="Taking your seat…" />
         <div className="flex items-center gap-2">
           <Spade className="h-7 w-7 text-[var(--accent-lime)]" fill="currentColor" />
           <span className="text-xl font-bold text-[var(--text-primary)]">Felt</span>
@@ -173,7 +191,7 @@ export default function TablePage({ params }: { params: Promise<{ roomId: string
             <span className="font-mono font-semibold text-[var(--accent-lime)]">{roomId}</span>
           </p>
 
-          {joinError && (
+          {joinError && seatClaim.status !== "pending" && (
             <p role="alert" className="mb-3 rounded-md bg-[var(--danger)]/10 px-3 py-2 text-center text-sm text-[var(--danger)]">
               {joinError === "Room not found."
                 ? "This table isn't open any more — check the code, or ask the host for a new link."
@@ -181,6 +199,49 @@ export default function TablePage({ params }: { params: Promise<{ roomId: string
             </p>
           )}
 
+          {/* The host said no: their reason, in their words. */}
+          {seatClaim.status === "rejected" && (
+            <div role="alert" data-testid="seat-claim-rejected" className="mb-3 rounded-md bg-[var(--danger)]/10 px-3 py-2 text-center text-sm text-[var(--danger)]">
+              <p className="font-semibold">The host didn&rsquo;t give you {seatClaim.name}&rsquo;s seat.</p>
+              <p className="mt-0.5">&ldquo;{seatClaim.reason}&rdquo;</p>
+            </div>
+          )}
+
+          {/* That name is taken — possibly by this very person, in another
+              browser. They can ask the host to hand the seat over. */}
+          {canAskForSeat && (
+            <div data-testid="seat-claim-offer" className="mb-4 rounded-xl border border-[var(--accent-lime)]/30 bg-[var(--accent-lime)]/8 px-3 py-3 text-center">
+              <p className="text-sm font-semibold text-[var(--text-primary)]">Is that you?</p>
+              <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
+                If you joined as {nameTaken} from another browser or device, the host can give you that seat back, chips
+                and all.
+              </p>
+              <Button
+                variant="outline"
+                className="mt-2.5 w-full border-[var(--accent-lime)]/50 text-[var(--accent-lime)] hover:bg-[var(--accent-lime)]/10 hover:text-[var(--accent-lime)]"
+                disabled={askingForSeat || !connected}
+                data-testid="seat-claim-request"
+                onClick={handleAskForSeat}
+              >
+                Ask the host for my seat back
+              </Button>
+              <p className="mt-2 text-[11px] text-[var(--text-secondary)]">Not you? Just pick a different name.</p>
+            </div>
+          )}
+
+          {seatClaim.status === "pending" ? (
+            <div data-testid="seat-claim-pending" role="status" className="rounded-xl border border-white/10 bg-black/25 px-4 py-5 text-center">
+              <span className="mx-auto mb-3 block h-5 w-5 animate-spin rounded-full border-2 border-[var(--accent-lime)]/30 border-t-[var(--accent-lime)]" aria-hidden />
+              <p className="text-sm font-semibold text-[var(--text-primary)]">Asked the host for {seatClaim.name}&rsquo;s seat</p>
+              <p className="mt-1 text-xs text-[var(--text-secondary)]">
+                Waiting for them to answer. Keep this page open — you&rsquo;ll be seated the moment they approve.
+              </p>
+              <Button variant="ghost" size="sm" className="mt-3 text-[var(--text-secondary)]" data-testid="seat-claim-cancel" onClick={() => cancelSeatClaim(roomId)}>
+                Cancel request
+              </Button>
+            </div>
+          ) : (
+          <>
           <div className="grid gap-1.5 mb-4">
             <Label htmlFor="name">Your display name</Label>
             <Input
@@ -202,6 +263,8 @@ export default function TablePage({ params }: { params: Promise<{ roomId: string
           >
             {connected ? "Join Table" : "Connecting…"}
           </Button>
+          </>
+          )}
 
           <button
             className="mt-3 w-full text-center text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
@@ -215,6 +278,10 @@ export default function TablePage({ params }: { params: Promise<{ roomId: string
   }
 
   const isHost = room.hostPlayerId === room.you.playerId;
+  // One floating card at a time in that corner: a seat request waits on a
+  // person who can't do anything else meanwhile, so it goes first (buy-in
+  // requests stay reachable from the bell).
+  const hasSeatClaimToAnswer = (room.seatClaims ?? []).some((claim) => canResolveSeatClaim(room, room.you.playerId, claim));
 
   const handleSit = async (seat: Parameters<typeof takeSeat>[0]) => {
     const res = await takeSeat(seat);
@@ -232,6 +299,14 @@ export default function TablePage({ params }: { params: Promise<{ roomId: string
           onRemovePlayer={removePlayer}
           onTransferOwnership={transferOwnership}
           onLeave={handleLeave}
+          hideFloatingRequests={hasSeatClaimToAnswer}
+        />
+        <SeatClaimRequests
+          room={room}
+          onResolve={async (claimId, approve, reason) => {
+            const res = await resolveSeatClaim(claimId, approve, reason);
+            if (!res.ok) toast.error(res.error);
+          }}
         />
 
         <AppShell
