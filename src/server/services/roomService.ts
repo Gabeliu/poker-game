@@ -1,6 +1,7 @@
 import type { ClientRoomView, Player, PublicPlayer, RoomSettings, RoomState, SeatNumber } from "@/lib/types";
 import { MAX_SEATS } from "@/lib/types";
 import { MAX_BIG_BLIND, MAX_SMALL_BLIND, validateBlinds } from "@/lib/blinds";
+import { MAX_TURN_SECONDS, MIN_TURN_SECONDS } from "@/lib/roomLimits";
 import { roomStore } from "./roomStore";
 import { generatePlayerId, generatePlayerToken, generateRoomId } from "@/server/utils/ids";
 
@@ -36,18 +37,34 @@ function sanitizeSettings(partial: Partial<RoomSettings>): RoomSettings {
       : null;
   if (blindProblem) throw new RoomServiceError(blindProblem);
 
+  // Same for the turn timer: a blank field used to arrive as 0 and be turned
+  // into the 5-second minimum, which the host only found out about when
+  // players started timing out.
+  const turnSeconds = Number(merged.turnTimeLimitSeconds);
+  if (!Number.isFinite(turnSeconds) || turnSeconds < MIN_TURN_SECONDS || turnSeconds > MAX_TURN_SECONDS) {
+    throw new RoomServiceError(`Turn time limit must be between ${MIN_TURN_SECONDS} and ${MAX_TURN_SECONDS} seconds.`);
+  }
+
+  const minBuyIn = merged.minBuyIn == null ? null : clampPositiveInt(merged.minBuyIn, 1, 100_000_000);
+  const maxBuyIn = merged.maxBuyIn == null ? null : clampPositiveInt(merged.maxBuyIn, 1, 100_000_000);
+  // A minimum above the maximum leaves no amount anyone is allowed to buy in for.
+  if (minBuyIn != null && maxBuyIn != null && minBuyIn > maxBuyIn) {
+    throw new RoomServiceError("Minimum buy-in can't be more than the maximum buy-in.");
+  }
+
   return {
-    roomName: (merged.roomName || "Poker Night").slice(0, 60),
+    roomName: (String(merged.roomName ?? "").trim() || "Poker Night").slice(0, 60),
     smallBlind: clampPositiveInt(merged.smallBlind, 1, MAX_SMALL_BLIND),
     bigBlind: clampPositiveInt(merged.bigBlind, 1, MAX_BIG_BLIND),
-    minBuyIn: merged.minBuyIn == null ? null : clampPositiveInt(merged.minBuyIn, 1, 100_000_000),
-    maxBuyIn: merged.maxBuyIn == null ? null : clampPositiveInt(merged.maxBuyIn, 1, 100_000_000),
+    minBuyIn,
+    maxBuyIn,
     allowAdditionalBuyIns: Boolean(merged.allowAdditionalBuyIns),
     allowJoinDuringHand: Boolean(merged.allowJoinDuringHand),
-    turnTimeLimitSeconds: clampPositiveInt(merged.turnTimeLimitSeconds, 5, 300),
+    turnTimeLimitSeconds: Math.floor(turnSeconds),
     runItTwiceEnabled: Boolean(merged.runItTwiceEnabled),
   };
 }
+
 
 function clampPositiveInt(value: number | null | undefined, min: number, max: number): number {
   const n = Math.floor(Number(value));
@@ -228,6 +245,7 @@ export function buildClientView(room: RoomState, viewerPlayerId: string | null):
       handHistory: viewer?.handHistory ?? [],
     },
     stateVersion: roomStore.getVersion(room.id),
+    serverNow: Date.now(),
   };
 }
 

@@ -42,6 +42,9 @@ interface RoomStoreState {
   /** The highest ClientRoomView.stateVersion applied so far — guards against
    * a slow resync ack landing after a newer room:state push already did. */
   appliedStateVersion: number;
+  /** Server clock minus this browser's clock, in ms. A deadline from the
+   * server, minus this, is the moment on the local clock when it falls due. */
+  clockOffset: number;
 
   initListeners: () => void;
   /** Re-fetches the current authoritative snapshot without going through
@@ -81,6 +84,9 @@ interface RoomStoreState {
   dismissToast: (id: number) => void;
 }
 
+/** A difference between two clock readings bigger than this isn't network
+ * delay — the device's clock moved. */
+const CLOCK_JUMP_MS = 3000;
 let listenersInitialized = false;
 let toastCounter = 0;
 let lastResyncAt = 0;
@@ -104,6 +110,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => ({
   toasts: [],
   resyncNonce: 0,
   appliedStateVersion: -1,
+  clockOffset: 0,
 
   initListeners: () => {
     if (listenersInitialized) return;
@@ -348,8 +355,20 @@ function applyView(
   const current = get();
   if (expectedRoomId !== null && view.id !== expectedRoomId) return;
   if (current.room?.id === view.id && view.stateVersion < current.appliedStateVersion) return;
+  // Each view left the server a little before it got here, so "server time
+  // minus local time" always reads low by however long it took. The largest
+  // value seen at this table is therefore the closest to the truth — unless
+  // it's off by more than any delay would explain, which means this device's
+  // clock was changed, and the new reading is the one to go by.
+  const offsetSample = view.serverNow - Date.now();
+  const sameTable = current.room?.id === view.id;
+  const clockOffset =
+    sameTable && Math.abs(offsetSample - current.clockOffset) < CLOCK_JUMP_MS
+      ? Math.max(current.clockOffset, offsetSample)
+      : offsetSample;
   set({
     room: view,
+    clockOffset,
     // At the table now, however we got here — any seat request is settled.
     seatClaim: NO_SEAT_CLAIM,
     nameTaken: null,

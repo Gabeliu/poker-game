@@ -51,3 +51,36 @@ describe("blind settings are validated, not silently corrected", () => {
     expect(room.settings.roomName).toBe("Renamed");
   });
 });
+
+describe("the other table limits are validated too", () => {
+  it("rejects a minimum buy-in above the maximum — nobody could ever buy in", () => {
+    const { room } = createRoom("Host", {});
+    expect(() => updateSettings(room, { minBuyIn: 5000, maxBuyIn: 100 })).toThrow(/Minimum buy-in/);
+    expect(room.settings).toMatchObject({ minBuyIn: null, maxBuyIn: null });
+
+    updateSettings(room, { minBuyIn: 100, maxBuyIn: 5000 });
+    expect(room.settings).toMatchObject({ minBuyIn: 100, maxBuyIn: 5000 });
+    // Raising only the minimum past the saved maximum is caught as well.
+    expect(() => updateSettings(room, { minBuyIn: 6000 })).toThrow(/Minimum buy-in/);
+    updateSettings(room, { minBuyIn: 5000 });
+    updateSettings(room, { minBuyIn: null, maxBuyIn: null });
+    expect(room.settings).toMatchObject({ minBuyIn: null, maxBuyIn: null });
+  });
+
+  it.each([0, 4, 301, Number.NaN, "" as unknown as number, null as unknown as number])(
+    "rejects a turn time limit of %j instead of quietly turning it into 5 seconds",
+    (turnTimeLimitSeconds) => {
+      const { room } = createRoom("Host", {});
+      expect(() => updateSettings(room, { turnTimeLimitSeconds })).toThrow(/Turn time limit/);
+      expect(room.settings.turnTimeLimitSeconds).toBe(30);
+    }
+  );
+
+  it("accepts a turn time limit inside the range", () => {
+    const { room } = createRoom("Host", {});
+    for (const seconds of [5, 45, 300]) {
+      updateSettings(room, { turnTimeLimitSeconds: seconds });
+      expect(room.settings.turnTimeLimitSeconds).toBe(seconds);
+    }
+  });
+});

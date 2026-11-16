@@ -6,6 +6,7 @@ import { isTopCenterPosition, playerAtSeat, ringPositionForSeat, ringSeatPositio
 import { copyInviteLink } from "@/lib/invite";
 import { usePlayerStatusLabels } from "@/hooks/usePlayerStatusLabels";
 import { useBoardFit } from "@/hooks/useBoardFit";
+import { useTableScale } from "@/hooks/useTableScale";
 import { useRoomStore } from "@/hooks/useRoomStore";
 import { PlayerSeat } from "./PlayerSeat";
 import { EmptySeat } from "./EmptySeat";
@@ -71,6 +72,10 @@ export function PokerTable({ room, isHost, onRemovePlayer, onSit, onStartHand }:
     .map(({ seat, position }) => (isTopCenterPosition(position) ? playerAtSeat(room.players, seat) : null))
     .find(Boolean) ?? null;
   const tableRef = useRef<HTMLDivElement>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  // Declared before useBoardFit: the board is fitted inside the scaled table,
+  // so the scale has to be in place by the time it measures.
+  useTableScale(wrapRef);
   const eligibleCount = getEligiblePlayers(room.players).length;
   const startError = getStartHandError(room.players);
   const waiting = room.hand.phase === "waiting";
@@ -79,7 +84,10 @@ export function PokerTable({ room, isHost, onRemovePlayer, onSit, onStartHand }:
   const seatObstacleKey = room.players
     .map((p) => `${p.seat}:${p.hasHoleCards ? 1 : 0}${p.holeCardsRevealed ? 1 : 0}${p.handStatus === "folded" ? 1 : 0}`)
     .join("|");
-  useBoardFit(tableRef, topSeatPlayer?.id ?? null, waiting, `${mySeat}|${seatObstacleKey}`);
+  // What's straight across from the viewer: a player, or — for someone who
+  // hasn't sat down yet — a solid "Sit Here" button if that seat is free.
+  const topSeatKey = topSeatPlayer?.id ?? (canSit ? "open-seat" : null);
+  useBoardFit(tableRef, topSeatKey, waiting, `${mySeat}|${seatObstacleKey}`);
   const result = room.hand.result;
   const secondResult = room.hand.secondBoard?.result ?? null;
   // Run 2 is dealt and revealed strictly after run 1 finishes — don't show
@@ -224,7 +232,7 @@ export function PokerTable({ room, isHost, onRemovePlayer, onSit, onStartHand }:
   };
 
   return (
-    <div className="poker-table-wrap">
+    <div className="poker-table-wrap" ref={wrapRef}>
       <div className="poker-table" ref={tableRef}>
         <div className="table-dome-rim absolute inset-0 rounded-[46%] shadow-[0_24px_60px_rgba(0,0,0,0.6)]" />
         <div className="table-dome-surface absolute inset-[4.5%] rounded-[46%]">

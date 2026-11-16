@@ -40,8 +40,9 @@ function intersects(a: Box, b: Box): boolean {
  * for the largest size, nearest the middle, at which the pot and the board
  * touch nobody's seat or cards.
  *
- * `seatKey` identifies who is in the top-centre seat (null when empty) so a
- * different player taking it is measured afresh; `waiting` is true while the
+ * `seatKey` identifies what is in the top-centre seat — a player, or the
+ * "Sit Here" button shown to someone not yet seated (null when it's just a
+ * ghosted empty seat) — so a change there is measured afresh; `waiting` is true while the
  * lobby is showing instead of the pot and boards; `obstacleKey` changes
  * whenever a seat fills, empties, or shows/hides cards.
  */
@@ -56,7 +57,7 @@ export function useBoardFit(
     const board = table?.querySelector<HTMLElement>(".table-board");
     if (!table || !board) return;
     const content = board.querySelector<HTMLElement>(".table-board-content, .table-lobby");
-    const seat = seatKey ? table.querySelector<HTMLElement>('[data-bet-edge="top-center"]') : null;
+    const seat = seatKey ? table.querySelector<HTMLElement>('[data-bet-edge="top-center"], [data-top-seat-button]') : null;
     const own = table.querySelector<HTMLElement>(".self-cards");
     const ownSeat = table.querySelector<HTMLElement>(".self-seat");
 
@@ -125,8 +126,11 @@ export function useBoardFit(
         }
         content.style.setProperty("--board-fit", fit.toFixed(3));
       }
-      board.style.setProperty("--board-pad-top", `${Math.max(0, Math.round(padTop))}px`);
-      board.style.setProperty("--board-pad-bottom", `${Math.max(0, Math.round(padBottom))}px`);
+      // Everything above was measured on screen; the padding is applied
+      // inside the table, which may itself be scaled down (useTableScale).
+      const tableScale = parseFloat(getComputedStyle(table).getPropertyValue("--table-scale")) || 1;
+      board.style.setProperty("--board-pad-top", `${Math.max(0, Math.round(padTop / tableScale))}px`);
+      board.style.setProperty("--board-pad-bottom", `${Math.max(0, Math.round(padBottom / tableScale))}px`);
     };
     measure();
     const observer = new ResizeObserver(measure);

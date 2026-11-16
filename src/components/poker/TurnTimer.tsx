@@ -1,31 +1,39 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { cn } from "@/lib/utils";
 
 interface TurnTimerProps {
   durationSeconds: number;
+  /** When time runs out, on this browser's clock (epoch ms) — the server's
+   * deadline with the clock difference taken off (see `clockOffset` in
+   * useRoomStore). Without it the countdown just shows the full duration. */
+  endsAt?: number | null;
   variant?: "ring" | "pill" | "bar";
   className?: string;
 }
 
-/**
- * A countdown that always starts at `durationSeconds` on mount. The parent
- * remounts this component (via a `key` tied to the turn's deadline) at the
- * start of every turn — this is a purely visual pacing cue, the server is
- * the sole authority on timeouts, so a few hundred ms of network-latency
- * imprecision from not reading the exact deadline is an acceptable trade
- * for never needing to read the clock during render.
- */
-export function TurnTimer({ durationSeconds, variant = "ring", className }: TurnTimerProps) {
-  const [remaining, setRemaining] = useState(durationSeconds);
+function subscribeToTick(onTick: () => void): () => void {
+  const interval = setInterval(onTick, 250);
+  return () => clearInterval(interval);
+}
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setRemaining((s) => Math.max(0, s - 1));
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
+/**
+ * A countdown to `endsAt`. It reads the clock rather than counting its own
+ * ticks, so it is right however it got on screen: a page reloaded halfway
+ * through a turn shows what's actually left (it used to start again from the
+ * full time), and a phone that was locked for twenty seconds comes back
+ * twenty seconds further on (timers don't tick in the background, so it used
+ * to pick up where it left off — and the player was folded "early").
+ *
+ * Still only a display: the server alone decides when time is up.
+ */
+export function TurnTimer({ durationSeconds, endsAt, variant = "ring", className }: TurnTimerProps) {
+  const remaining = useSyncExternalStore(
+    subscribeToTick,
+    () => (endsAt == null ? durationSeconds : Math.max(0, Math.min(durationSeconds, Math.ceil((endsAt - Date.now()) / 1000)))),
+    () => durationSeconds
+  );
 
   const pct = Math.max(0, Math.min(1, remaining / durationSeconds));
   const urgent = pct < 0.25;
@@ -60,6 +68,8 @@ export function TurnTimer({ durationSeconds, variant = "ring", className }: Turn
 
   return (
     <div
+      data-testid="turn-timer"
+      data-seconds-left={remaining}
       className={cn(
         "flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold shadow-[0_4px_16px_rgba(0,0,0,0.4)] backdrop-blur",
         urgent ? "border-[var(--danger)]/50 text-[var(--danger)]" : "border-[var(--accent-lime)]/40 text-[var(--accent-lime)]",

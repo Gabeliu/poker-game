@@ -6,6 +6,7 @@ import { formatChips } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { ActionRequest, ClientRoomView, PokerAction } from "@/lib/types";
 import { getLegalActions } from "@/server/engine/betting";
+import { useRoomStore } from "@/hooks/useRoomStore";
 import { audioManager } from "@/audio/AudioManager";
 import type { SoundEventName } from "@/audio/types";
 import { BetControls } from "./BetControls";
@@ -29,11 +30,21 @@ interface PokerActionsProps {
 export function PokerActions({ room, onAction }: PokerActionsProps) {
   const [raising, setRaising] = useState(false);
   const [pending, setPending] = useState(false);
+  const clockOffset = useRoomStore((s) => s.clockOffset);
+  const turnEndsAt = room.hand.turnDeadline == null ? null : room.hand.turnDeadline - clockOffset;
 
   const myPlayer = room.players.find((p) => p.id === room.you.playerId);
   const isMyTurn = Boolean(myPlayer) && room.hand.activePlayerId === myPlayer!.id;
   const info = myPlayer ? getLegalActions(myPlayer, room.hand, room.settings.bigBlind) : null;
-  const canBetOrRaise = Boolean(info) && (info!.legalActions.includes("bet") || info!.legalActions.includes("raise"));
+  // Betting only means something while someone else can still respond to
+  // it. Once every other player left in the hand is all-in, a raise could
+  // only ever be handed straight back, so it isn't offered.
+  const someoneCanRespond = room.players.some((p) => p.id !== myPlayer?.id && p.handStatus === "active");
+  const canBetOrRaise =
+    Boolean(info) && someoneCanRespond && (info!.legalActions.includes("bet") || info!.legalActions.includes("raise"));
+  // Calling takes the whole stack: that *is* going all-in, so it's one
+  // button saying so, not a "Call" and an "All In" that do the same thing.
+  const callIsAllIn = Boolean(info && myPlayer) && info!.legalActions.includes("call") && info!.callAmount >= myPlayer!.chips;
   const raiseVerb = info?.legalActions.includes("bet") ? "Bet" : "Raise";
   const potTotal = room.players.reduce((s, p) => s + p.totalCommittedThisHand, 0);
 
@@ -56,13 +67,19 @@ export function PokerActions({ room, onAction }: PokerActionsProps) {
   };
 
   // Keyboard shortcuts: F(old), C(heck/all), R(aise) — only live on your turn,
-  // and only when focus isn't in a text field (so typing a raise amount
-  // doesn't also fire a shortcut).
+  // and only for a bare key press aimed at the table itself:
+  //  - not with Ctrl/Cmd/Alt held (Ctrl+F to search the page folded the hand,
+  //    Ctrl+C to copy the room code called, Ctrl+R to reload opened a raise);
+  //  - not while typing in a field, or with a dialog, menu or popover open;
+  //  - not while the raise panel is open (it has its own buttons), and not
+  //    from a key being held down.
   useEffect(() => {
-    if (!isMyTurn || !info || pending) return;
+    if (!isMyTurn || !info || pending || raising) return;
     const handler = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey || e.repeat || e.defaultPrevented) return;
       const target = e.target as HTMLElement | null;
-      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) return;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT" || target.isContentEditable)) return;
+      if (document.querySelector('[role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"]')) return;
       const key = e.key.toLowerCase();
       if (key === "f") run({ action: "fold" });
       else if (key === "c") {
@@ -70,13 +87,12 @@ export function PokerActions({ room, onAction }: PokerActionsProps) {
         else if (info.legalActions.includes("call")) run({ action: "call" });
       } else if (key === "r") {
         if (canBetOrRaise) setRaising(true);
-        else if (info.legalActions.includes("all-in")) run({ action: "all-in" });
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isMyTurn, info, pending, canBetOrRaise]);
+  }, [isMyTurn, info, pending, canBetOrRaise, raising]);
 
   if (!isMyTurn || !myPlayer || !info) return null;
 
@@ -84,20 +100,21 @@ export function PokerActions({ room, onAction }: PokerActionsProps) {
   // not just the small ring on other players' avatars or the desktop-only
   // "Your Turn!" pill.
   const timerBar = (
-    <div className="flex w-full flex-col items-center gap-2">
-      <TurnTimer key={`label-${room.hand.turnDeadline ?? 0}`} durationSeconds={room.settings.turnTimeLimitSeconds} variant="pill" />
+    <div className="turn-timer-stack flex w-full flex-col items-center gap-2">
+      <TurnTimer key={`label-${room.hand.turnDeadline ?? 0}`} durationSeconds={room.settings.turnTimeLimitSeconds} endsAt={turnEndsAt} variant="pill" />
       <TurnTimer
-      key={room.hand.turnDeadline ?? 0}
-      durationSeconds={room.settings.turnTimeLimitSeconds}
-      variant="bar"
-      className="w-full max-w-xs"
+        key={room.hand.turnDeadline ?? 0}
+        durationSeconds={room.settings.turnTimeLimitSeconds}
+        endsAt={turnEndsAt}
+        variant="bar"
+        className="w-full max-w-xs"
       />
     </div>
   );
 
   if (raising && canBetOrRaise) {
     return (
-      <div className="flex w-full max-w-md flex-col items-center gap-1.5">
+      <div className="raise-panel flex w-full max-w-md flex-col items-center gap-1.5">
         {timerBar}
         <BetControls
           minAmount={info.minRaiseToAmount ?? room.settings.bigBlind}
@@ -141,11 +158,11 @@ export function PokerActions({ room, onAction }: PokerActionsProps) {
         {info.legalActions.includes("call") && (
           <ActionButton
             testId="action-call"
-            label={`Call ${formatChips(info.callAmount)}`}
+            label={callIsAllIn ? `Call All-In ${formatChips(info.callAmount)}` : `Call ${formatChips(info.callAmount)}`}
             shortcut="C"
             disabled={pending}
             onClick={() => run({ action: "call" })}
-            tone="neutral"
+            tone={callIsAllIn ? "positive" : "neutral"}
           />
         )}
 
@@ -159,7 +176,7 @@ export function PokerActions({ room, onAction }: PokerActionsProps) {
             tone="positive"
           />
         ) : (
-          info.legalActions.includes("all-in") && (
+          info.legalActions.includes("all-in") && !info.legalActions.includes("call") && (
             <ActionButton
               testId="action-allin"
               // Total committed this street after shoving — matches BetControls'

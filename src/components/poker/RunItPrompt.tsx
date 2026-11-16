@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { TurnTimer } from "./TurnTimer";
 import type { PublicPlayer, RunItChoice, RunItDecision } from "@/lib/types";
+import { useRoomStore } from "@/hooks/useRoomStore";
 
 interface RunItPromptProps {
   decision: RunItDecision;
@@ -11,11 +12,9 @@ interface RunItPromptProps {
   onChoose: (choice: RunItChoice) => Promise<{ ok: true } | { ok: false; error: string }>;
 }
 
-/** Must match RUN_IT_DECISION_SECONDS in handEngine.ts — this is display
- * pacing only (the server is the sole authority on the actual deadline), so
- * a fixed duration keyed on `decision.deadline` (like every other TurnTimer
- * usage in this app) is enough; reading Date.now() during render to compute
- * an exact remaining count is neither necessary nor pure. */
+/** Must match RUN_IT_DECISION_SECONDS in handEngine.ts — the length of the
+ * bar; how much of it is left comes from the decision's own deadline. This
+ * is display pacing only: the server is the sole authority on the deadline. */
 const RUN_IT_DECISION_SECONDS = 10;
 
 /** Shown to the two all-in players (and, read-only, everyone else) while a
@@ -28,10 +27,12 @@ export function RunItPrompt({ decision, players, myPlayerId, onChoose }: RunItPr
   const [firstId, secondId] = decision.eligiblePlayerIds;
   const amEligible = myPlayerId != null && decision.eligiblePlayerIds.includes(myPlayerId);
   const myChoice = myPlayerId ? decision.choices[myPlayerId] : undefined;
+  const clockOffset = useRoomStore((s) => s.clockOffset);
   const timer = (
     <TurnTimer
       key={decision.deadline}
       durationSeconds={RUN_IT_DECISION_SECONDS}
+      endsAt={decision.deadline - clockOffset}
       variant="bar"
       className="w-full max-w-xs"
     />

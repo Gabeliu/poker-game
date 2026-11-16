@@ -11,6 +11,7 @@ import { ChipStack } from "./ChipStack";
 import { PlayerStatus } from "./PlayerStatus";
 import { TurnTimer } from "./TurnTimer";
 import { ConfirmRemoveDialog } from "./ConfirmRemoveDialog";
+import { useRoomStore } from "@/hooks/useRoomStore";
 import { RunResultTags } from "./RunResultTags";
 import { Crown, WifiOff, X } from "lucide-react";
 
@@ -59,6 +60,7 @@ export function PlayerSeat({
   isRunItTwice,
 }: PlayerSeatProps) {
   const [confirmingRemove, setConfirmingRemove] = useState(false);
+  const clockOffset = useRoomStore((s) => s.clockOffset);
   // Cards already in this player's hand when the seat first renders (a
   // reload mid-hand) appear in place; only cards dealt while watching
   // animate. Re-arms once the hand empties.
@@ -123,7 +125,12 @@ export function PlayerSeat({
         <div className="relative">
           {isActiveTurn && !folded && (
             <div className="absolute -inset-1.5 rounded-full">
-              <TurnTimer key={turnDeadline ?? 0} durationSeconds={turnTimeLimitSeconds} variant="ring" />
+              <TurnTimer
+                key={turnDeadline ?? 0}
+                durationSeconds={turnTimeLimitSeconds}
+                endsAt={turnDeadline == null ? null : turnDeadline - clockOffset}
+                variant="ring"
+              />
             </div>
           )}
           <PlayerAvatar name={player.displayName} size="table" dimmed={folded || sittingOut} />

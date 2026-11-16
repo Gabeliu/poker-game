@@ -90,7 +90,11 @@ export function BetControls({
   const behind = playerChips - (amount - playerCurrentBet);
 
   return (
-    <div className="animate-in slide-in-from-bottom-2 fade-in flex w-full min-w-[17.5rem] max-w-md flex-col gap-2.5 rounded-2xl border border-white/10 bg-black/55 p-3 shadow-[0_12px_32px_rgba(0,0,0,0.5)] backdrop-blur-xl duration-200">
+    // Two groups — choosing the amount, and the shortcuts + confirm — stacked
+    // by default; on a short desktop window the stylesheet sets them side by
+    // side (see .bet-controls) so the panel doesn't take the table's room.
+    <div className="bet-controls animate-in slide-in-from-bottom-2 fade-in flex w-full min-w-[17.5rem] max-w-md flex-col gap-2.5 rounded-2xl border border-white/10 bg-black/55 p-3 shadow-[0_12px_32px_rgba(0,0,0,0.5)] backdrop-blur-xl duration-200">
+      <div className="bet-controls-group flex flex-col gap-2.5">
       <p className="text-xs text-[var(--text-secondary)]">
         {currentBetAmount > 0 && (
           <>
@@ -98,7 +102,7 @@ export function BetControls({
             {" · "}
           </>
         )}
-        Min raise to <span className="text-[var(--text-primary)]">{formatChips(minAmount)}</span>
+        {actionLabel === "Raise" ? "Min raise to" : "Min bet"} <span className="text-[var(--text-primary)]">{formatChips(minAmount)}</span>
       </p>
 
       <div className="flex items-center gap-2">
@@ -143,7 +147,9 @@ export function BetControls({
         onChange={(e) => setClamped(Number(e.target.value))}
         className="h-1.5 w-full cursor-pointer accent-[var(--accent-lime)]"
       />
+      </div>
 
+      <div className="bet-controls-group flex flex-col gap-2.5">
       <div className="flex gap-1.5">
         {[
           { label: "½ Pot", value: potTotal / 2 },
@@ -163,7 +169,7 @@ export function BetControls({
         ))}
       </div>
 
-      <p className="text-center text-xs text-[var(--text-secondary)]">
+      <p className="bet-controls-behind text-center text-xs text-[var(--text-secondary)]">
         You&apos;ll have <span className="font-semibold text-[var(--text-primary)]">{formatChips(Math.max(0, behind))}</span> behind
       </p>
 
@@ -183,6 +189,7 @@ export function BetControls({
         >
           {actionLabel === "Raise" ? "Raise to" : actionLabel} {formatChips(amount)}
         </button>
+      </div>
       </div>
     </div>
   );

@@ -46,7 +46,21 @@ button:active:not(:disabled) { translate: 0 1px; }
 .chat-panel input { padding-block: 11px; }
 
 .table-stage { position: relative; flex: 1; min-height: 0; container-type: size; display: flex; flex-direction: column; align-items: center; justify-content: center; background: radial-gradient(ellipse at 50% 48%, #19422b33, transparent 69%), repeating-linear-gradient(45deg, #ffffff01 0 1px, transparent 1px 5px); }
-.poker-table-wrap { width: 100%; display: flex; align-items: center; justify-content: center; }
+/* The table and everything on it is drawn at the size it was designed for
+   and then scaled as one piece (useTableScale sets --table-scale) when the
+   space left for it is smaller than that — a laptop-height window, or the
+   action bar growing for the raise panel or a showdown summary. Seats have a
+   minimum size, so merely shrinking the felt underneath them piled them on
+   top of each other and pushed the far seat's cards up into the header.
+   Sized in the stage's own units and divided by the scale, so at any scale it
+   exactly fills the stage; it is also the container the table measures itself
+   against, which is what makes the layout inside come out the same at every
+   scale. */
+/* Floats over the top of the table area rather than taking a row of it: the
+   table fills the stage exactly, so anything else in the flow would push it
+   out of the bottom. */
+.host-banner { position: absolute; z-index: 20; top: 8px; left: 50%; transform: translateX(-50%); width: max-content; max-width: calc(100% - 24px); background-color: #1a0f0ef2; }
+.poker-table-wrap { flex: none; width: calc(100cqw / var(--table-scale, 1)); height: calc(100cqh / var(--table-scale, 1)); zoom: var(--table-scale, 1); container-type: size; display: flex; align-items: center; justify-content: center; }
 .poker-table { position: relative; width: min(calc(100cqw - 112px), calc((100cqh - 75px) * 1.8)); aspect-ratio: 1.8; container-type: size; }
 .poker-table > .table-dome-rim { inset: 7% 0; border-radius: 46%; }
 .poker-table > .table-dome-surface { inset: 11% 3%; border-radius: 46%; }
@@ -191,7 +205,13 @@ button:active:not(:disabled) { translate: 0 1px; }
 .poker-action-danger { background: linear-gradient(#302422, #211a19); color: #d6aaa4; border: 1px solid #90534a55; box-shadow: 0 3px 0 #110e0d, 0 8px 20px #0006; }
 .poker-action-positive { background: linear-gradient(var(--accent-lime), #9bc73d); color: #1a2810; box-shadow: 0 3px 0 #3c5425, 0 8px 24px #a5dc371c; }
 .poker-action-neutral { background: linear-gradient(#29352c, #19211c); }
-.winner-summary { max-height: 150px; overflow-y: auto; border-color: #d0bb8940; }
+.winner-summary { max-height: 150px; overflow-y: auto; border-color: #d0bb8940; scrollbar-width: thin; scrollbar-color: #d0bb8966 transparent; }
+/* A full table's worth of results: smaller cards and tighter rows, so most
+   or all of them are on screen without scrolling. */
+.winner-summary-compact { gap: 6px 14px; padding: 8px 12px; }
+.winner-summary-compact > div { gap: 8px; font-size: 12px; }
+.winner-summary-compact [role="img"] { width: 28px; height: 40px; font-size: 10px; border-radius: 5px; }
+.winner-summary-compact p + p, .winner-summary-compact [data-testid="per-run-result"] { font-size: 11px; }
 /* The everyday top-up button under the stack: a real, finger-sized button
    in the action colour — it used to be 10px grey text that players missed. */
 .buy-chips-button { height: 36px; padding-inline: 12px; gap: 5px; border: 1px solid #b5ea4855; border-radius: 10px; background: #b5ea4814; color: var(--accent-lime); font-size: 12px; font-weight: 600; white-space: nowrap; }
@@ -285,6 +305,36 @@ button:active:not(:disabled) { translate: 0 1px; }
 
 @keyframes seat-arrive { from { transform: scale(.92); } to { transform: scale(1); } }
 @keyframes card-reveal { from { transform: perspective(600px) rotateY(65deg); } to { transform: perspective(600px) rotateY(0); } }
+/* Short desktop windows (a laptop with the browser's toolbars takes a 768px
+   screen down to about 650): the action bar gives height back to the table.
+   Everything in it stays, just closer together — the raise panel sets its
+   two halves side by side where there's width for that. */
+/* The seat straight across is the one with no room above it: its run-it-twice
+   tags go beside its cards instead of under them, so the cards stay where
+   they are (below the header) when a hand is run twice. */
+@media (min-width: 768px) {
+  .player-seat[data-bet-edge="top-center"] .opponent-cards .run-tags { position: absolute; left: calc(100% + 4px); top: 50%; transform: translateY(-50%); flex-direction: column; gap: 3px; }
+}
+@media (min-width: 768px) and (max-height: 780px) {
+  .action-area { padding: 10px 18px 12px; }
+  .action-dock { min-height: 48px; }
+  .dock-stack { gap: 5px; }
+  .dock-stack [data-testid="your-stack"] { flex-direction: row; align-items: baseline; gap: 7px; padding-block: 4px; }
+  .dock-stack .buy-chips-button { height: 30px; }
+  .turn-timer-stack { gap: 5px; }
+  .poker-action { height: 46px; }
+  .raise-panel { max-width: 660px; }
+  .raise-panel .turn-timer-stack > :first-child { display: none; }
+  .bet-controls { max-width: 660px; display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); align-items: end; gap: 8px 16px; padding: 9px 12px; }
+  .bet-controls-group { gap: 7px; }
+  .bet-controls-behind { display: none; }
+  /* Every result list gets the compact rows here, not just a long one. */
+  .winner-summary { max-height: 112px; gap: 6px 14px; padding: 8px 12px; }
+  .winner-summary > div { gap: 8px; font-size: 12px; }
+  .winner-summary [role="img"] { width: 28px; height: 40px; font-size: 10px; border-radius: 5px; }
+  .winner-summary p + p, .winner-summary [data-testid="per-run-result"] { font-size: 11px; }
+  .bust-callout { padding-block: 8px; }
+}
 @media (min-width: 1600px) { .room-header { padding-inline: 30px; } .table-lobby { gap: 10px; } .table-lobby h1 { font-size: 36px; } .table-stakes { font-size: 25px; } }
 @media (max-width: 1200px) { .room-header > div:first-child { flex-basis: 95px; } .room-header { padding-inline: 15px; } .room-header > div:last-child { gap: 2px; } .poker-table { width: min(calc(100cqw - 72px), calc((100cqh - 60px) * 1.65)); aspect-ratio: 1.65; } .empty-seat, .seat-panel { width: 88px; } .table-lobby { gap: 4px; } .table-lobby .room-eyebrow:first-child { display: none; } .room-title { position: static; transform: none; flex: 1; text-align: left; padding-left: 12px; } .room-title-meta { justify-content: flex-start; } .poker-action { min-width: 84px; padding-inline: 12px; } }
 @media (min-width: 768px) and (max-width: 1050px) { .room-sidebar { display: none; } .game-client > div > .md\:hidden { display: flex; } .room-header > div:last-child > button span { display: none; } }

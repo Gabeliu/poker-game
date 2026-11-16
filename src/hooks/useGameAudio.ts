@@ -6,6 +6,7 @@ import { audioManager } from "@/audio/AudioManager";
 import { panForPlayer } from "@/lib/seatLayout";
 import { boardResultKey } from "@/lib/resultKey";
 import { canResolveSeatClaim } from "@/lib/seatClaims";
+import { useRoomStore } from "@/hooks/useRoomStore";
 
 interface PlayerSnapshot {
   handStatus: string;
@@ -166,7 +167,8 @@ export function useGameAudio(room: ClientRoomView | null): void {
 
   useEffect(() => {
     if (!isMyTurn || !turnDeadline) return;
-    const remaining = turnDeadline - Date.now();
+    // The deadline is the server's time; take the clock difference off.
+    const remaining = turnDeadline - useRoomStore.getState().clockOffset - Date.now();
     const fireAt = remaining - 5000;
     if (fireAt <= 0) return;
     const timeoutId = window.setTimeout(() => audioManager.play("timer-low"), fireAt);

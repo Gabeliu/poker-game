@@ -5,7 +5,29 @@ import { formatChips } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { PublicPlayer } from "@/lib/types";
 
-export function PlayerListPanel({ players, meId }: { players: PublicPlayer[]; meId: string | null }) {
+/** One line on where a player stands. During a hand that includes whether
+ * they're still in it — the list used to say "Ready" next to someone who had
+ * folded, or who was all-in with nothing left. */
+function statusFor(p: PublicPlayer, handInProgress: boolean): string {
+  if (p.connectionStatus === "disconnected") return "Offline";
+  if (handInProgress && p.handStatus === "all-in") return "All-in";
+  if (handInProgress && p.handStatus === "folded") return "Folded";
+  if (p.sittingOut) return "Sitting out";
+  if (!p.hasBoughtIn) return "Awaiting buy-in";
+  if (p.chips <= 0 && p.handStatus !== "all-in" && p.handStatus !== "active") return "Out of chips";
+  if (handInProgress) return p.handStatus === "active" ? "In the hand" : "Waiting for next hand";
+  return "Ready";
+}
+
+export function PlayerListPanel({
+  players,
+  meId,
+  handInProgress = false,
+}: {
+  players: PublicPlayer[];
+  meId: string | null;
+  handInProgress?: boolean;
+}) {
   const sorted = [...players].sort((a, b) => (a.seat ?? 99) - (b.seat ?? 99));
 
   return (
@@ -31,7 +53,7 @@ export function PlayerListPanel({ players, meId }: { players: PublicPlayer[]; me
                 {p.id === meId ? " (you)" : ""}
               </p>
               <p className="text-[10px] tabular-nums text-[var(--text-secondary)]">
-                {p.isHost ? "Host · " : ""}{p.connectionStatus === "disconnected" ? "Offline" : p.sittingOut ? "Sitting out" : !p.hasBoughtIn ? "Awaiting buy-in" : p.chips <= 0 && p.handStatus !== "all-in" && p.handStatus !== "active" ? "Out of chips" : "Ready"}
+                {p.isHost ? "Host · " : ""}{statusFor(p, handInProgress)}
               </p>
             </div>
             <span className="text-xs tabular-nums text-[var(--text-primary)]">{formatChips(p.chips)}</span>

@@ -299,6 +299,10 @@ export interface ClientRoomView extends Omit<RoomState, "players"> {
    * would touch every server-side literal that builds one); the client uses
    * it to drop a stale view that arrives after a newer one already landed. */
   stateVersion: number;
+  /** The server's clock when this view was built (epoch ms). Deadlines in
+   * the view are server times; a browser whose own clock is off, or which
+   * was asleep for a while, uses this to tell how long is really left. */
+  serverNow: number;
 }
 
 // ---------- Player actions ----------

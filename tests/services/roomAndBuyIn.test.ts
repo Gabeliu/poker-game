@@ -327,3 +327,13 @@ describe("hand history", () => {
     expect(hostNet + guestNet).toBe(0);
   });
 });
+
+describe("what a client is sent", () => {
+  it("carries the server's clock, so a browser can read deadlines against it rather than its own", () => {
+    const { room, playerId } = createRoom("Gabriel", {});
+    const before = Date.now();
+    const view = buildClientView(room, playerId);
+    expect(view.serverNow).toBeGreaterThanOrEqual(before);
+    expect(view.serverNow).toBeLessThanOrEqual(Date.now());
+  });
+});

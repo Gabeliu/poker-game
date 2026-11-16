@@ -84,7 +84,7 @@ export default function Home() {
   };
 
   const handleJoin = () => {
-    const code = joinCode.trim().toUpperCase();
+    const code = cleanRoomCode(joinCode);
     if (!code) return;
     setLoadingText("Joining table…");
     router.push(`/table/${code}`);
@@ -208,9 +208,19 @@ export default function Home() {
                   <div className="flex gap-2 pt-1">
                     <Input
                       value={joinCode}
-                      onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                      // Room codes are letters and digits only. Anything else
+                      // (a space, a slash from a mangled paste) used to go
+                      // straight into the address and land on the wrong page.
+                      onChange={(e) => setJoinCode(cleanRoomCode(e.target.value))}
+                      // A whole invite link pasted here: take the code out of it.
+                      onPaste={(e) => {
+                        const fromLink = /\/table\/([A-Za-z0-9]+)/.exec(e.clipboardData.getData("text"));
+                        if (fromLink) {
+                          e.preventDefault();
+                          setJoinCode(cleanRoomCode(fromLink[1]));
+                        }
+                      }}
                       placeholder="Enter room code"
-                      maxLength={8}
                       autoFocus
                       className="h-12 flex-1 text-center font-mono text-base tracking-[0.3em]"
                       onKeyDown={(e) => e.key === "Enter" && handleJoin()}
@@ -220,7 +230,7 @@ export default function Home() {
                       data-testid="landing-join-submit"
                       className="h-12 shrink-0 bg-[var(--accent-lime)] px-4 text-[var(--accent-lime-foreground)] hover:bg-[var(--accent-lime)]/90 font-semibold"
                       onClick={handleJoin}
-                      disabled={!joinCode.trim()}
+                      disabled={!cleanRoomCode(joinCode)}
                     >
                       <ArrowRight className="h-4 w-4" />
                     </Button>
@@ -349,4 +359,8 @@ function FeatureCard({ icon, title, body }: { icon: React.ReactNode; title: stri
       <p>{body}</p>
     </div>
   );
+}
+
+function cleanRoomCode(text: string): string {
+  return text.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
 }

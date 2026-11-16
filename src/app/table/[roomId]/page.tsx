@@ -313,7 +313,7 @@ export default function TablePage({ params }: { params: Promise<{ roomId: string
           left={
             <>
               <HandHistoryPanel entries={room.you.handHistory} />
-              <PlayerListPanel players={room.players} meId={room.you.playerId} />
+              <PlayerListPanel players={room.players} meId={room.you.playerId} handInProgress={room.status === "in-hand"} />
             </>
           }
           right={<ChatPanel messages={room.chatMessages} meId={room.you.playerId} onSend={sendChat} />}

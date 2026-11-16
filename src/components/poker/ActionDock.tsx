@@ -176,7 +176,7 @@ export function ActionDock({ room, isHost, onAction, onStartHand, onSitOut, onRe
         )}
       </div>
 
-      <div className="flex w-20 shrink-0 flex-col items-end gap-1.5 sm:w-32">
+      <div className="dock-stack flex w-20 shrink-0 flex-col items-end gap-1.5 sm:w-32">
         {me?.hasBoughtIn && (
           <>
             <div
@@ -278,7 +278,13 @@ function ResultSummary({ room }: { room: ClientRoomView }) {
   // Show everyone who put chips in this hand, winner or not, so a player
   // who lost can see their real loss instead of just disappearing.
   const contributors = room.players.filter((p) => p.totalCommittedThisHand > 0);
-  const summaries = summarizeHandResult(contributors, result, secondResult);
+  // Winners first, then whoever else showed their cards, then those who
+  // folded: with a full table the list can be longer than the space for it
+  // (it scrolls), and who won with what is the part nobody should have to
+  // scroll for.
+  const rank = (s: { playerId: string; netChange: number }) =>
+    s.netChange > 0 ? 0 : result.revealedHands[s.playerId] ? 1 : 2;
+  const summaries = [...summarizeHandResult(contributors, result, secondResult)].sort((a, b) => rank(a) - rank(b));
   const isRunItTwice = Boolean(secondResult);
 
   return (
@@ -286,6 +292,8 @@ function ResultSummary({ room }: { room: ClientRoomView }) {
       data-testid="hand-result-summary"
       className={cn(
         "winner-summary flex flex-wrap items-center justify-center gap-3 rounded-2xl border border-[var(--accent-lime)]/30 bg-black/55 px-5 py-3 text-center shadow-[0_12px_32px_rgba(0,0,0,0.5)] backdrop-blur-xl",
+        // Five or more results: smaller rows, so more of them fit at once.
+        summaries.length > 4 && "winner-summary-compact",
         !isRunItTwice && summaries.filter((s) => s.netChange > 0).length === 1 && "animate-winner-pulse"
       )}
     >

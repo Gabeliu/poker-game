@@ -31,6 +31,13 @@ Repo: [github.com/Gabeliu/poker-game](https://github.com/Gabeliu/poker-game)
   ask for the seat back; the host approves, or rejects with a reason the player is shown
 - Survives backgrounded mobile tabs: the client resyncs on focus/visibility/reconnect using a
   state version so a stale snapshot can never overwrite a newer one
+- Fits the window it's given: on a laptop-height screen, or when the action bar grows for the raise
+  panel or a showdown summary, the whole table scales down as one piece instead of the seats
+  piling onto each other
+- Turn countdowns follow the server's clock, so they stay right after a reload, after a phone has
+  been locked, and on a device whose own clock is wrong
+- Keyboard shortcuts on your turn (F fold, C check/call, R raise) — bare keys only, so Ctrl+F or
+  Ctrl+C never plays your hand for you
 - Chat, per-player hand history, sounds, and host controls (kicks are only allowed between hands,
   with a confirmation step)
 
@@ -163,7 +170,8 @@ token, retires the old ones, and signs the previous browser out; the seat itself
 - `e2e/*.spec.ts` — real multi-browser-context Playwright flows: the full multiplayer lifecycle,
   net results, mid-hand rebuys, network-drop resync, host-leaving notification, run-it-twice
   (agree / disagree / timeout / sequential reveal), sound behavior, and layout checks at desktop
-  and mobile sizes.
+  and mobile sizes — including a full eight-seat table on a laptop-sized window, where no seat
+  may overlap another, the board, or the edge of the table area.
 
 ## Known limitations
 

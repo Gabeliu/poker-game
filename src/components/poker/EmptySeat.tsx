@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import type { ArcPosition } from "@/lib/seatLayout";
+import { isTopCenterPosition, type ArcPosition } from "@/lib/seatLayout";
 import { Plus } from "lucide-react";
 
 interface EmptySeatProps {
@@ -70,6 +70,10 @@ export function EmptySeat({ position, canSit, onSit, canInvite, onInvite }: Empt
       title={canSit ? "Take this seat" : "Invite a player to this seat"}
       data-testid="empty-seat"
       data-seat-action={canSit ? "sit" : "invite"}
+      // A solid "Sit Here" button straight across the table sits right on top
+      // of whatever is drawn in the middle; the board layout steers round it
+      // the same way it does for a player sitting there (see useBoardFit).
+      data-top-seat-button={canSit && isTopCenterPosition(position) ? "" : undefined}
     >
       {content}
     </button>
